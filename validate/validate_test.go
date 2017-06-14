@@ -102,46 +102,34 @@ func TestCheckSubstitutionTemplate(t *testing.T) {
 		steps         []*cb.BuildStep
 		substitutions map[string]string
 		wantErr       bool
-		wantWarnings  int
 	}{{
 		steps: []*cb.BuildStep{{Name: "$_FOO"}},
 		substitutions: map[string]string{
 			"_FOO": "Bar",
 		},
-		wantWarnings: 0,
+		wantErr: false,
 	}, {
-		steps:        []*cb.BuildStep{{Name: "$$FOO"}},
-		wantWarnings: 0,
+		steps:   []*cb.BuildStep{{Name: "$$FOO"}},
+		wantErr: false,
 	}, {
 		steps:         []*cb.BuildStep{{Name: "$_FOO"}},
 		substitutions: map[string]string{}, // missing substitution
-		wantWarnings:  1,
+		wantErr:       true,
 	}, {
 		steps: []*cb.BuildStep{{Name: "Baz"}}, // missing variable in template
 		substitutions: map[string]string{
 			"_FOO": "Bar",
 		},
-		wantWarnings: 1,
-	}, {
-		// missing variable in template and missing variable in map
-		steps: []*cb.BuildStep{{Name: "$_BAZ"}},
-		substitutions: map[string]string{
-			"_FOO": "Bar",
-		},
-		wantWarnings: 2,
+		wantErr: true,
 	}, {
 		steps:         []*cb.BuildStep{{Name: "$FOO"}}, // invalid built-in substitution
 		substitutions: map[string]string{},
 		wantErr:       true,
 	}} {
-		warnings, err := CheckSubstitutionTemplate(c.images, c.steps, c.substitutions)
-		if err == nil && c.wantErr {
+		if err := CheckSubstitutionTemplate(c.images, c.steps, c.substitutions); err == nil && c.wantErr {
 			t.Errorf("CheckSubstitutionTemplate(%v,%v,%v) did not return error", c.images, c.steps, c.substitutions)
 		} else if err != nil && !c.wantErr {
 			t.Errorf("CheckSubstitutionTemplate(%v,%v,%v) got unexpected error: %v", c.images, c.steps, c.substitutions, err)
-		}
-		if !c.wantErr && len(warnings) != c.wantWarnings {
-			t.Errorf("CheckSubstitutionTemplate(%v,%v,%v) did not return the correct number of warnings; got %d, want %d", c.images, c.steps, c.substitutions, len(warnings), c.wantWarnings)
 		}
 	}
 }
@@ -235,25 +223,6 @@ func TestValidateBuild(t *testing.T) {
 			Images: manyStrings(maxNumImages + 1),
 		},
 		valid: false,
-	}, {
-		build: &cb.Build{
-			Id: "check-substitutions-failure",
-			Steps: []*cb.BuildStep{{
-				Name: "$_UNKNOWN_SUBSTITUTION $_ANOTHER_ONE",
-			}},
-		},
-		valid: false,
-	}, {
-		build: &cb.Build{
-			Id: "check-substitutions-failure",
-			Steps: []*cb.BuildStep{{
-				Name: "$_UNKNOWN_SUBSTITUTION $_ANOTHER_ONE",
-			}},
-			Options: &cb.BuildOptions{
-				SubstitutionOption: cb.BuildOptions_ALLOW_LOOSE,
-			},
-		},
-		valid: true,
 	}}
 	for _, tc := range testCases {
 		b := tc.build
