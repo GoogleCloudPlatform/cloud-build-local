@@ -1,0 +1,5 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ["build", "-t", "$_IMAGE", "."]
+- name: 'gcr.io/cloud-builders/docker'
+  args: ["push", "$_IMAGE"]
