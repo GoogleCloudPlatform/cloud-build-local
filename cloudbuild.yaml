@@ -10,7 +10,7 @@ steps:
   args:
   - '-c'
   - |
-    $ for GOOS in darwin linux windows; do
+    for GOOS in darwin linux windows; do
         for GOARCH in 386 amd64; do
             go build -o container-builder-local_$$GOOS_$$GOARCH-$COMMIT_SHA
         done

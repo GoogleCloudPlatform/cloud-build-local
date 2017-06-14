@@ -15,6 +15,7 @@
 package gcloud
 
 import (
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -26,11 +27,13 @@ type mockRunner struct {
 	t            *testing.T
 	testCaseName string
 	commands     []string
+	projectID    string
 }
 
-func newMockRunner(t *testing.T) *mockRunner {
+func newMockRunner(t *testing.T, projectID string) *mockRunner {
 	return &mockRunner{
-		t: t,
+		t:         t,
+		projectID: projectID,
 	}
 }
 
@@ -53,8 +56,8 @@ func (r *mockRunner) Run(args []string, in io.Reader, out, err io.Writer, _ stri
 	r.mu.Unlock()
 
 	if startsWith(args, "gcloud", "config", "list") {
-		io.WriteString(out, `my-project-id
-`)
+		io.WriteString(out, fmt.Sprintf(`%s
+`, r.projectID))
 	} else if startsWith(args, "gcloud", "projects", "describe") {
 		io.WriteString(out, `1234
 `)
@@ -76,7 +79,7 @@ func (r *mockRunner) Clean() error {
 }
 
 func TestAccessToken(t *testing.T) {
-	r := newMockRunner(t)
+	r := newMockRunner(t, "")
 	if _, err := AccessToken(r); err != nil {
 		t.Errorf("AccessToken failed: %v", err)
 	}
@@ -88,7 +91,7 @@ func TestAccessToken(t *testing.T) {
 }
 
 func TestProjectInfo(t *testing.T) {
-	r := newMockRunner(t)
+	r := newMockRunner(t, "my-project-id")
 	projectInfo, err := ProjectInfo(r)
 	if err != nil {
 		t.Errorf("ProjectInfo failed: %v", err)
@@ -104,5 +107,13 @@ func TestProjectInfo(t *testing.T) {
 		`gcloud projects describe my-project-id --format value(projectNumber)`}, "\n")
 	if got != want {
 		t.Errorf("Commands didn't match!\n===Want:\n%s\n===Got:\n%s", want, got)
+	}
+}
+
+func TestProjectInfoError(t *testing.T) {
+	r := newMockRunner(t, "")
+	_, err := ProjectInfo(r)
+	if err == nil {
+		t.Errorf("ProjectInfo should fail when no projectId set in gcloud")
 	}
 }

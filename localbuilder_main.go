@@ -95,11 +95,13 @@ func main() {
 	}
 
 	// Parse substitutions.
-	substMap, err := common.ParseSubstitutionsFlag(*substitutions)
-	if err != nil {
-		log.Fatal(err)
+	if *substitutions != "" {
+		substMap, err := common.ParseSubstitutionsFlag(*substitutions)
+		if err != nil {
+			log.Fatal(err)
+		}
+		buildConfig.Substitutions = substMap
 	}
-	buildConfig.Substitutions = substMap
 
 	// Validate the build.
 	if err := validate.CheckBuild(buildConfig); err != nil {
@@ -157,6 +159,10 @@ func main() {
 	go supplyTokenToMetadata(metadataUpdater, r)
 
 	b.Start()
+
+	if *dryRun == true {
+		log.Printf("This was a dry run. Add --dryrun=false if you want to run the build.")
+	}
 }
 
 // supplyTokenToMetadata gets gcloud token and supply it to the metadata server.

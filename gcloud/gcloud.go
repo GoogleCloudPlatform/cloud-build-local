@@ -17,6 +17,7 @@ package gcloud
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -44,6 +45,10 @@ func ProjectInfo(r runner.Runner) (metadata.ProjectInfo, error) {
 		return metadata.ProjectInfo{}, err
 	}
 	projectID := strings.TrimSpace(idb.String())
+
+	if projectID == "" {
+		return metadata.ProjectInfo{}, fmt.Errorf("no project is set in gcloud, use 'gcloud config set project my-project'")
+	}
 
 	cmd = []string{"gcloud", "projects", "describe", projectID, "--format", "value(projectNumber)"}
 	if err := r.Run(cmd, nil, &numb, os.Stderr, ""); err != nil {
