@@ -7,34 +7,5 @@ steps:
     find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath|integration-test" | xargs /builder/bin/go.bash test
 - name: 'gcr.io/cloud-builders/go:wheezy'
   args: ['install', 'github.com/GoogleCloudPlatform/container-builder-local']
-- name: 'gcr.io/cloud-builders/docker'
-  entrypoint: 'bash'
-  args:
-  - '-c'
-  - |
-    mkdir /test
-    cd /test
-    cp /workspace/integration-test/* .
-    cp /workspace/gopath/bin/container-builder-local .
-    ./container-builder-local --substitutions="_IMAGE=test" --config=cloudbuild.yaml --dryrun=false .
-    docker images
-# - name: 'gcr.io/cloud-builders/gcloud'
-#   args:
-#   - 'compute'
-#   - 'instances'
-#   - 'create'
-#   - 'test-philmod'
-#   - '--project'
-#   - 'argo-local-builder'
-#   - '--zone'
-#   - 'us-central1-a'
-#   - '--machine-type'
-#   - 'n1-standard-1'
-#   - '--image'
-#   - 'ubuntu-1704'
 - name: 'gcr.io/cloud-builders/gsutil'
   args: ['cp', './gopath/bin/container-builder-local', 'gs://container-builder-local/container-builder-local-$COMMIT_SHA']
-- name: 'busybox'
-  args: ['ls', '-alh']
-- name: 'busybox'
-  args: ['ls', '-alh', '/test']
