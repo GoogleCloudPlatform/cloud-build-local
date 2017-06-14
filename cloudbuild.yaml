@@ -1,6 +1,6 @@
 steps:
 - name: 'gcr.io/cloud-builders/go'
-  args: ['install', 'localbuild_main']
+  args: ['install', 'main']
   env: ['GOPATH=.']
 - name: 'gcr.io/cloud-builders/go'
   args: ['test']
