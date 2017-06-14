@@ -7,8 +7,8 @@ steps:
   - '-c'
   - |
     find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath|integration-test" | xargs /builder/bin/go.bash test
-- name: 'gcr.io/cloud-builders/go:wheezy'
-  args: ['install', 'github.com/GoogleCloudPlatform/container-builder-local']
+#- name: 'gcr.io/cloud-builders/go:wheezy'
+#  args: ['install', 'github.com/GoogleCloudPlatform/container-builder-local']
 - name: 'gcr.io/cloud-builders/go:wheezy'
   entrypoint: 'bash'
   args:
@@ -20,6 +20,7 @@ steps:
             /builder/bin/go.bash build -o container-builder-local_$${GOOS}_$${GOARCH}-$COMMIT_SHA github.com/GoogleCloudPlatform/container-builder-local
         done
     done
+    GOOS=darwin GOARCH=386 /builder/bin/go.bash build -o container-builder-local_yo github.com/GoogleCloudPlatform/container-builder-local
 - name: 'ubuntu'
   entrypoint: 'bash'
   args:
