@@ -27,16 +27,16 @@ import (
 	"golang.org/x/oauth2"
 	"github.com/google/uuid"
 
-	"build/build"
-	"buildlog/buildlog"
-	"common/common"
-	"config/config"
-	"gcloud/gcloud"
-	"metadata/metadata"
-	"runner/runner"
-	"subst/subst"
-	"validate/validate"
-	"volume/volume"
+	"container-builder-local/build/build"
+	"container-builder-local/buildlog/buildlog"
+	"container-builder-local/common/common"
+	"container-builder-local/config/config"
+	"container-builder-local/gcloud/gcloud"
+	"container-builder-local/metadata/metadata"
+	"container-builder-local/runner/runner"
+	"container-builder-local/subst/subst"
+	"container-builder-local/validate/validate"
+	"container-builder-local/volume/volume"
 )
 
 const (

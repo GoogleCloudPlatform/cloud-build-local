@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"runner/runner"
+	"container-builder-local/runner/runner"
 
 	"golang.org/x/oauth2"
 )
