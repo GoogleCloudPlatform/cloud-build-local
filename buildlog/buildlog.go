@@ -27,7 +27,7 @@ import (
 	"sync"
 	"time"
 
-	"container-builder-local/common/common"
+	"./common/common"
 )
 
 const (

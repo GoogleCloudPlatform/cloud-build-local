@@ -18,7 +18,7 @@ package volume
 import (
 	"fmt"
 
-	"container-builder-local/runner/runner"
+	"./runner/runner"
 )
 
 const (

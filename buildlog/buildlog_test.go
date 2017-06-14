@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"container-builder-local/common/common"
+	"./common/common"
 )
 
 
