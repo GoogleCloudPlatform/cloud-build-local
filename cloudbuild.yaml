@@ -1,5 +1,14 @@
 steps:
 - name: 'gcr.io/cloud-builders/go'
+  args:
+  - 'get'
+  - 'golang.org/x/oauth2'
+  - 'github.com/google/uuid'
+  - 'gopkg.in/yaml.v2'
+  - 'google.golang.org/api/cloudkms/v1'
+  - 'google.golang.org/api/cloudbuild/v1'
+  env: ['GOPATH=.']
+- name: 'gcr.io/cloud-builders/go'
   args: ['install', '...']
   env: ['GOPATH=.']
 - name: 'gcr.io/cloud-builders/go'
