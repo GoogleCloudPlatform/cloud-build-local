@@ -15,7 +15,7 @@ steps:
     mkdir /test
     cd /test
     cp /workspace/integration-test/* .
-    cp /workspace/container-builder-local .
+    cp /workspace/gopath/bin/container-builder-local .
     ./container-builder-local --substitutions="_IMAGE=test" --config=cloudbuild.yaml --dryrun=false .
     docker images
 # - name: 'gcr.io/cloud-builders/gcloud'
