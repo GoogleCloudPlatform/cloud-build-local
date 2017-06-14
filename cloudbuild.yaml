@@ -1,4 +1,8 @@
 steps:
+- name: 'busybox'
+  args: ['makedir', '-p', '/worspace/src/container-builder-local']
+- name: 'busybox'
+  args: ['cp', '/workspace/.', '/worspace/src/container-builder-local']
 - name: 'gcr.io/cloud-builders/go'
   args:
   - 'get'
@@ -15,7 +19,7 @@ steps:
 - name: 'busybox'
   args: ['ls', 'src/']
 - name: 'gcr.io/cloud-builders/go'
-  args: ['install', '...']
+  args: ['install', 'container-builder-local']
   env: ['GOPATH=.']
 - name: 'busybox'
   args: ['ls', 'pkg/']
