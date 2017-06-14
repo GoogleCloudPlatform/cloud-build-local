@@ -4,7 +4,7 @@ steps:
 - name: 'busybox'
   args: ['ls', '/workspace/']
 - name: 'busybox'
-  args: ['cp', '/workspace/*', '/worspace/src/container-builder-local/']
+  args: ['mv', '-v', '/workspace/*', '/worspace/src/container-builder-local/']
 - name: 'gcr.io/cloud-builders/go'
   args:
   - 'get'
