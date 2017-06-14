@@ -18,7 +18,7 @@ package volume
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/container-builder-local/runner
+	"github.com/GoogleCloudPlatform/container-builder-local/runner"
 )
 
 const (

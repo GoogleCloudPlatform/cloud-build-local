@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/container-builder-local/runner
+	"github.com/GoogleCloudPlatform/container-builder-local/runner"
 
 	"golang.org/x/oauth2"
 )
