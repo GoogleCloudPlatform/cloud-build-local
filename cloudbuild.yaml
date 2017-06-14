@@ -8,7 +8,7 @@ steps:
   - |
     go list ./... | grep -v /vendor/
 - name: 'gcr.io/cloud-builders/go:wheezy'
-  args: ['test', 'runner']
+  args: ['test', './runner']
 # - name: 'gcr.io/cloud-builders/go:wheezy'
 #   entrypoint: 'bash'
 #   args:
