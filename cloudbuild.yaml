@@ -2,29 +2,10 @@ steps:
 - name: 'gcr.io/cloud-builders/go:wheezy'
   args: ['install', 'github.com/GoogleCloudPlatform/container-builder-local']
 - name: 'gcr.io/cloud-builders/go:wheezy'
-  args: ['test', './build']
-- name: 'gcr.io/cloud-builders/go:wheezy'
   entrypoint: 'bash'
   args:
   - '-c'
   - |
-    # go test .
-    for dir in */
-    do
-      package=./${dir%/}
-      echo ${package}
-      # go test ${package}
-    done
-
-    # go test ./build
-    # go test ./buildlog
-    # go test ./config
-    go test ./volume
-
-    # go test ./...
-
-    # find . -type d -maxdepth 1 | grep -Ev "vendor|.git" | xargs go test
-# - name: 'gcr.io/cloud-builders/go:wheezy'
-#   args: ['test', './...']
+    find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath" | xargs /builder/bin/go.bash test
 - name: 'busybox'
   args: ['ls', './gopath/bin']
