@@ -14,13 +14,13 @@ steps:
   args: ['ls', '.']
 - name: 'busybox'
   args: ['ls', 'src/']
+- name: 'gcr.io/cloud-builders/go'
+  args: ['install', '...']
+  env: ['GOPATH=.']
 - name: 'busybox'
   args: ['ls', 'pkg/']
 - name: 'busybox'
   args: ['ls', 'bin']
-- name: 'gcr.io/cloud-builders/go'
-  args: ['install', '...']
-  env: ['GOPATH=.']
 - name: 'gcr.io/cloud-builders/go'
   args: ['test', '...']
   env: ['GOPATH=.']
