@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"google3/net/proto2/go/jsonpb"
+	"github.com/golang/protobuf/jsonpb"
 
 	"gopkg.in/yaml.v2"
 
