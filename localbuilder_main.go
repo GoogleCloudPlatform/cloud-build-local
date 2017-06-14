@@ -27,16 +27,16 @@ import (
 	"golang.org/x/oauth2"
 	"github.com/google/uuid"
 
-	"github.com/GoogleCloudPlatform/container-builder-local/build/build"
-	"github.com/GoogleCloudPlatform/container-builder-local/buildlog/buildlog"
-	"github.com/GoogleCloudPlatform/container-builder-local/common/common"
-	"github.com/GoogleCloudPlatform/container-builder-local/config/config"
-	"github.com/GoogleCloudPlatform/container-builder-local/gcloud/gcloud"
-	"github.com/GoogleCloudPlatform/container-builder-local/metadata/metadata"
-	"github.com/GoogleCloudPlatform/container-builder-local/runner/runner"
-	"github.com/GoogleCloudPlatform/container-builder-local/subst/subst"
-	"github.com/GoogleCloudPlatform/container-builder-local/validate/validate"
-	"github.com/GoogleCloudPlatform/container-builder-local/volume/volume"
+	"github.com/GoogleCloudPlatform/container-builder-local/build
+	"github.com/GoogleCloudPlatform/container-builder-local/buildlog
+	"github.com/GoogleCloudPlatform/container-builder-local/common
+	"github.com/GoogleCloudPlatform/container-builder-local/config
+	"github.com/GoogleCloudPlatform/container-builder-local/gcloud
+	"github.com/GoogleCloudPlatform/container-builder-local/metadata
+	"github.com/GoogleCloudPlatform/container-builder-local/runner
+	"github.com/GoogleCloudPlatform/container-builder-local/subst
+	"github.com/GoogleCloudPlatform/container-builder-local/validate
+	"github.com/GoogleCloudPlatform/container-builder-local/volume
 )
 
 const (

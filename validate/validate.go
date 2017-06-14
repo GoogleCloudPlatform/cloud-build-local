@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	cb "google.golang.org/api/cloudbuild/v1"
-	"github.com/GoogleCloudPlatform/container-builder-local/subst/subst"
+	"github.com/GoogleCloudPlatform/container-builder-local/subst
 )
 
 const (
