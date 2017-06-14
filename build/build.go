@@ -44,8 +44,9 @@ const (
 	containerWorkspaceDir = "/workspace"
 
 	// homeVolume is the name of the Docker volume that contains the build's
-	// $HOME directory, mounted in as /home.
+	// $HOME directory, mounted in as /builder/home.
 	homeVolume = "homevol"
+	homeDir    = "/builder/home"
 
 	// maxPushRetries is the maximum number of times we retry pushing an image
 	// in the face of gcr.io DNS lookup errors.
@@ -240,9 +241,9 @@ func (b *Build) UpdateDockerAccessToken(tok string) error {
 		var buf bytes.Buffer
 		args := []string{"docker", "run",
 			// Mount in the home volume.
-			"--volume", homeVolume + ":/home",
-			// Make /home $HOME.
-			"--env", "HOME=/home",
+			"--volume", homeVolume + ":" + homeDir,
+			// Make /builder/home $HOME.
+			"--env", "HOME=" + homeDir,
 			// Make sure the container uses the correct docker daemon.
 			"--volume", "/var/run/docker.sock:/var/run/docker.sock",
 			"gcr.io/cloud-builders/docker",
@@ -279,9 +280,9 @@ func (b *Build) dockerPull(tag string, outWriter, errWriter io.Writer) (string, 
 	// Pull from within a container with $HOME mounted.
 	args := []string{"docker", "run",
 		// Mount in the home volume.
-		"--volume", homeVolume + ":/home",
-		// Make /home $HOME.
-		"--env", "HOME=/home",
+		"--volume", homeVolume + ":" + homeDir,
+		// Make /builder/home $HOME.
+		"--env", "HOME=" + homeDir,
 		// Make sure the container uses the correct docker daemon.
 		"--volume", "/var/run/docker.sock:/var/run/docker.sock",
 		"gcr.io/cloud-builders/docker",
@@ -368,9 +369,9 @@ func (b *Build) dockerPushWithRetries(tag string, attempt int) (string, error) {
 	// Push from within a container with $HOME mounted.
 	args := []string{"docker", "run",
 		// Mount in the home volume.
-		"--volume", homeVolume + ":/home",
-		// Make /home $HOME.
-		"--env", "HOME=/home",
+		"--volume", homeVolume + ":" + homeDir,
+		// Make /builder/home $HOME.
+		"--env", "HOME=" + homeDir,
 		// Make sure the container uses the correct docker daemon.
 		"--volume", "/var/run/docker.sock:/var/run/docker.sock",
 		"gcr.io/cloud-builders/docker",
@@ -621,6 +622,9 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 	for _, env := range step.Env {
 		args = append(args, "--env", env)
 	}
+	for _, vol := range step.Volumes {
+		args = append(args, "--volume", fmt.Sprintf("%s:%s", vol.Name, vol.Path))
+	}
 	if step.Entrypoint != "" {
 		args = append(args, "--entrypoint", step.Entrypoint)
 	}
@@ -638,18 +642,40 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 }
 
 func (b *Build) runBuildSteps() error {
-	defer b.cleanBuildSteps()
-
 	// Create the home volume.
-	vol := volume.New(homeVolume, b.Runner)
-	if err := vol.Setup(); err != nil {
+	homeVol := volume.New(homeVolume, b.Runner)
+	if err := homeVol.Setup(); err != nil {
 		return err
 	}
 	defer func() {
-		if err := vol.Close(); err != nil {
+		if err := homeVol.Close(); err != nil {
 			log.Printf("Failed to delete homevol: %v", err)
 		}
 	}()
+
+	// Create all the volumes referenced by all steps and defer cleanup.
+	
+	allVolumes := map[string]bool{}
+	for _, step := range b.Request.Steps {
+		for _, v := range step.Volumes {
+			if !allVolumes[v.Name] {
+				allVolumes[v.Name] = true
+				vol := volume.New(v.Name, b.Runner)
+				if err := vol.Setup(); err != nil {
+					return err
+				}
+				defer func(v *volume.Volume, volName string) {
+					if err := v.Close(); err != nil {
+						log.Printf("Failed to delete volume %q: %v", volName, err)
+					}
+				}(vol, v.Name)
+			}
+		}
+	}
+
+	// Clean the build steps before trying to delete the volume used by the
+	// running containers.
+	defer b.cleanBuildSteps()
 
 	b.HasMultipleSteps = len(b.Request.Steps) > 1
 	errors := make(chan error)
@@ -714,9 +740,9 @@ func (b *Build) dockerRunArgs(stepDir string, idx int) []string {
 		// filepath.Join would produce an incorrect result.
 		"--workdir", path.Join(containerWorkspaceDir, stepDir),
 		// Mount in the home volume.
-		"--volume", homeVolume+":/home",
-		// Make /home $HOME.
-		"--env", "HOME=/home",
+		"--volume", homeVolume+":"+homeDir,
+		// Make /builder/home $HOME.
+		"--env", "HOME="+homeDir,
 		// Link in the spoofed metadata container to provide GCE metadata.
 		"--link", "metadata:metadata.google.internal",
 		// Run in privileged mode per discussion in b/31267381.

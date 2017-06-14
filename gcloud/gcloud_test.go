@@ -56,11 +56,11 @@ func (r *mockRunner) Run(args []string, in io.Reader, out, err io.Writer, _ stri
 	r.mu.Unlock()
 
 	if startsWith(args, "gcloud", "config", "list") {
-		io.WriteString(out, fmt.Sprintf(`%s
-`, r.projectID))
+		fmt.Fprintln(out, r.projectID)
 	} else if startsWith(args, "gcloud", "projects", "describe") {
-		io.WriteString(out, `1234
-`)
+		fmt.Fprintln(out, "1234")
+	} else if startsWith(args, "gcloud", "auth", "application-default", "print-access-token") {
+		fmt.Fprintln(out, "my-token")
 	}
 
 	return nil
@@ -80,8 +80,12 @@ func (r *mockRunner) Clean() error {
 
 func TestAccessToken(t *testing.T) {
 	r := newMockRunner(t, "")
-	if _, err := AccessToken(r); err != nil {
+	token, err := AccessToken(r)
+	if err != nil {
 		t.Errorf("AccessToken failed: %v", err)
+	}
+	if token != "my-token" {
+		t.Errorf("AccessToken failed returning the token; got %s, want %s", token, "my-token")
 	}
 	got := strings.Join(r.commands, "\n")
 	want := "gcloud auth application-default print-access-token"

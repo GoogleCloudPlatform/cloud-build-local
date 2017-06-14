@@ -33,7 +33,7 @@ func AccessToken(r runner.Runner) (string, error) {
 	if err := r.Run(cmd, nil, &tb, os.Stderr, ""); err != nil {
 		return "", err
 	}
-	return tb.String(), nil
+	return strings.TrimSpace(tb.String()), nil
 }
 
 // ProjectInfo gets the project id and number from local gcloud.

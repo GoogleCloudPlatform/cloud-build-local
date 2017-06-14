@@ -15,6 +15,7 @@
 package validate
 
 import (
+	"errors"
 	"math/rand"
 	"strings"
 	"testing"
@@ -26,6 +27,7 @@ const (
 	projectID  = "valid-project"
 	projectNum = int64(12345)
 	userID     = int64(67890)
+	kmsKeyName = "projects/my-project/locations/global/keyRings/my-key-ring/cryptoKeys/my-crypto-key"
 )
 
 func randSeq(n int) string {
@@ -451,6 +453,129 @@ func TestCheckBuildSteps(t *testing.T) {
 			Dir:  strings.Repeat("a", maxDirLength+1),
 		}},
 		wantErr: true,
+	}, {
+		// happy build with volumes.
+		steps: []*cb.BuildStep{{
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+		}},
+	}, {
+		// happy build with more volumes.
+		steps: []*cb.BuildStep{{
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+		}},
+	}, {
+		// fails because volume isn't used 2+ times
+		steps: []*cb.BuildStep{{
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+		}},
+		wantErr: true,
+	}, {
+		// fails because volume isn't used 2+ times, even when another is
+		steps: []*cb.BuildStep{{
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "othervol", Path: "/foo"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "othervol", Path: "/foo"}},
+		}},
+		wantErr: true,
+	}, {
+		// fails because volume name is invalid
+		steps: []*cb.BuildStep{{
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "@#()*$@)(*$@", Path: "/foo"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "@#()*$@)(*$@", Path: "/foo"}},
+		}},
+		wantErr: true,
+	}, {
+		// fails because volume path is invalid
+		steps: []*cb.BuildStep{{
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "myvol", Path: ")(!*!)($*@#"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+		}},
+		wantErr: true,
+	}, {
+		// fails because volume path is reserved
+		steps: []*cb.BuildStep{{
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "myvol", Path: "/workspace"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+		}},
+		wantErr: true,
+	}, {
+		// fails because volume path starts with /cloudbuild/
+		steps: []*cb.BuildStep{{
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "myvol", Path: "/cloudbuild/foo"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+		}},
+		wantErr: true,
+	}, {
+		// fails because volume path is not absolute
+		steps: []*cb.BuildStep{{
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "myvol", Path: "/absolute"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*cb.Volume{{Name: "myvol", Path: "relative"}},
+		}},
+		wantErr: true,
+	}, {
+		// fails because volume name is specified twice in the same step
+		steps: []*cb.BuildStep{{
+			Name: "okay",
+			Volumes: []*cb.Volume{
+				{Name: "myvol", Path: "/foo"},
+				{Name: "myvol", Path: "/bar"},
+			},
+		}, {
+			Name: "okay",
+			Volumes: []*cb.Volume{
+				{Name: "myvol", Path: "/foo"},
+				{Name: "othervol", Path: "/bar"},
+			},
+		}},
+		wantErr: true,
+	}, {
+		// fails because volume path is specified twice in the same step
+		steps: []*cb.BuildStep{{
+			Name: "okay",
+			Volumes: []*cb.Volume{
+				{Name: "myvol", Path: "/foo"},
+				{Name: "othervol", Path: "/foo"},
+			},
+		}, {
+			Name: "okay",
+			Volumes: []*cb.Volume{
+				{Name: "myvol", Path: "/foo"},
+				{Name: "othervol", Path: "/bar"},
+			},
+		}},
+		wantErr: true,
 	}} {
 		if err := CheckBuildSteps(c.steps); err == nil && c.wantErr {
 			t.Errorf("CheckBuildSteps(%v) did not return error", c.steps)
@@ -493,5 +618,181 @@ func makeTestBuild(buildID string) *cb.Build {
 			Args: []string{"gcr.io/some/image/tag2"},
 		}},
 		Images: []string{"gcr.io/some/image/tag", "gcr.io/some/image/tag2"},
+	}
+}
+
+func TestCheckSecrets(t *testing.T) {
+	for _, c := range []struct {
+		desc    string
+		b       *cb.Build
+		wantErr error
+	}{{
+		desc: "Build with no secrets",
+		b:    &cb.Build{},
+	}, {
+		desc: "Build with one secret, used once",
+		b: &cb.Build{
+			Steps: []*cb.BuildStep{{
+				SecretEnv: []string{"MY_SECRET"},
+			}},
+			Secrets: []*cb.Secret{{
+				KmsKeyName: kmsKeyName,
+				SecretEnv: map[string][]byte{
+					"MY_SECRET": []byte("hunter2"),
+				},
+			}},
+		},
+	}, {
+		desc: "Build with one secret, never used",
+		b: &cb.Build{
+			Secrets: []*cb.Secret{{
+				KmsKeyName: kmsKeyName,
+				SecretEnv: map[string][]byte{
+					"MY_SECRET": []byte("hunter2"),
+				},
+			}},
+		},
+		wantErr: errors.New(`secretEnv "MY_SECRET" is defined without being used`),
+	}, {
+		desc: "Build with no secrets, but secret is used",
+		b: &cb.Build{
+			Steps: []*cb.BuildStep{{
+				SecretEnv: []string{"MY_SECRET"},
+			}},
+		},
+		wantErr: errors.New(`secretEnv "MY_SECRET" is used without being defined`),
+	}, {
+		desc: "Build with secret defined twice with different keys",
+		b: &cb.Build{
+			Secrets: []*cb.Secret{{
+				KmsKeyName: kmsKeyName,
+				SecretEnv: map[string][]byte{
+					"MY_SECRET": []byte("hunter2"),
+				},
+			}, {
+				KmsKeyName: kmsKeyName + "-2",
+				SecretEnv: map[string][]byte{
+					"MY_SECRET": []byte("hunter3"),
+				},
+			}},
+		},
+		wantErr: errors.New(`secretEnv "MY_SECRET" is defined more than once`),
+	}, {
+		desc: "Build with secret without any secret_envs",
+		b: &cb.Build{
+			Secrets: []*cb.Secret{{
+				KmsKeyName: kmsKeyName,
+			}},
+		},
+		wantErr: errors.New("secret 0 defines no secretEnvs"),
+	}, {
+		desc: "Build with secret key defined twice",
+		b: &cb.Build{
+			Secrets: []*cb.Secret{{
+				KmsKeyName: kmsKeyName,
+				SecretEnv: map[string][]byte{
+					"MY_SECRET": []byte("hunter2"),
+				},
+			}, {
+				KmsKeyName: kmsKeyName,
+				SecretEnv: map[string][]byte{
+					"ANOTHER_SECRET": []byte("hunter3"),
+				},
+			}},
+		},
+		wantErr: errors.New(`kmsKeyName "projects/my-project/locations/global/keyRings/my-key-ring/cryptoKeys/my-crypto-key" is used by more than one secret`),
+	}, {
+		desc: "Build with secret_env specified twice in the same step",
+		b: &cb.Build{
+			Steps: []*cb.BuildStep{{
+				SecretEnv: []string{"MY_SECRET", "MY_SECRET"},
+			}},
+			Secrets: []*cb.Secret{{
+				KmsKeyName: kmsKeyName,
+				SecretEnv: map[string][]byte{
+					"MY_SECRET": []byte("hunter2"),
+				},
+			}},
+		},
+		wantErr: errors.New(`Step 0 uses the secretEnv "MY_SECRET" more than once`),
+	}, {
+		desc: "Build with secret value >1 KB",
+		b: &cb.Build{
+			Steps: []*cb.BuildStep{{
+				SecretEnv: []string{"MY_SECRET"},
+			}},
+			Secrets: []*cb.Secret{{
+				KmsKeyName: kmsKeyName,
+				SecretEnv: map[string][]byte{
+					"MY_SECRET": []byte(strings.Repeat("a", 2000)),
+				},
+			}},
+		},
+		wantErr: errors.New(`secretEnv value for "MY_SECRET" cannot exceed 1KB`),
+	}, {
+		desc: "Build with >10 secret values",
+		b: &cb.Build{
+			Steps: []*cb.BuildStep{{
+				SecretEnv: []string{"MY_SECRET_1", "MY_SECRET_2", "MY_SECRET_3", "MY_SECRET_4", "MY_SECRET_5", "MY_SECRET_6", "MY_SECRET_7", "MY_SECRET_8", "MY_SECRET_9", "MY_SECRET_10", "MY_SECRET_11"},
+			}},
+			Secrets: []*cb.Secret{{
+				KmsKeyName: kmsKeyName,
+				SecretEnv: map[string][]byte{
+					"MY_SECRET_1":  []byte("hunter1"),
+					"MY_SECRET_2":  []byte("hunter1"),
+					"MY_SECRET_3":  []byte("hunter1"),
+					"MY_SECRET_4":  []byte("hunter1"),
+					"MY_SECRET_5":  []byte("hunter1"),
+					"MY_SECRET_6":  []byte("hunter1"),
+					"MY_SECRET_7":  []byte("hunter1"),
+					"MY_SECRET_8":  []byte("hunter1"),
+					"MY_SECRET_9":  []byte("hunter1"),
+					"MY_SECRET_10": []byte("hunter1"),
+					"MY_SECRET_11": []byte("hunter1"),
+				},
+			}},
+		},
+		wantErr: errors.New("build defines more than ten secret values"),
+	}, {
+		desc: "Step has env and secret_env collision",
+		b: &cb.Build{
+			Steps: []*cb.BuildStep{{
+				Env:       []string{"MY_SECRET=awesome"},
+				SecretEnv: []string{"MY_SECRET"},
+			}},
+			Secrets: []*cb.Secret{{
+				KmsKeyName: kmsKeyName,
+				SecretEnv: map[string][]byte{
+					"MY_SECRET": []byte("hunter2"),
+				},
+			}},
+		},
+		wantErr: errors.New(`step 0 has secret and non-secret env "MY_SECRET"`),
+	}, {
+		desc: "Build has secret and non-secret env in separate steps (which is okay)",
+		b: &cb.Build{
+			Steps: []*cb.BuildStep{{
+				Env: []string{"MY_SECRET=awesome"},
+			}, {
+				SecretEnv: []string{"MY_SECRET"},
+			}},
+			Secrets: []*cb.Secret{{
+				KmsKeyName: kmsKeyName,
+				SecretEnv: map[string][]byte{
+					"MY_SECRET": []byte("hunter2"),
+				},
+			}},
+		},
+	}} {
+		gotErr := checkSecrets(c.b)
+		if gotErr == nil && c.wantErr != nil {
+			t.Errorf("%s\n got %v, want %v", c.desc, gotErr, c.wantErr)
+		} else if gotErr != nil && c.wantErr == nil {
+			t.Errorf("%s\n got %v, want %v", c.desc, gotErr, c.wantErr)
+		} else if gotErr == nil && c.wantErr == nil {
+			// expected
+		} else if gotErr.Error() != c.wantErr.Error() {
+			t.Errorf("%s\n  got %v\n want %v", c.desc, gotErr, c.wantErr)
+		}
 	}
 }
