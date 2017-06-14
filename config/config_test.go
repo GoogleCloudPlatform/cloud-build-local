@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	cb "google.golang.org/api/cloudbuild/v1"
+	cb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 )
 
 func TestLoad(t *testing.T) {

@@ -27,7 +27,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	cb "google.golang.org/api/cloudbuild/v1"
+	cb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 )
 
 // Load loads a config file and transforms it to a build proto.

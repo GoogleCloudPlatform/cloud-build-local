@@ -31,7 +31,7 @@ import (
 	"sync"
 	"time"
 
-	cb "google.golang.org/api/cloudbuild/v1"
+	cb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 
 	"github.com/GoogleCloudPlatform/container-builder-local/buildlog"
 	"github.com/GoogleCloudPlatform/container-builder-local/common"

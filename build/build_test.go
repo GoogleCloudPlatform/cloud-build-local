@@ -32,7 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/container-builder-local/runner"
 	"golang.org/x/oauth2"
 
-	cb "google.golang.org/api/cloudbuild/v1"
+	cb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 )
 
 type mockRunner struct {
