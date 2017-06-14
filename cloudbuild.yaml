@@ -6,6 +6,12 @@ steps:
   args:
   - '-c'
   - |
+    go test ./runner
+- name: 'gcr.io/cloud-builders/go:wheezy'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
     find . -type d -maxdepth 1 | grep -Ev "vendor|.git"
     go test $(find . -type d -maxdepth 1 | grep -Ev "vendor|.git")
 - name: 'busybox'
