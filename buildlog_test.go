@@ -24,7 +24,7 @@ import (
 )
 
 /*
-TODO: Add the following classes of test cases.
+TODO(jasmuth): Add the following classes of test cases.
 - close the stream with no output at all
 - send a stream of only \n
 - send non-ascii

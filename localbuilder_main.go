@@ -145,7 +145,7 @@ func main() {
 	// we're building a docker image that depends on a private image.
 	// This step requires docker-credential-gcr to be installed:
 	// `gcloud components install docker-credential-gcr`
-	// TODO: refresh as necessary, instead of a constant interval.
+	
 	go func() {
 		for ; ; time.Sleep(tokenRefreshDur) {
 			if err := b.UpdateDockerAccessToken(); err != nil {
@@ -169,7 +169,7 @@ func supplyTokenToMetadata(metadataUpdater metadata.RealUpdater, r runner.Runner
 		}
 		token := oauth2.Token{
 			AccessToken: accessToken,
-			// TODO: Use a more appropriate expiration
+			
 			// https://developers.google.com/identity/sign-in/web/backend-auth#calling-the-tokeninfo-endpoint
 			Expiry: time.Now().Add(2 * tokenRefreshDur),
 		}

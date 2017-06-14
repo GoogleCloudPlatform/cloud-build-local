@@ -245,7 +245,7 @@ func (b *Build) imageIsLocal(tag string) bool {
 }
 
 func (b *Build) dockerPull(tag string, outWriter, errWriter io.Writer) (string, error) {
-	// TODO: When spoofed metadata is available, before removing
+	
 	// docker cred file, do this in a container with spoofed metadata and run
 	// "gcloud docker pull"
 	var buf bytes.Buffer
@@ -508,7 +508,7 @@ func (b *Build) getKMSClient() (kms, error) {
 		return b.kms, nil
 	}
 
-	// TODO(jasonhall,b/33233310): Use the google.DefaultClient helper which
+	
 	// automatically gets (and refreshes) credentials from the metadata server
 	// when spoofing metadata works by IP. Until then, we'll just fetch the token
 	// and pass it to all HTTP requests.
@@ -599,7 +599,7 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 						errors <- fmt.Errorf("Plaintext was not base64-decodeable: %v", err)
 						return
 					}
-					// TODO(jasonhall,b/37552668): Handle decrypted values with spaces by quoting env values.
+					
 					args = append(args, "--env", fmt.Sprintf("%s=%s", se, string(dec)))
 					break
 				}
