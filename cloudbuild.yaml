@@ -1,11 +1,4 @@
 steps:
-- name: 'busybox'
-  args: ['mkdir', '-p', 'src/container-builder-local']
-- name: 'busybox'
-  args: ['ls', 'src/']
-# don't use busybox which fails with mv.
-- name: 'ubuntu'
-  args: ['cp', '.', 'src/container-builder-local/']
 - name: 'gcr.io/cloud-builders/go'
   args:
   - 'get'
@@ -24,14 +17,10 @@ steps:
 - name: 'gcr.io/cloud-builders/go'
   args: ['install', 'container-builder-local']
   env: ['GOPATH=.']
-- name: 'busybox'
-  args: ['ls', 'pkg/']
-- name: 'busybox'
-  args: ['ls', 'bin']
-- name: 'gcr.io/cloud-builders/go'
-  args: ['test', '...']
-  env: ['GOPATH=.']
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '--tag=gcr.io/$PROJECT_ID/container-builder-local', '.']
+#- name: 'gcr.io/cloud-builders/go'
+#  args: ['test', '...']
+#  env: ['GOPATH=.']
+#- name: 'gcr.io/cloud-builders/docker'
+#  args: ['build', '--tag=gcr.io/$PROJECT_ID/container-builder-local', '.']
 
 images: ['gcr.io/$PROJECT_ID/container-builder-local']
