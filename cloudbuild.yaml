@@ -1,9 +1,9 @@
 steps:
 - name: 'gcr.io/cloud-builders/go'
-  args: ['install']
+  args: ['install', 'localbuild_main']
   env: ['GOPATH=.']
 - name: 'gcr.io/cloud-builders/go'
-  args: ['test', 'container-builder-local']
+  args: ['test']
   env: ['GOPATH=.']
 - name: 'gcr.io/cloud-builders/docker'
   args: ['build', '--tag=gcr.io/$PROJECT_ID/container-builder-local', '.']
