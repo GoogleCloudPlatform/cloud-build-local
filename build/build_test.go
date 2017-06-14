@@ -1217,69 +1217,6 @@ func TestStripTagDigest(t *testing.T) {
 	}
 }
 
-func TestSecrets(t *testing.T) {
-	t.Parallel()
-	kmsKeyName := "projects/my-project/locations/global/keyRings/my-key-ring/cryptoKeys/my-crypto-key"
-	for _, c := range []struct {
-		name        string
-		plaintext   string
-		kmsErr      error
-		wantErr     error
-		wantCommand string
-	}{{
-		name: "Happy case",
-		wantCommand: dockerRunInStepDir(0, "") +
-			" --env MY_SECRET=sup3rs3kr1t" +
-			" gcr.io/my-project/my-builder",
-		plaintext: base64.StdEncoding.EncodeToString([]byte("sup3rs3kr1t")),
-		kmsErr:    nil,
-	}, {
-		name:    "KMS returns error",
-		kmsErr:  errors.New("kms failure"),
-		wantErr: fmt.Errorf(`Failed to decrypt "MY_SECRET" using key %q: kms failure`, kmsKeyName),
-	}, {
-		name:      "KMS returns non-base64 response",
-		plaintext: "This is not valid base64!",
-		kmsErr:    nil,
-		wantErr:   fmt.Errorf("Plaintext was not base64-decodeable: illegal base64 data at input byte 4"),
-	}} {
-		// All tests use the same build request.
-		buildRequest := cb.Build{
-			Steps: []*cb.BuildStep{{
-				Name:      "gcr.io/my-project/my-builder",
-				SecretEnv: []string{"MY_SECRET"},
-			}},
-			Secrets: []*cb.Secret{{
-				KmsKeyName: kmsKeyName,
-				SecretEnv: map[string][]byte{
-					"MY_SECRET": []byte("this is encrypted"),
-				},
-			}},
-		}
-
-		var gotCommand string
-		r := newMockRunner(t, c.name)
-		r.dockerRunHandler = func(args []string, _, _ io.Writer) error {
-			gotCommand = strings.Join(args, " ")
-			return nil
-		}
-		b := New(r, buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, false)
-		b.kms = fakeKMS{
-			plaintext: c.plaintext,
-			err:       c.kmsErr,
-		}
-
-		err := b.runBuildSteps()
-		if !reflect.DeepEqual(err, c.wantErr) {
-			t.Errorf("%s: Unexpected error\n got %v\nwant %v", c.name, err, c.wantErr)
-		}
-
-		if !reflect.DeepEqual(gotCommand, c.wantCommand) {
-			t.Errorf("%s: Unexpected command\n got %s\nwant: %s", c.name, c.wantCommand, gotCommand)
-		}
-	}
-}
-
 type fakeKMS struct {
 	plaintext string
 	err       error

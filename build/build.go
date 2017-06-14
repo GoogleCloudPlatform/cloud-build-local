@@ -17,7 +17,6 @@ package build
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -573,38 +572,6 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 	}
 	if step.Entrypoint != "" {
 		args = append(args, "--entrypoint", step.Entrypoint)
-	}
-
-	// If the step specifies any secrets, decrypt them and pass the plaintext
-	// values as envs.
-	if len(step.SecretEnv) > 0 {
-		kms, err := b.getKMSClient()
-		if err != nil {
-			errors <- err
-			return
-		}
-		for _, se := range step.SecretEnv {
-			// Figure out which KMS key to use to decrypt the value. Admin's validations in CreateBuild
-			// previously validated that one and only one secret is defined for each secretEnv.
-			for _, sec := range b.Request.Secrets {
-				if val, found := sec.SecretEnv[se]; found {
-					kmsKeyName := sec.KmsKeyName
-					plaintext, err := kms.Decrypt(kmsKeyName, base64.StdEncoding.EncodeToString(val))
-					if err != nil {
-						errors <- fmt.Errorf("Failed to decrypt %q using key %q: %v", se, kmsKeyName, err)
-						return
-					}
-					dec, err := base64.StdEncoding.DecodeString(plaintext)
-					if err != nil {
-						errors <- fmt.Errorf("Plaintext was not base64-decodeable: %v", err)
-						return
-					}
-					
-					args = append(args, "--env", fmt.Sprintf("%s=%s", se, string(dec)))
-					break
-				}
-			}
-		}
 	}
 
 	args = append(args, runTarget)
