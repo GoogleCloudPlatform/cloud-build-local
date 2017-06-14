@@ -5,7 +5,7 @@ steps:
   args: ['ls', '/workspace/src/']
 # don't use busybox which fails with mv.
 - name: 'debian'
-  args: ['mv', '/workspace/*', '/workspace/src/container-builder-local/']
+  args: ['cp', '/workspace/*', '/workspace/src/container-builder-local/']
 - name: 'gcr.io/cloud-builders/go'
   args:
   - 'get'
