@@ -1,0 +1,22 @@
+steps:
+- name: 'gcr.io/cloud-builders/go'
+  args:
+  - 'get'
+  - 'container-builder-local'
+  env: ['PROJECT_ROOT=container-builder-local']
+- name: 'busybox'
+  args: ['pwd']
+- name: 'busybox'
+  args: ['ls', '.']
+- name: 'busybox'
+  args: ['ls', 'src/']
+- name: 'gcr.io/cloud-builders/go'
+  args: ['install', 'container-builder-local']
+  env: ['PROJECT_ROOT=container-builder-local']
+#- name: 'gcr.io/cloud-builders/go'
+#  args: ['test', '...']
+#  env: ['GOPATH=.']
+#- name: 'gcr.io/cloud-builders/docker'
+#  args: ['build', '--tag=gcr.io/$PROJECT_ID/container-builder-local', '.']
+
+images: ['gcr.io/$PROJECT_ID/container-builder-local']
