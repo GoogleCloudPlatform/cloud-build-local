@@ -1,8 +1,4 @@
 steps:
-- name: 'busybox'
-  args: ['pwd']
-- name: 'busybox'
-  args: ['ls']
 - name: 'gcr.io/cloud-builders/go'
   args: ['install', '.']
   env: ['PROJECT_ROOT=.']
