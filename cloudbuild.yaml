@@ -63,5 +63,7 @@ steps:
 #   env:
 #   - 'GOOS=windows'
 #   - 'GOARCH=amd64'
+- name: 'busybox'
+  args: ['ls']
 - name: 'gcr.io/cloud-builders/gsutil'
   args: ['cp', 'container-builder-local_*', 'gs://container-builder-local/']
