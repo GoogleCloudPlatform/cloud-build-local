@@ -6,10 +6,10 @@ steps:
   args:
   - '-c'
   - |
-    go test .
-    for dir in .
+    # go test .
+    for dir in */
     do
-      echo dir
+      echo $dir
     done
     # find . -type d -maxdepth 1 | grep -Ev "vendor|.git" | xargs go test
 - name: 'busybox'
