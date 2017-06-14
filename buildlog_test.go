@@ -23,13 +23,7 @@ import (
 	"logentry"
 )
 
-/*
-TODO(jasmuth): Add the following classes of test cases.
-- close the stream with no output at all
-- send a stream of only \n
-- send non-ascii
-- is there a way to truncate / interrupt the send in an abrupt manner that we expect to cause an error on the recipient?
-*/
+
 
 var (
 	fakeTime = time.Unix(1439323141, 78)
