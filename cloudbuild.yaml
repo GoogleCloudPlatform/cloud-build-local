@@ -6,6 +6,52 @@ steps:
   - |
     find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath|integration-test" | xargs /builder/bin/go.bash test
 - name: 'gcr.io/cloud-builders/go:wheezy'
-  args: ['install', 'github.com/GoogleCloudPlatform/container-builder-local']
+  args:
+  - 'build'
+  - '-o=container-builder-local_linux_386-$COMMIT_SHA'
+  - 'github.com/GoogleCloudPlatform/container-builder-local'
+  env:
+  - 'GOOS=linux'
+  - 'GOARCH=386'
+- name: 'gcr.io/cloud-builders/go:wheezy'
+  args:
+  - 'build'
+  - '-o=container-builder-local_linux_amd64-$COMMIT_SHA'
+  - 'github.com/GoogleCloudPlatform/container-builder-local'
+  env:
+  - 'GOOS=linux'
+  - 'GOARCH=amd64'
+- name: 'gcr.io/cloud-builders/go:wheezy'
+  args:
+  - 'build'
+  - '-o=container-builder-local_darwin_386-$COMMIT_SHA'
+  - 'github.com/GoogleCloudPlatform/container-builder-local'
+  env:
+  - 'GOOS=darwin'
+  - 'GOARCH=386'
+- name: 'gcr.io/cloud-builders/go:wheezy'
+  args:
+  - 'build'
+  - '-o=container-builder-local_darwin_amd64-$COMMIT_SHA'
+  - 'github.com/GoogleCloudPlatform/container-builder-local'
+  env:
+  - 'GOOS=darwin'
+  - 'GOARCH=amd64'
+- name: 'gcr.io/cloud-builders/go:wheezy'
+  args:
+  - 'build'
+  - '-o=container-builder-local_windows_386-$COMMIT_SHA'
+  - 'github.com/GoogleCloudPlatform/container-builder-local'
+  env:
+  - 'GOOS=windows'
+  - 'GOARCH=386'
+- name: 'gcr.io/cloud-builders/go:wheezy'
+  args:
+  - 'build'
+  - '-o=container-builder-local_windows_amd64-$COMMIT_SHA'
+  - 'github.com/GoogleCloudPlatform/container-builder-local'
+  env:
+  - 'GOOS=windows'
+  - 'GOARCH=amd64'
 - name: 'gcr.io/cloud-builders/gsutil'
-  args: ['cp', './gopath/bin/container-builder-local', 'gs://container-builder-local/container-builder-local-$COMMIT_SHA']
+  args: ['cp', 'container-builder-local_*', 'gs://container-builder-local/']
