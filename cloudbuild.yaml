@@ -6,6 +6,11 @@ steps:
   args:
   - '-c'
   - |
-    find . -type d -maxdepth 1 | grep -Ev "vendor|.git" | xargs go test
+    go test .
+    for dir in .
+    do
+      echo dir
+    done
+    # find . -type d -maxdepth 1 | grep -Ev "vendor|.git" | xargs go test
 - name: 'busybox'
   args: ['ls', './gopath/bin']
