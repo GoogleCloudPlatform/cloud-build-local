@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package main runs the gcb local builder.
-package main
+package main // import "github.com/GoogleCloudPlatform/container-builder-local"
 
 import (
 	"bytes"
