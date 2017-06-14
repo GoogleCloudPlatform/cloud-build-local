@@ -1,12 +1,10 @@
 steps:
 - name: 'busybox'
-  args: ['ls', '/workspace/']
-- name: 'busybox'
   args: ['mkdir', '-p', '/worspace/src/container-builder-local']
 - name: 'busybox'
   args: ['ls', '/workspace/']
 - name: 'busybox'
-  args: ['mv', '/workspace/*', '/worspace/src/container-builder-local/']
+  args: ['cp', '/workspace/*', '/worspace/src/container-builder-local/']
 - name: 'gcr.io/cloud-builders/go'
   args:
   - 'get'
