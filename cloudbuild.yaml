@@ -2,7 +2,7 @@ steps:
 - name: 'gcr.io/cloud-builders/go'
   args: ['install', 'github.com/GoogleCloudPlatform/container-builder-local']
 - name: 'gcr.io/cloud-builders/go'
-  args: ['list ./... | grep -v /vendor/']
+  args: ['list', './...']
 - name: 'gcr.io/cloud-builders/go'
   args: ['test', '$(go list ./... | grep -v /vendor/)']
 - name: 'busybox'
