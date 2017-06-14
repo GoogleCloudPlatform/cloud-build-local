@@ -1,13 +1,13 @@
 steps:
-- name: 'gcr.io/cloud-builders/go'
+- name: 'gcr.io/cloud-builders/go:wheezy'
   args: ['install', 'github.com/GoogleCloudPlatform/container-builder-local']
-- name: 'gcr.io/cloud-builders/go'
+- name: 'gcr.io/cloud-builders/go:wheezy'
   entrypoint: 'bash'
   args:
   - '-c'
   - |
     go list ./... | grep -v /vendor/
-- name: 'gcr.io/cloud-builders/go'
+- name: 'gcr.io/cloud-builders/go:wheezy'
   entrypoint: 'bash'
   args:
   - '-c'
