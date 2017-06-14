@@ -6,7 +6,7 @@ steps:
   args:
   - '-c'
   - |
-    go test ./runner
+    go test ./runner ./volume ./config
 - name: 'gcr.io/cloud-builders/go:wheezy'
   entrypoint: 'bash'
   args:
