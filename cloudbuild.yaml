@@ -5,7 +5,7 @@ steps:
   args: ['ls', 'src/']
 # don't use busybox which fails with mv.
 - name: 'ubuntu'
-  args: ['cp', '*', 'src/container-builder-local/']
+  args: ['cp', '.', 'src/container-builder-local/']
 - name: 'gcr.io/cloud-builders/go'
   args:
   - 'get'
