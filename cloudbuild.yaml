@@ -2,6 +2,6 @@ steps:
 - name: 'gcr.io/cloud-builders/go'
   args: ['install', 'github.com/GoogleCloudPlatform/container-builder-local']
 - name: 'gcr.io/cloud-builders/go'
-  args: ['test', 'github.com/GoogleCloudPlatform/container-builder-local']
+  args: ['test', './...']
 - name: 'busybox'
-  args: ['ls', '$GOPATH/bin/']
+  args: ['ls', './gopath/bin']
