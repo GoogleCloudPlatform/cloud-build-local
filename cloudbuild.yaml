@@ -21,6 +21,8 @@ steps:
     # go test ./config
     # go test ./volume
 
+    go test ./...
+
     # find . -type d -maxdepth 1 | grep -Ev "vendor|.git" | xargs go test
 - name: 'busybox'
   args: ['ls', './gopath/bin']
