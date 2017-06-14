@@ -8,6 +8,10 @@ steps:
   - 'google.golang.org/api/cloudkms/v1'
   - 'google.golang.org/api/cloudbuild/v1'
   env: ['GOPATH=.']
+- name: 'busybox'
+  args: ['pwd']
+- name: 'busybox'
+  args: ['ls', '.']
 - name: 'gcr.io/cloud-builders/go'
   args: ['install', '...']
   env: ['GOPATH=.']
