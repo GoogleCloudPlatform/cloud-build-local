@@ -9,7 +9,7 @@ steps:
     # go test .
     for dir in */
     do
-      package=./${dir}
+      package=./${dir%/}
       echo ${package}
       go test ${package}
     done
