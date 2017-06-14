@@ -2,18 +2,6 @@ steps:
 - name: 'gcr.io/cloud-builders/go:wheezy'
   args: ['install', 'github.com/GoogleCloudPlatform/container-builder-local']
 - name: 'gcr.io/cloud-builders/go:wheezy'
-  entrypoint: 'bash'
-  args:
-  - '-c'
-  - |
-    go list ./... | grep -v /vendor/
-- name: 'gcr.io/cloud-builders/go:wheezy'
-  args: ['test', './runner']
-- name: 'gcr.io/cloud-builders/go:wheezy'
-  entrypoint: 'bash'
-  args:
-  - '-c'
-  - |
-    go test $(ls -d */ | grep -v vendor)
+  args: ['test', 'github.com/GoogleCloudPlatform/container-builder-local/...']
 - name: 'busybox'
   args: ['ls', './gopath/bin']
