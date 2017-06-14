@@ -1,8 +1,8 @@
 steps:
 - name: 'gcr.io/cloud-builders/go'
   args: ['install', 'github.com/GoogleCloudPlatform/container-builder-local']
-#- name: 'gcr.io/cloud-builders/go'
-#  args: ['test', '...']
+- name: 'gcr.io/cloud-builders/go'
+  args: ['test', 'github.com/GoogleCloudPlatform/container-builder-local']
 #  env: ['GOPATH=.']
 #- name: 'gcr.io/cloud-builders/docker'
 #  args: ['build', '--tag=gcr.io/$PROJECT_ID/container-builder-local', '.']
