@@ -2,6 +2,10 @@ steps:
 - name: 'gcr.io/cloud-builders/go:wheezy'
   args: ['install', 'github.com/GoogleCloudPlatform/container-builder-local']
 - name: 'gcr.io/cloud-builders/go:wheezy'
-  args: ['test', 'github.com/GoogleCloudPlatform/container-builder-local/...']
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    go test $(find . -type d -maxdepth 1 | grep -Ev "vendor|.git")
 - name: 'busybox'
   args: ['ls', './gopath/bin']
