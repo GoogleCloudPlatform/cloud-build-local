@@ -7,5 +7,7 @@ steps:
   - '-c'
   - |
     find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath" | xargs /builder/bin/go.bash test
+- name: 'gcr.io/cloud-builders/gsutil'
+  args: ['cp', './gopath/bin/container-builder-local', 'gs://container-builder-local']
 - name: 'busybox'
   args: ['ls', './gopath/bin']
