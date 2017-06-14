@@ -5,7 +5,7 @@ steps:
   args: ['ls']
 - name: 'gcr.io/cloud-builders/go'
   args: ['install', '.']
-  env: ['PROJECT_ROOT=/workspace']
+  env: ['PROJECT_ROOT=.']
 - name: 'gcr.io/cloud-builders/go'
   args: ['test', 'container-builder-local']
   env: ['PROJECT_ROOT=container-builder-local']
