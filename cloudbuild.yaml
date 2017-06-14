@@ -3,8 +3,9 @@ steps:
   args: ['mkdir', '-p', '/worspace/src/container-builder-local']
 - name: 'busybox'
   args: ['ls', '/workspace/']
-- name: 'busybox'
-  args: ['cp', '/workspace/*', '/worspace/src/container-builder-local/']
+# don't use busybox which fails with mv.
+- name: 'debian'
+  args: ['mv', '/workspace/*', '/worspace/src/container-builder-local/']
 - name: 'gcr.io/cloud-builders/go'
   args:
   - 'get'
