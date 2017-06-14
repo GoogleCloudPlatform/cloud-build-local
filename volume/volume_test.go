@@ -67,9 +67,7 @@ func TestSetup(t *testing.T) {
 	}
 
 	got := strings.Join(r.commands, "\n")
-	want := strings.Join([]string{`docker volume create --name gcb-local-vol
-docker run -v gcb-local-vol:/workspace --name gcb-local-vol-helper busybox`}, "\n")
-
+	want := "docker volume create --name gcb-local-vol"
 	if got != want {
 		t.Errorf("Commands didn't match!\n===Want:\n%s\n===Got:\n%s", want, got)
 	}
@@ -79,14 +77,33 @@ func TestCopy(t *testing.T) {
 	r := newMockRunner(t)
 	vol := New(volumeName, r)
 
-	dir := "/wherever/you/want"
-	if err := vol.Copy(dir); err != nil {
+	if err := vol.Copy("/wherever/you/want"); err != nil {
 		t.Errorf("Copy failed: %v", err)
 	}
 
 	got := strings.Join(r.commands, "\n")
-	want := strings.Join([]string{fmt.Sprintf(`docker cp %s gcb-local-vol-helper:/workspace`, dir)}, "\n")
+	want := `docker run -v gcb-local-vol:/workspace --name gcb-local-vol-helper busybox
+docker cp /wherever/you/want gcb-local-vol-helper:/workspace`
+	if got != want {
+		t.Errorf("Commands didn't match!\n===Want:\n%s\n===Got:\n%s", want, got)
+	}
+}
 
+func TestCopyTwice(t *testing.T) {
+	r := newMockRunner(t)
+	vol := New(volumeName, r)
+
+	if err := vol.Copy("/wherever/you/want"); err != nil {
+		t.Errorf("Copy failed: %v", err)
+	}
+	if err := vol.Copy("/wherever/else/you/want"); err != nil {
+		t.Errorf("Copy failed: %v", err)
+	}
+
+	got := strings.Join(r.commands, "\n")
+	want := `docker run -v gcb-local-vol:/workspace --name gcb-local-vol-helper busybox
+docker cp /wherever/you/want gcb-local-vol-helper:/workspace
+docker cp /wherever/else/you/want gcb-local-vol-helper:/workspace`
 	if got != want {
 		t.Errorf("Commands didn't match!\n===Want:\n%s\n===Got:\n%s", want, got)
 	}
@@ -101,9 +118,29 @@ func TestClose(t *testing.T) {
 	}
 
 	got := strings.Join(r.commands, "\n")
-	want := strings.Join([]string{fmt.Sprintf(`docker rm gcb-local-vol-helper
-docker volume rm %s`, volumeName)}, "\n")
+	want := fmt.Sprintf("docker volume rm %s", volumeName)
+	if got != want {
+		t.Errorf("Commands didn't match!\n===Want:\n%s\n===Got:\n%s", want, got)
+	}
+}
 
+func TestCloseWithHelper(t *testing.T) {
+	r := newMockRunner(t)
+	vol := New(volumeName, r)
+
+	if err := vol.Copy("/wherever/you/want"); err != nil {
+		t.Errorf("Copy failed: %v", err)
+	}
+
+	if err := vol.Close(); err != nil {
+		t.Errorf("Close failed: %v", err)
+	}
+
+	got := strings.Join(r.commands, "\n")
+	want := `docker run -v gcb-local-vol:/workspace --name gcb-local-vol-helper busybox
+docker cp /wherever/you/want gcb-local-vol-helper:/workspace
+docker rm gcb-local-vol-helper
+docker volume rm gcb-local-vol`
 	if got != want {
 		t.Errorf("Commands didn't match!\n===Want:\n%s\n===Got:\n%s", want, got)
 	}

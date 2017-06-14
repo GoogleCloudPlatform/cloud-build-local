@@ -63,7 +63,7 @@ var (
 	}
 )
 
-// CheckBuild returns nil if build is valid,
+// CheckBuild returns no error if build is valid,
 // otherwise a descriptive canonical error.
 func CheckBuild(b *cb.Build) error {
 	if b == nil {
@@ -82,8 +82,14 @@ func CheckBuild(b *cb.Build) error {
 		return fmt.Errorf("invalid .steps field: %v", err)
 	}
 
-	if err := CheckSubstitutionTemplate(b.Images, b.Steps, b.Substitutions); err != nil {
+	if missingSubs, err := CheckSubstitutionTemplate(b.Images, b.Steps, b.Substitutions); err != nil {
 		return err
+	} else if len(missingSubs) > 0 {
+		// If the user doesn't specifically allow loose substitutions, the warnings
+		// are returned as an error.
+		if b.GetOptions().GetSubstitutionOption() != cb.BuildOptions_ALLOW_LOOSE {
+			return fmt.Errorf(strings.Join(missingSubs, ";"))
+		}
 	}
 	return nil
 }
@@ -115,8 +121,11 @@ func CheckSubstitutions(substitutions map[string]string) error {
 }
 
 // CheckSubstitutionTemplate checks that all the substitution variables are used
-// and all the variables found in the template are used too.
-func CheckSubstitutionTemplate(images []string, steps []*cb.BuildStep, substitutions map[string]string) error {
+// and all the variables found in the template are used too. It may returns an
+// error and a list of string warnings.
+func CheckSubstitutionTemplate(images []string, steps []*cb.BuildStep, substitutions map[string]string) ([]string, error) {
+	warnings := []string{}
+
 	// substitutionsUsed is used to check that all the substitution variables
 	// are used in the template.
 	substitutionsUsed := make(map[string]bool)
@@ -132,10 +141,11 @@ func CheckSubstitutionTemplate(images []string, steps []*cb.BuildStep, substitut
 			}
 			if _, ok := substitutions[p.Key]; !ok {
 				if validUserSubstKeyRE.MatchString(p.Key) {
-					return fmt.Errorf("key in the template %q is not matched in the substitution data", p.Key)
+					warnings = append(warnings, fmt.Sprintf("key in the template %q is not matched in the substitution data", p.Key))
+					continue
 				}
 				if _, ok := validBuiltInVariables[p.Key]; !ok {
-					return fmt.Errorf("key in the template %q is not a valid built-in subtitution", p.Key)
+					return fmt.Errorf("key in the template %q is not a valid built-in substitution", p.Key)
 				}
 			}
 			substitutionsUsed[p.Key] = true
@@ -145,36 +155,36 @@ func CheckSubstitutionTemplate(images []string, steps []*cb.BuildStep, substitut
 
 	for _, step := range steps {
 		if err := checkParameters(step.Name); err != nil {
-			return err
+			return warnings, err
 		}
 		for _, a := range step.Args {
 			if err := checkParameters(a); err != nil {
-				return err
+				return warnings, err
 			}
 		}
 		for _, e := range step.Env {
 			if err := checkParameters(e); err != nil {
-				return err
+				return warnings, err
 			}
 		}
 		if err := checkParameters(step.Dir); err != nil {
-			return err
+			return warnings, err
 		}
 		if err := checkParameters(step.Entrypoint); err != nil {
-			return err
+			return warnings, err
 		}
 	}
 	for _, img := range images {
 		if err := checkParameters(img); err != nil {
-			return err
+			return warnings, err
 		}
 	}
 	for k, v := range substitutionsUsed {
 		if v == false {
-			return fmt.Errorf("key %q in the substitution data is not matched in the template", k)
+			warnings = append(warnings, fmt.Sprintf("key %q in the substitution data is not matched in the template", k))
 		}
 	}
-	return nil
+	return warnings, nil
 }
 
 // CheckImages checks the number of images and image's length are under limits.

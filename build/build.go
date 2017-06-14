@@ -23,7 +23,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"path"
 	"regexp"
 	"sort"
@@ -36,12 +35,17 @@ import (
 	"github.com/GoogleCloudPlatform/container-builder-local/buildlog"
 	"github.com/GoogleCloudPlatform/container-builder-local/common"
 	"github.com/GoogleCloudPlatform/container-builder-local/runner"
+	"github.com/GoogleCloudPlatform/container-builder-local/volume"
 	"google.golang.org/api/cloudkms/v1"
 	"golang.org/x/oauth2"
 )
 
 const (
 	containerWorkspaceDir = "/workspace"
+
+	// homeVolume is the name of the Docker volume that contains the build's
+	// $HOME directory, mounted in as /home.
+	homeVolume = "homevol"
 
 	// maxPushRetries is the maximum number of times we retry pushing an image
 	// in the face of gcr.io DNS lookup errors.
@@ -216,11 +220,39 @@ func (b *Build) Failbuild(err error) {
 	b.Mu.Unlock()
 }
 
-// UpdateDockerAccessToken updates the credentials we use to authorize requests to GCR.
-// docker-credential-gcr is a prerequisite to be installed.
-func (b *Build) UpdateDockerAccessToken() error {
-	if err := b.Runner.Run([]string{"docker-credential-gcr", "configure-docker"}, nil, nil, nil, ""); err != nil {
-		return fmt.Errorf("failed to update local docker configs w/ auth: %v", err)
+// gcrHosts is the list of GCR hosts that should be logged into when we refresh
+// credentials.
+var gcrHosts = []string{
+	"https://asia.gcr.io",
+	"https://b.gcr.io",
+	"https://bucket.gcr.io",
+	"https://eu.gcr.io",
+	"https://gcr.io",
+	"https://gcr-staging.sandbox.google.com",
+	"https://us.gcr.io",
+}
+
+// UpdateDockerAccessToken updates the credentials we use to authorize requests
+// to GCR.
+// https://cloud.google.com/container-registry/docs/advanced-authentication#using_an_access_token
+func (b *Build) UpdateDockerAccessToken(tok string) error {
+	for _, host := range gcrHosts {
+		var buf bytes.Buffer
+		args := []string{"docker", "run",
+			// Mount in the home volume.
+			"--volume", homeVolume + ":/home",
+			// Make /home $HOME.
+			"--env", "HOME=/home",
+			// Make sure the container uses the correct docker daemon.
+			"--volume", "/var/run/docker.sock:/var/run/docker.sock",
+			"gcr.io/cloud-builders/docker",
+			"login",
+			"--username=oauth2accesstoken",
+			"--password=" + tok,
+			host}
+		if err := b.Runner.Run(args, nil, &buf, &buf, ""); err != nil {
+			return fmt.Errorf("failed to update docker credentials: %v\n%s", err, buf.String())
+		}
 	}
 	return nil
 }
@@ -244,12 +276,19 @@ func (b *Build) imageIsLocal(tag string) bool {
 }
 
 func (b *Build) dockerPull(tag string, outWriter, errWriter io.Writer) (string, error) {
-	
-	// docker cred file, do this in a container with spoofed metadata and run
-	// "gcloud docker pull"
+	// Pull from within a container with $HOME mounted.
+	args := []string{"docker", "run",
+		// Mount in the home volume.
+		"--volume", homeVolume + ":/home",
+		// Make /home $HOME.
+		"--env", "HOME=/home",
+		// Make sure the container uses the correct docker daemon.
+		"--volume", "/var/run/docker.sock:/var/run/docker.sock",
+		"gcr.io/cloud-builders/docker",
+		"pull", tag}
+
 	var buf bytes.Buffer
-	err := b.Runner.Run([]string{"docker", "pull", tag}, nil, io.MultiWriter(outWriter, &buf), errWriter, "")
-	if err != nil {
+	if err := b.Runner.Run(args, nil, io.MultiWriter(outWriter, &buf), errWriter, ""); err != nil {
 		return "", err
 	}
 	return scrapePullDigest(buf.String())
@@ -325,7 +364,19 @@ func findStatus(s string) string {
 // Convoy issue which seeks to address the problems we've identified.
 func (b *Build) dockerPushWithRetries(tag string, attempt int) (string, error) {
 	b.Log.WriteMainEntry(fmt.Sprintf("Pushing %s", tag))
-	output, err := b.runWithScrapedLogging("PUSH", []string{"docker", "push", tag}, "")
+
+	// Push from within a container with $HOME mounted.
+	args := []string{"docker", "run",
+		// Mount in the home volume.
+		"--volume", homeVolume + ":/home",
+		// Make /home $HOME.
+		"--env", "HOME=/home",
+		// Make sure the container uses the correct docker daemon.
+		"--volume", "/var/run/docker.sock:/var/run/docker.sock",
+		"gcr.io/cloud-builders/docker",
+		"push", tag}
+
+	output, err := b.runWithScrapedLogging("PUSH", args, "")
 	if err != nil {
 		b.PushErrors++
 		if derr := b.detectPushFailure(output); derr != nil {
@@ -589,6 +640,17 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 func (b *Build) runBuildSteps() error {
 	defer b.cleanBuildSteps()
 
+	// Create the home volume.
+	vol := volume.New(homeVolume, b.Runner)
+	if err := vol.Setup(); err != nil {
+		return err
+	}
+	defer func() {
+		if err := vol.Close(); err != nil {
+			log.Printf("Failed to delete homevol: %v", err)
+		}
+	}()
+
 	b.HasMultipleSteps = len(b.Request.Steps) > 1
 	errors := make(chan error)
 	var finishedChannels []chan struct{}
@@ -638,11 +700,6 @@ func (b *Build) dockerRunArgs(stepDir string, idx int) []string {
 		args = append(args, "--rm")
 	}
 
-	hostDockerCreds := "/root/.docker"
-	if b.local {
-		hostDockerCreds = path.Join(os.Getenv("HOME"), ".docker")
-	}
-
 	args = append(args,
 		// Gives a unique name to each build step.
 		// Makes the build step easier to kill when it fails.
@@ -656,8 +713,10 @@ func (b *Build) dockerRunArgs(stepDir string, idx int) []string {
 		// are always Linux forward slash paths. As this tool can run on any OS,
 		// filepath.Join would produce an incorrect result.
 		"--workdir", path.Join(containerWorkspaceDir, stepDir),
-		// Mount in any creds needed to pull (and push) private customer project images.
-		"--volume", fmt.Sprintf("%s:%s", hostDockerCreds, "/root/.docker"),
+		// Mount in the home volume.
+		"--volume", homeVolume+":/home",
+		// Make /home $HOME.
+		"--env", "HOME=/home",
 		// Link in the spoofed metadata container to provide GCE metadata.
 		"--link", "metadata:metadata.google.internal",
 		// Run in privileged mode per discussion in b/31267381.

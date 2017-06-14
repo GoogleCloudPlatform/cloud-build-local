@@ -85,6 +85,20 @@ func startsWith(arr []string, parts ...string) bool {
 	return true
 }
 
+// contains returns true iff arr contains parts in order, considering only the
+// first occurrence of the first part.
+func contains(arr []string, parts ...string) bool {
+	if len(arr) < len(parts) {
+		return false
+	}
+	for i, a := range arr {
+		if a == parts[0] {
+			return startsWith(arr[i:], parts...)
+		}
+	}
+	return false
+}
+
 func (r *mockRunner) MkdirAll(dir string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -128,8 +142,8 @@ func (r *mockRunner) Run(args []string, in io.Reader, out, err io.Writer, _ stri
 		// Image not present.
 		return fmt.Errorf("exit status 1")
 	}
-	if startsWith(args, "docker", "pull") {
-		tag := args[2]
+	if startsWith(args, "docker", "run") && contains(args, "gcr.io/cloud-builders/docker", "pull") {
+		tag := args[len(args)-1]
 		if r.remoteImages[tag] {
 			// Successful pull.
 			io.WriteString(out, `Using default tag: latest
@@ -145,12 +159,12 @@ Status: Downloaded newer image for gcr.io/test-argo/busybox:latest
 		// Failed pull.
 		return fmt.Errorf("exit status 1 for tag %q", tag)
 	}
-	if startsWith(args, "docker", "push") {
+	if startsWith(args, "docker", "run") && contains(args, "gcr.io/cloud-builders/docker", "push") {
 		if r.remotePushesFail {
 			// Failed push.
 			return fmt.Errorf("exit status 1")
 		}
-		tag := args[2]
+		tag := args[len(args)-1]
 		io.WriteString(out, `The push refers to a repository [skelterjohn/ubuntu] (len: 1)
 ca4d7b1b9a51: Image already exists
 a467a7c6794f: Image successfully pushed
@@ -165,6 +179,16 @@ ea358092da77: Image successfully pushed
 	}
 	if startsWith(args, "docker", "run") && r.dockerRunHandler != nil {
 		return r.dockerRunHandler(args, out, err)
+	}
+	if startsWith(args, "docker", "volume") {
+		if reflect.DeepEqual(args, []string{"docker", "volume", "create", "--name", "homevol"}) {
+			return nil
+		}
+		if reflect.DeepEqual(args, []string{"docker", "volume", "rm", "homevol"}) {
+			return nil
+		}
+		r.t.Errorf("Unexpected docker volume call: %v", args)
+		return nil
 	}
 	if startsWith(args, "gsutil", "cp") {
 		uri := args[2]
@@ -330,9 +354,9 @@ func TestFetchBuilder(t *testing.T) {
 		buildRequest: commonBuildRequest,
 		wantCommands: []string{
 			"docker inspect gcr.io/my-project/my-compiler",
-			"docker pull gcr.io/my-project/my-compiler",
+			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-compiler",
 			"docker inspect gcr.io/my-project/my-builder",
-			"docker pull gcr.io/my-project/my-builder",
+			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 		},
 	}, {
 		name: "TestFetchBuilderExists",
@@ -354,7 +378,7 @@ func TestFetchBuilder(t *testing.T) {
 		// no image in remoteImages
 		wantCommands: []string{
 			"docker inspect gcr.io/invalid-build-step",
-			"docker pull gcr.io/invalid-build-step",
+			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
 		},
 		wantErr: errors.New(`error pulling build step "gcr.io/invalid-build-step": exit status 1 for tag "gcr.io/invalid-build-step"`),
 	}}
@@ -553,11 +577,12 @@ func TestRunBuildSteps(t *testing.T) {
 		name:         "TestRunBuilder",
 		buildRequest: commonBuildRequest,
 		wantCommands: []string{
+			"docker volume create --name homevol",
 			"docker inspect gcr.io/my-project/my-compiler",
-			"docker pull gcr.io/my-project/my-compiler",
+			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-compiler",
 			dockerRunString(0) + " gcr.io/my-project/my-compiler",
 			"docker inspect gcr.io/my-project/my-builder",
-			"docker pull gcr.io/my-project/my-builder",
+			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 			dockerRunInStepDir(1, "foo/baz") +
 				" --env FOO=bar" +
 				" --env BAZ=buz" +
@@ -565,6 +590,7 @@ func TestRunBuildSteps(t *testing.T) {
 			"docker inspect gcr.io/build-output-tag-1",
 			"docker inspect gcr.io/build-output-tag-2",
 			"docker inspect gcr.io/build-output-tag-no-digest",
+			"docker volume rm homevol",
 			"docker rm -f step_0 step_1",
 		},
 	}, {
@@ -868,9 +894,9 @@ func TestPushImages(t *testing.T) {
 		buildRequest:     commonBuildRequest,
 		remotePushesFail: false,
 		wantCommands: []string{
-			"docker push gcr.io/build-output-tag-1",
-			"docker push gcr.io/build-output-tag-2",
-			"docker push gcr.io/build-output-tag-no-digest",
+			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-1",
+			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-2",
+			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-no-digest",
 		},
 	}, {
 		name:             "TestPushImagesFail",
@@ -1407,12 +1433,14 @@ func TestStart(t *testing.T) {
 			Images: []string{"gcr.io/build"},
 		},
 		wantCommands: []string{
+			"docker volume create --name homevol",
 			"docker inspect gcr.io/my-project/my-builder",
-			"docker pull gcr.io/my-project/my-builder",
+			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 			dockerRunString(0) + " gcr.io/my-project/my-builder a",
 			"docker inspect gcr.io/build",
+			"docker volume rm homevol",
 			"docker rm -f step_0",
-			"docker push gcr.io/build",
+			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build",
 		},
 	}, {
 		name: "Build without pushing images",
@@ -1425,10 +1453,12 @@ func TestStart(t *testing.T) {
 			Images: []string{"gcr.io/build"},
 		},
 		wantCommands: []string{
+			"docker volume create --name homevol",
 			"docker inspect gcr.io/my-project/my-builder",
-			"docker pull gcr.io/my-project/my-builder",
+			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 			dockerRunString(0) + " gcr.io/my-project/my-builder a",
 			"docker inspect gcr.io/build",
+			"docker volume rm homevol",
 			"docker rm -f step_0",
 		},
 	}} {

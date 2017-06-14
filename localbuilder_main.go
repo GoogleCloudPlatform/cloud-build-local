@@ -79,7 +79,8 @@ func main() {
 	// Check installed docker versions.
 	dockerServerVersion, dockerClientVersion, err := dockerVersions(r)
 	if err != nil {
-		log.Fatalf("Error getting local docker versions: %v", err)
+		log.Printf("Error getting local docker versions: %v", err)
+		return
 	}
 	if dockerServerVersion != gcbDockerVersion {
 		log.Printf("Warning: The server docker version installed (%s) is different from the one used in GCB (%s)", dockerServerVersion, gcbDockerVersion)
@@ -91,36 +92,42 @@ func main() {
 	// Load config file into a build struct.
 	buildConfig, err := config.Load(*configFile)
 	if err != nil {
-		log.Fatalf("Error loading config file: %v", err)
+		log.Printf("Error loading config file: %v", err)
+		return
 	}
 
 	// Parse substitutions.
 	if *substitutions != "" {
 		substMap, err := common.ParseSubstitutionsFlag(*substitutions)
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("Error parsing substitutions flag: %v", err)
+			return
 		}
 		buildConfig.Substitutions = substMap
 	}
 
 	// Validate the build.
 	if err := validate.CheckBuild(buildConfig); err != nil {
-		log.Fatalf("Error validating build: %v", err)
+		log.Printf("Error validating build: %v", err)
+		return
 	}
 
 	// Apply substitutions.
 	if err := subst.SubstituteBuildFields(buildConfig); err != nil {
-		log.Fatalf("Error applying substitutions: %v", err)
+		log.Printf("Error applying substitutions: %v", err)
+		return
 	}
 
 	// Create a volume, a helper container to copy the source, and defer cleaning.
 	volumeName := fmt.Sprintf("%s%s", volumeNamePrefix, uuid.New())
 	vol := volume.New(volumeName, r)
 	if err := vol.Setup(); err != nil {
-		log.Fatalf("Error creating docker volume: %v", err)
+		log.Printf("Error creating docker volume: %v", err)
+		return
 	}
 	if err := vol.Copy(dir); err != nil {
-		log.Fatalf("Error copying directory to docker volume: %v", err)
+		log.Printf("Error copying directory to docker volume: %v", err)
+		return
 	}
 	defer vol.Close()
 
@@ -129,7 +136,8 @@ func main() {
 	// Start the spoofed metadata server.
 	log.Println("Starting spoofed metadata server...")
 	if err := metadata.StartServer(r, metadataImageName); err != nil {
-		log.Fatalf("Failed to start spoofed metadata server: %v", err)
+		log.Printf("Failed to start spoofed metadata server: %v", err)
+		return
 	}
 	log.Println("Started spoofed metadata server")
 	metadataUpdater := metadata.RealUpdater{}
@@ -138,20 +146,24 @@ func main() {
 	// Get project info to feed the metadata server.
 	projectInfo, err := gcloud.ProjectInfo(r)
 	if err != nil {
-		log.Fatalf("Error getting project information from gcloud: %v", err)
+		log.Printf("Error getting project information from gcloud: %v", err)
+		return
 	}
 	metadataUpdater.SetProjectInfo(projectInfo)
 
 	// Update docker credentials, for build steps that require pulling
 	// private images. This can be either a private build step image or if
 	// we're building a docker image that depends on a private image.
-	// This step requires docker-credential-gcr to be installed:
-	// `gcloud components install docker-credential-gcr`
 	
 	go func() {
 		for ; ; time.Sleep(tokenRefreshDur) {
-			if err := b.UpdateDockerAccessToken(); err != nil {
-				log.Fatalf("Error updating docker access token: %v", err)
+			tok, err := gcloud.AccessToken(r)
+			if err != nil {
+				log.Printf("Error getting access token to update docker credentials: %v", err)
+				continue
+			}
+			if err := b.UpdateDockerAccessToken(tok); err != nil {
+				log.Printf("Error updating docker credentials: %v", err)
 			}
 		}
 	}()
@@ -170,7 +182,7 @@ func supplyTokenToMetadata(metadataUpdater metadata.RealUpdater, r runner.Runner
 	for ; ; time.Sleep(tokenRefreshDur) {
 		accessToken, err := gcloud.AccessToken(r)
 		if err != nil {
-			log.Fatalf("Error getting gcloud token: %v", err)
+			log.Printf("Error getting gcloud token: %v", err)
 			continue
 		}
 		token := oauth2.Token{
@@ -180,7 +192,7 @@ func supplyTokenToMetadata(metadataUpdater metadata.RealUpdater, r runner.Runner
 			Expiry: time.Now().Add(2 * tokenRefreshDur),
 		}
 		if err := metadataUpdater.SetToken(token); err != nil {
-			log.Fatalf("Error updating token in metadata server: %v", err)
+			log.Printf("Error updating token in metadata server: %v", err)
 			continue
 		}
 	}
