@@ -24,7 +24,7 @@ steps:
     # go test ./...
 
     # find . -type d -maxdepth 1 | grep -Ev "vendor|.git" | xargs go test
-- name: 'gcr.io/cloud-builders/go:wheezy'
-  args: ['test', './...']
+# - name: 'gcr.io/cloud-builders/go:wheezy'
+#   args: ['test', './...']
 - name: 'busybox'
   args: ['ls', './gopath/bin']
