@@ -2,7 +2,11 @@ steps:
 - name: 'gcr.io/cloud-builders/go'
   args: ['install', 'github.com/GoogleCloudPlatform/container-builder-local']
 - name: 'gcr.io/cloud-builders/go'
-  args: ['list', './...']
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    go list ./... | grep -v /vendor/
 - name: 'gcr.io/cloud-builders/go'
   entrypoint: 'bash'
   args:
