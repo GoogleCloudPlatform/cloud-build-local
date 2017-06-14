@@ -9,6 +9,28 @@ steps:
     find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath|integration-test" | xargs /builder/bin/go.bash test
 - name: 'gcr.io/cloud-builders/go:wheezy'
   args: ['install', 'github.com/GoogleCloudPlatform/container-builder-local']
+- name: 'gcr.io/cloud-builders/go:wheezy'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    for GOOS in darwin linux windows; do
+        for GOARCH in 386 amd64; do
+            /builder/bin/go.bash build -o container-builder-local_$${GOOS}_$${GOARCH}-$COMMIT_SHA github.com/GoogleCloudPlatform/container-builder-local
+        done
+    done
+- name: 'ubuntu'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    for GOOS in darwin linux windows; do
+        for GOARCH in 386 amd64; do
+            file container-builder-local_$${GOOS}_$${GOARCH}-$COMMIT_SHA
+        done
+    done
+- name: 'gcr.io/cloud-builders/gsutil'
+  args: ['cp', 'container-builder-local_*', 'gs://container-builder-local/']
 
 - name: 'busybox'
   args: ['echo', 'Create a Github PR from release to master branch.']
