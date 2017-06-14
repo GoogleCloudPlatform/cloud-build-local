@@ -1,7 +1,7 @@
 steps:
 - name: 'gcr.io/cloud-builders/go'
   args: ['install', 'github.com/GoogleCloudPlatform/container-builder-local']
-  env: ['GOPATH=.']
+  env: ['PROJECT_ROOT=github.com/GoogleCloudPlatform/container-builder-local']
 #- name: 'gcr.io/cloud-builders/go'
 #  args: ['test', '...']
 #  env: ['GOPATH=.']
