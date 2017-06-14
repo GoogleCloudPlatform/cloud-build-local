@@ -12,6 +12,12 @@ steps:
   args: ['pwd']
 - name: 'busybox'
   args: ['ls', '.']
+- name: 'busybox'
+  args: ['ls', 'src/']
+- name: 'busybox'
+  args: ['ls', 'pkg/']
+- name: 'busybox'
+  args: ['ls', 'bin/']
 - name: 'gcr.io/cloud-builders/go'
   args: ['install', '...']
   env: ['GOPATH=.']
