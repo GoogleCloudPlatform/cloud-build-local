@@ -7,3 +7,4 @@ for import in $imports; do
 done
 mv vendor/src/* vendor
 rm -r vendor/src vendor/pkg
+find vendor/ -type d | grep ".git$" | xargs rm -rf
