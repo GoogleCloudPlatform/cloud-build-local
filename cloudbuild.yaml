@@ -2,7 +2,7 @@ steps:
 - name: 'gcr.io/cloud-builders/go'
   args:
   - 'get'
-  - 'container-builder-local'
+  - 'github.com/GoogleCloudPlatform/container-builder-local'
 - name: 'busybox'
   args: ['pwd']
 - name: 'busybox'
