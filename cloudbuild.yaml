@@ -4,6 +4,10 @@ steps:
 - name: 'gcr.io/cloud-builders/go'
   args: ['list', './...']
 - name: 'gcr.io/cloud-builders/go'
-  args: ['test', '$(go list ./... | grep -v /vendor/)']
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    go test $(go list ./... | grep -v /vendor/)
 - name: 'busybox'
   args: ['ls', './gopath/bin']
