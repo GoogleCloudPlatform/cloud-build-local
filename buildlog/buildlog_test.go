@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"./common/common"
+	"github.com/GoogleCloudPlatform/container-builder-local/common/common"
 )
 
 

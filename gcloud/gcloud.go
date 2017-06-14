@@ -21,8 +21,8 @@ import (
 	"strconv"
 	"strings"
 
-	"./metadata/metadata"
-	"./runner/runner"
+	"github.com/GoogleCloudPlatform/container-builder-local/metadata/metadata"
+	"github.com/GoogleCloudPlatform/container-builder-local/runner/runner"
 )
 
 // AccessToken gets a fresh access token from gcloud.

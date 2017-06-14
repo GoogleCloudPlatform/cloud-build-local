@@ -34,9 +34,9 @@ import (
 
 	cb "google.golang.org/api/cloudbuild/v1"
 
-	"./buildlog/buildlog"
-	"./common/common"
-	"./runner/runner"
+	"github.com/GoogleCloudPlatform/container-builder-local/buildlog/buildlog"
+	"github.com/GoogleCloudPlatform/container-builder-local/common/common"
+	"github.com/GoogleCloudPlatform/container-builder-local/runner/runner"
 	"google.golang.org/api/cloudkms/v1"
 	"golang.org/x/oauth2"
 )
