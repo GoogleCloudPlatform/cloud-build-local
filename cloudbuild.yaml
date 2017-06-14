@@ -6,5 +6,7 @@ steps:
 #  env: ['GOPATH=.']
 #- name: 'gcr.io/cloud-builders/docker'
 #  args: ['build', '--tag=gcr.io/$PROJECT_ID/container-builder-local', '.']
+- name: 'busybox'
+  args: ['ls']
 
-images: ['gcr.io/$PROJECT_ID/container-builder-local']
+# images: ['gcr.io/$PROJECT_ID/container-builder-local']
