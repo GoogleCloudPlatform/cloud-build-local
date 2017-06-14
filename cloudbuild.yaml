@@ -24,6 +24,7 @@ steps:
   args:
   - '-c'
   - |
+    apt-get update || exit
     apt-get install -y file || exit
     for GOOS in darwin linux windows; do
         for GOARCH in 386 amd64; do
