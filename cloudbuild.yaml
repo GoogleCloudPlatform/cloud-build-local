@@ -3,7 +3,6 @@ steps:
   args:
   - 'get'
   - 'container-builder-local'
-  env: ['PROJECT_ROOT=container-builder-local']
 - name: 'busybox'
   args: ['pwd']
 - name: 'busybox'
@@ -12,7 +11,6 @@ steps:
   args: ['ls', 'src/']
 - name: 'gcr.io/cloud-builders/go'
   args: ['install', 'container-builder-local']
-  env: ['PROJECT_ROOT=container-builder-local']
 #- name: 'gcr.io/cloud-builders/go'
 #  args: ['test', '...']
 #  env: ['GOPATH=.']
