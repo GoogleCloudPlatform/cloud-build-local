@@ -8,10 +8,12 @@ steps:
   - |
     go list ./... | grep -v /vendor/
 - name: 'gcr.io/cloud-builders/go:wheezy'
-  entrypoint: 'bash'
-  args:
-  - '-c'
-  - |
-    go test $(go list ./... | grep -v /vendor/)
+  args: ['test', 'runner']
+# - name: 'gcr.io/cloud-builders/go:wheezy'
+#   entrypoint: 'bash'
+#   args:
+#   - '-c'
+#   - |
+#     go test $(go list ./... | grep -v /vendor/)
 - name: 'busybox'
   args: ['ls', './gopath/bin']
