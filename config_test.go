@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	cb "google.golang.org/api/cloudbuild/v1"
-	// 		cb "vendor/cloudbuild"
 )
 
 func TestLoad(t *testing.T) {

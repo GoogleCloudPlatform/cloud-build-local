@@ -25,10 +25,10 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"runner"
 
-	md "google3/third_party/argo/metadata/metadata/metadata"
 	"golang.org/x/oauth2"
 )
 
@@ -45,6 +45,14 @@ type ProjectInfo struct {
 	ProjectNum int64  `json:"project_num"`
 }
 
+// Token represents the OAuth token request containing the access token and the
+// time it expires.
+type Token struct {
+	AccessToken string    `json:"access_token"`
+	Expiry      time.Time `json:"expiry"`
+	Scopes      []string
+}
+
 // RealUpdater actually sends POST requests to update spoofed metadata.
 type RealUpdater struct{}
 
@@ -54,7 +62,7 @@ func (RealUpdater) SetToken(tok oauth2.Token) error {
 	if err != nil {
 		return err
 	}
-	t := md.Token{
+	t := Token{
 		AccessToken: tok.AccessToken,
 		Expiry:      tok.Expiry,
 		Scopes:      scopes,
