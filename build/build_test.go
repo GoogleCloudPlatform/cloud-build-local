@@ -28,8 +28,8 @@ import (
 	"testing"
 	"time"
 
-	"buildlog"
-	"runner"
+	"buildlog/buildlog"
+	"runner/runner"
 	"golang.org/x/oauth2"
 
 	cb "google.golang.org/api/cloudbuild/v1"

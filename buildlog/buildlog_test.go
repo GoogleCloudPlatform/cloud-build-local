@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"logentry"
+	"common/common"
 )
 
 
@@ -34,7 +34,7 @@ func TestSingleSink(t *testing.T) {
 	log := &BuildLog{}
 	sink := log.NewSink("test")
 
-	var outputs []*logentry.Entry
+	var outputs []*common.LogEntry
 	go func() {
 		for output := range sink.Lines {
 			output.Time = fakeTime
@@ -49,7 +49,7 @@ func TestSingleSink(t *testing.T) {
 		t.Errorf("error closing log: %v", err)
 	}
 
-	expected := []*logentry.Entry{
+	expected := []*common.LogEntry{
 		{
 			Line:  0,
 			Label: "tag",
@@ -81,11 +81,11 @@ func TestMultiSink(t *testing.T) {
 	sink1 := log.NewSink("test1")
 	sink2 := log.NewSink("test2")
 
-	var outputs1 []*logentry.Entry
+	var outputs1 []*common.LogEntry
 	go func() {
 		for output := range sink1.Lines {
 			// Copy output fields into new struct and set the time.
-			outputs1 = append(outputs1, &logentry.Entry{
+			outputs1 = append(outputs1, &common.LogEntry{
 				Line:  output.Line,
 				Label: output.Label,
 				Text:  output.Text,
@@ -95,11 +95,11 @@ func TestMultiSink(t *testing.T) {
 		sink1.Result <- nil
 	}()
 
-	var outputs2 []*logentry.Entry
+	var outputs2 []*common.LogEntry
 	go func() {
 		for output := range sink2.Lines {
 			// Copy output fields into new struct and set the time.
-			outputs2 = append(outputs2, &logentry.Entry{
+			outputs2 = append(outputs2, &common.LogEntry{
 				Line:  output.Line,
 				Label: output.Label,
 				Text:  output.Text,
@@ -115,7 +115,7 @@ func TestMultiSink(t *testing.T) {
 		t.Errorf("error closing log: %v", err)
 	}
 
-	expected := []*logentry.Entry{
+	expected := []*common.LogEntry{
 		{
 			Line:  0,
 			Label: "tag",

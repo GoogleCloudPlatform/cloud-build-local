@@ -27,6 +27,18 @@ const (
 	backoffRange  = 0.4 // backoff is randomized downwards by this factor
 )
 
+// LogEntry is a single log entry containing 1 line of text.
+type LogEntry struct {
+	// Line number for this line of output.
+	Line int
+	// Label describes the writer generating the log entry. eg, "MAIN" or "3:gcr.io/cloud-builders/some-builder:STDOUT"
+	Label string
+	// Text is one line of output.
+	Text string
+	// Time is the time the log line was written.
+	Time time.Time
+}
+
 // Backoff returns a value in [0, maxDelay] that increases exponentially with
 // retries, starting from baseDelay.
 func Backoff(baseDelay, maxDelay time.Duration, retries int) time.Duration {

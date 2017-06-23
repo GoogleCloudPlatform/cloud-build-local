@@ -27,7 +27,7 @@ import (
 	"sync"
 	"time"
 
-	"logentry"
+	"common/common"
 )
 
 const (
@@ -51,7 +51,7 @@ type BuildLog struct {
 
 func (l *BuildLog) writeEntry(tag string, msg string) {
 	l.mu.Lock()
-	entry := &logentry.Entry{
+	entry := &common.LogEntry{
 		Line:  l.line,
 		Label: tag,
 		Text:  msg,
@@ -63,7 +63,7 @@ func (l *BuildLog) writeEntry(tag string, msg string) {
 }
 
 // PublishEntry publishes a log entry to the sinks.
-func (l *BuildLog) PublishEntry(entry *logentry.Entry) {
+func (l *BuildLog) PublishEntry(entry *common.LogEntry) {
 	l.mu.Lock()
 	sinks := l.sinks
 	l.mu.Unlock()
@@ -198,17 +198,17 @@ func (w *Writer) Flush() {
 // LogSink is a struct that encapsulates a log sink.
 type LogSink struct {
 	Name  string
-	Lines chan *logentry.Entry
+	Lines chan *common.LogEntry
 	// We wait on a single message to the `result` channel after flushing all lines to the sink.
 	Result      chan error
-	HandleBatch func([]*logentry.Entry) error
+	HandleBatch func([]*common.LogEntry) error
 }
 
 // NewSink creates a new sink and attach it to the BuildLog.
 func (l *BuildLog) NewSink(name string) *LogSink {
 	sink := &LogSink{
 		Name:   name,
-		Lines:  make(chan *logentry.Entry, 100000),
+		Lines:  make(chan *common.LogEntry, 100000),
 		Result: make(chan error, 1),
 	}
 	l.mu.Lock()
@@ -238,7 +238,7 @@ func (s *LogSink) Run() {
 // latency before log messages make it to the wire.  This is the common policy
 // code shared by all sinks.
 func (s *LogSink) batchInput() error {
-	var buf []*logentry.Entry // buffered entries
+	var buf []*common.LogEntry // buffered entries
 	batchTick := time.NewTicker(batchTime)
 	for {
 		select {
@@ -273,7 +273,7 @@ func (l *BuildLog) SetupPrint() error {
 	defer l.BufferMu.Unlock()
 
 	sink := l.NewSink("Print")
-	sink.HandleBatch = func(batch []*logentry.Entry) error {
+	sink.HandleBatch = func(batch []*common.LogEntry) error {
 		for _, entry := range batch {
 			if strings.HasPrefix(entry.Label, "Step #") {
 				fmt.Printf("%s\n", entry.Label+": "+entry.Text)

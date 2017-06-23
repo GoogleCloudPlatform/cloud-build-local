@@ -21,8 +21,8 @@ import (
 	"strconv"
 	"strings"
 
-	"metadata"
-	"runner"
+	"metadata/metadata"
+	"runner/runner"
 )
 
 // AccessToken gets a fresh access token from gcloud.
