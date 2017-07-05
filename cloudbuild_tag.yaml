@@ -1,4 +1,4 @@
-# This build happens when a new tag is created, the goal being to create the
+# This build happens when a new tag is created, the goal being to create all the
 # binaries and copy them to GCS.
 steps:
 - name: 'gcr.io/cloud-builders/go:wheezy'
