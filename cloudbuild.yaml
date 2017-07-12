@@ -1,14 +1,14 @@
-# This build happens on push to the release branch, the goal being to check
-# the code compiles before manually creating a Pull Request to the master branch.
+# This build is triggered on push to the release branch in order to ensure that
+# code compiles prior to creating a Pull Request to the master branch.
 steps:
+# Run unit tests in all subdirectories (except those excluded by the grep).
 - name: 'gcr.io/cloud-builders/go:wheezy'
   entrypoint: 'bash'
   args:
   - '-c'
   - |
-    find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath|integration-test" | xargs /builder/bin/go.bash test
+    find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath" | xargs /builder/bin/go.bash test
+# Binary creation.
 - name: 'gcr.io/cloud-builders/go:wheezy'
   args: ['install', 'github.com/GoogleCloudPlatform/container-builder-local']
 
-- name: 'busybox'
-  args: ['echo', 'Create a Github PR from release to master branch.']

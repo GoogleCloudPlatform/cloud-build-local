@@ -17,6 +17,7 @@ package volume
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/GoogleCloudPlatform/container-builder-local/runner"
 )
@@ -30,6 +31,9 @@ type Volume struct {
 	name   string
 	helper string
 	runner runner.Runner
+
+	createdHelper bool
+	mu            sync.Mutex
 }
 
 // New creates a new Volume.
@@ -44,25 +48,30 @@ func New(name string, r runner.Runner) *Volume {
 // Setup creates a docker volume and a helper container that can be used to
 // copy data to the volume.
 func (v *Volume) Setup() error {
-	if err := v.create(); err != nil {
-		return err
-	}
-	return v.createHelperContainer()
-}
-
-func (v *Volume) create() error {
 	cmd := []string{"docker", "volume", "create", "--name", v.name}
 	return v.runner.Run(cmd, nil, nil, nil, "")
 }
 
-func (v *Volume) createHelperContainer() error {
-	volume := fmt.Sprintf("%s:%s", v.name, workspaceDir)
-	cmd := []string{"docker", "run", "-v", volume, "--name", v.helper, "busybox"}
-	return v.runner.Run(cmd, nil, nil, nil, "")
+func (v *Volume) maybeCreateHelperContainer() error {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if !v.createdHelper {
+		volume := fmt.Sprintf("%s:%s", v.name, workspaceDir)
+		cmd := []string{"docker", "run", "-v", volume, "--name", v.helper, "busybox"}
+		if err := v.runner.Run(cmd, nil, nil, nil, ""); err != nil {
+			return err
+		}
+		v.createdHelper = true
+	}
+	return nil
 }
 
 // Copy copies files from a directory dir to the docker volume.
 func (v *Volume) Copy(dir string) error {
+	if err := v.maybeCreateHelperContainer(); err != nil {
+		return err
+	}
+
 	helperVol := fmt.Sprintf("%s:%s", v.helper, workspaceDir)
 	cmd := []string{"docker", "cp", dir, helperVol}
 	return v.runner.Run(cmd, nil, nil, nil, "")
@@ -70,8 +79,13 @@ func (v *Volume) Copy(dir string) error {
 
 // Close cleans up the helper container and the docker volume.
 func (v *Volume) Close() error {
-	if err := v.deleteHelper(); err != nil {
-		return err
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	if v.createdHelper {
+		if err := v.deleteHelper(); err != nil {
+			return err
+		}
 	}
 	return v.deleteVolume()
 }
