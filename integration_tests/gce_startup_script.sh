@@ -1,8 +1,12 @@
 successful_startup=0
 
+yo=$(curl -H"Metadata-flavor: Google" metadata.google.internal/computeMetadata/v1/instance/attributes/gcs_path)
+echo "--> au debut: " $yo
+
 function uploadLogs() {
   sudo fgrep startup-script /var/log/syslog > startuplog
   # Rename the file .txt so that it opens rather than downloading when clicked in Pantheon.
+  echo "--> au moment de startup logs: " $gcs_path
   gsutil cp startuplog gs://container-builder-local-test-logs/startup.txt
   [[ $successful_startup == 0 ]] && (
     gsutil cp startuplog gs://container-builder-local-test-logs/startup-failure.txt ||
@@ -83,7 +87,7 @@ gcloud compute instances add-metadata $HOSTNAME --metadata=successful_startup=1
 
 # Fetch test files from gcs.
 mkdir /root/test-files
-gsutil -m copy $gcs_path/* /root/test-files/
+gsutil -m copy ${gcs_path}/* /root/test-files/
 chmod +x /root/test-files/container-builder-local || exit
 mv /root/test-files/container-builder-local /usr/local/bin/
 chmod +x /root/test-files/test-script.sh || exit

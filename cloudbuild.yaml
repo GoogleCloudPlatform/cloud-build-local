@@ -31,9 +31,9 @@ steps:
   - '-c'
   - |
     DATE=`date +%Y%m%d_%H%M%S`
-    GCS_PATH=gs://container-builder-local-test/$$DATE/
-    gsutil -m copy container-builder-local $$GCS_PATH
-    gsutil -m copy ./integration_tests/* $$GCS_PATH
+    GCS_PATH=gs://container-builder-local-test/$$DATE
+    gsutil -m copy container-builder-local $$GCS_PATH/
+    gsutil -m copy ./integration_tests/* $$GCS_PATH/
     gsutil rm gs://container-builder-local-test-logs/*
 
     gcloud config set compute/zone us-central1-f
