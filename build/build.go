@@ -290,7 +290,6 @@ func (b *Build) SetDockerAccessToken(tok string) error {
 		return fmt.Errorf("failed to set initial docker credentials: %v\n%s", err, buf.String())
 	}
 	b.prevGCRAuth = auth
-	fmt.Println("--> successfully SET initial docker credentials", auth)
 	return nil
 }
 
@@ -333,7 +332,6 @@ func (b *Build) UpdateDockerAccessToken(tok string) error {
 		return fmt.Errorf("failed to update docker credentials: %v\n%s", err, buf.String())
 	}
 	b.prevGCRAuth = auth
-	fmt.Println("--> successfully UPDATED initial docker credentials", auth)
 	return nil
 }
 
@@ -803,8 +801,6 @@ func (b *Build) dockerRunArgs(stepDir string, idx int) []string {
 			"--volume", fmt.Sprintf("%s:%s", "/root/tokencache", "/root/tokencache"),
 		)
 	}
-
-	fmt.Println("--> ", args)
 	return args
 }
 
