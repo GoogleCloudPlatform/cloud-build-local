@@ -82,11 +82,9 @@ func CheckBuild(b *cb.Build) error {
 	if err := CheckSubstitutions(b.Substitutions); err != nil {
 		return fmt.Errorf("invalid .substitutions field: %v", err)
 	}
-
 	if err := CheckImages(b.Images); err != nil {
 		return fmt.Errorf("invalid .images field: %v", err)
 	}
-
 	if err := CheckBuildSteps(b.Steps); err != nil {
 		return fmt.Errorf("invalid .steps field: %v", err)
 	}
@@ -101,10 +99,18 @@ func CheckBuild(b *cb.Build) error {
 		}
 	}
 
+	if err := subst.SubstituteBuildFields(b); err != nil {
+		return err
+	}
 	if err := checkBuildTags(b.Tags); err != nil {
 		return err
 	}
-
+	if err := checkBuildStepNames(b.Steps); err != nil {
+		return err
+	}
+	if err := checkImageTags(b.Images); err != nil {
+		return err
+	}
 	return nil
 }
 

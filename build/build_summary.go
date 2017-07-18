@@ -27,7 +27,7 @@ const (
 	StatusBuild BuildStatus = "BUILD"
 	// StatusPush - Pushing the resultant image to GCR.
 	StatusPush BuildStatus = "PUSH"
-	// StatusDone - Build completed seccussfully.
+	// StatusDone - Build completed successfully.
 	StatusDone BuildStatus = "DONE"
 	// StatusError - Build failed.
 	StatusError BuildStatus = "ERROR"

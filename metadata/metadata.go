@@ -192,7 +192,7 @@ func startServer(r runner.Runner, metadataImage string, iptables bool, ip, subne
 	cmd := []string{"docker", "network", "create", "cloudbuild", "--subnet=" + subnet}
 	log.Println(cmd)
 	if err := r.Run(cmd, nil, os.Stdout, os.Stderr, ""); err != nil {
-		log.Fatalf("Error creating network: %v", err)
+		return fmt.Errorf("Error creating network: %v", err)
 	}
 
 	// Run the spoofed metadata server.
@@ -211,7 +211,7 @@ func startServer(r runner.Runner, metadataImage string, iptables bool, ip, subne
 	cmd = []string{"docker", "network", "connect", "--alias=metadata", "--alias=metadata.google.internal", "--ip=" + ip, "cloudbuild", "metadata"}
 	log.Println(cmd)
 	if err := r.Run(cmd, nil, os.Stdout, os.Stderr, ""); err != nil {
-		log.Fatalf("Error connecting metadata to network: %v", err)
+		return fmt.Errorf("Error connecting metadata to network: %v", err)
 	}
 
 	if iptables {
@@ -227,7 +227,7 @@ func startServer(r runner.Runner, metadataImage string, iptables bool, ip, subne
 		}
 		log.Println(cmd)
 		if err := r.Run(cmd, nil, os.Stdout, os.Stderr, ""); err != nil {
-			log.Fatalf("Error updating iptables: %v", err)
+			return fmt.Errorf("Error updating iptables: %v", err)
 		}
 	}
 
@@ -245,12 +245,12 @@ func startServer(r runner.Runner, metadataImage string, iptables bool, ip, subne
 
 // Stop stops the metadata server container and tears down the docker cloudbuild
 // network used to route traffic to it.
+// Try to clean both the container and the network before returning an error.
 func (RealUpdater) Stop(r runner.Runner) error {
-	if err := r.Run([]string{"docker", "rm", "-f", "metadata"}, nil, os.Stdout, os.Stderr, ""); err != nil {
-		return err
+	errContainer := r.Run([]string{"docker", "rm", "-f", "metadata"}, nil, os.Stdout, os.Stderr, "")
+	errNetwork := r.Run([]string{"docker", "network", "rm", "cloudbuild"}, nil, os.Stdout, os.Stderr, "")
+	if errContainer != nil {
+		return errContainer
 	}
-	if err := r.Run([]string{"docker", "network", "rm", "cloudbuild"}, nil, os.Stdout, os.Stderr, ""); err != nil {
-		return err
-	}
-	return nil
+	return errNetwork
 }

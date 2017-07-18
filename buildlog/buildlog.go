@@ -109,7 +109,6 @@ func (l *BuildLog) WriteMainEntry(msg string) {
 func (l *BuildLog) Close() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	log.Print("Closing build log")
 	// Flush any partial lines to the log.
 	for _, child := range l.children {
 		l.mu.Unlock() // child.Flush() will acquire/release mu
@@ -125,7 +124,6 @@ func (l *BuildLog) Close() error {
 			log.Printf("Error closing log %q: %v", sink.Name, err)
 			return err
 		}
-		log.Printf("Closed log: %s", sink.Name)
 	}
 	return nil
 }

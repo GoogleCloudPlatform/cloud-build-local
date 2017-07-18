@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	google_metadata "cloud.google.com/go/compute/metadata"
 	"golang.org/x/oauth2"
 	"github.com/google/uuid"
 
@@ -66,11 +67,11 @@ func main() {
 
 	if *help {
 		flag.PrintDefaults()
-		os.Exit(0)
+		return
 	}
 	if *versionFlag {
 		log.Printf("Version: %s", version)
-		os.Exit(0)
+		return
 	}
 
 	if len(args) == 0 {
@@ -157,8 +158,9 @@ func run(source string) error {
 
 	b := build.New(r, *buildConfig, nil, &buildlog.BuildLog{}, volumeName, true, *push)
 
-	if !*dryRun {
-		// Start the spoofed metadata server.
+	// Do not run the spoofed metadata server on a dryrun or
+	// on GCE where a real one exists.
+	if !*dryRun && !google_metadata.OnGCE() {
 		log.Println("Starting spoofed metadata server...")
 		if err := metadata.StartLocalServer(r, metadataImageName); err != nil {
 			return fmt.Errorf("Failed to start spoofed metadata server: %v", err)
@@ -200,7 +202,6 @@ func run(source string) error {
 		}()
 
 		go supplyTokenToMetadata(metadataUpdater, r)
-
 	}
 
 	b.Start()
