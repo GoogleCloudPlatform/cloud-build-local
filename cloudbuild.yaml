@@ -12,3 +12,12 @@ steps:
 - name: 'gcr.io/cloud-builders/go:wheezy'
   args: ['build', '-o', 'container-builder-local', 'github.com/GoogleCloudPlatform/container-builder-local']
 
+- name: 'gcr.io/cloud-builders/go:wheezy'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    go run ./integrations_tests/smoke_test.go \
+     --files_path=./integrations_tests/smoke_test.go \
+     --binary_path=./container-builder-local
+
