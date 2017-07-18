@@ -11,13 +11,16 @@ steps:
 # Binary creation.
 - name: 'gcr.io/cloud-builders/go:wheezy'
   args: ['build', '-o', 'container-builder-local', 'github.com/GoogleCloudPlatform/container-builder-local']
-
+# Run integration tests.
+# Probably need to first create a special image that contains: go, gcloud,
+# docker, gsutil, ...
 - name: 'gcr.io/cloud-builders/go:wheezy'
   entrypoint: 'bash'
   args:
   - '-c'
   - |
+    cp container-builder-local /usr/local/bin/
     go test ./integration_tests/smoke_test.go \
-     --files_path=./integration_tests/smoke_test.go \
-     --binary_path=./container-builder-local
+     --files_path=./integration_tests/ \
+     --binary_path=container-builder-local
 

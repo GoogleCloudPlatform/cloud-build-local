@@ -75,7 +75,7 @@ func TestFlags(t *testing.T) {
 	for _, tc := range testCases {
 		cmd := exec.Command(*binaryPath, tc.flags...)
 		stdout, err := cmd.CombinedOutput()
-		fmt.Println("--> ", cmd, err, string(stdout))
+		// fmt.Println("--> ", cmd, err, string(stdout))
 		if err != nil && !tc.wantErr {
 			t.Errorf("%s: Command returned an error: %v", tc.desc, err)
 		}
