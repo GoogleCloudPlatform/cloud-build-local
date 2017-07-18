@@ -43,7 +43,7 @@ import (
 const (
 	volumeNamePrefix  = "gcb-local-vol-"
 	tokenRefreshDur   = 10 * time.Minute
-	gcbDockerVersion  = "17.05"
+	gcbDockerVersion  = "17.05-ce"
 	metadataImageName = "gcr.io/cloud-builders/metadata"
 )
 
@@ -83,6 +83,15 @@ func main() {
 		exitUsage("Specify a config file")
 	}
 
+	if err := run(source); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// run method is used to encapsulate the local builder process, being
+// able to return errors to the main function which will then panic. So the
+// run function can probably run all the defer functions in any case.
+func run(source string) error {
 	// Create a runner.
 	r := &runner.RealRunner{
 		DryRun: *dryRun,
@@ -92,8 +101,7 @@ func main() {
 	if !*dryRun {
 		dockerServerVersion, dockerClientVersion, err := dockerVersions(r)
 		if err != nil {
-			log.Printf("Error getting local docker versions: %v", err)
-			return
+			return fmt.Errorf("Error getting local docker versions: %v", err)
 		}
 		if dockerServerVersion != gcbDockerVersion {
 			log.Printf("Warning: The server docker version installed (%s) is different from the one used in GCB (%s)", dockerServerVersion, gcbDockerVersion)
@@ -106,30 +114,26 @@ func main() {
 	// Load config file into a build struct.
 	buildConfig, err := config.Load(*configFile)
 	if err != nil {
-		log.Printf("Error loading config file: %v", err)
-		return
+		return fmt.Errorf("Error loading config file: %v", err)
 	}
 
 	// Parse substitutions.
 	if *substitutions != "" {
 		substMap, err := common.ParseSubstitutionsFlag(*substitutions)
 		if err != nil {
-			log.Printf("Error parsing substitutions flag: %v", err)
-			return
+			return fmt.Errorf("Error parsing substitutions flag: %v", err)
 		}
 		buildConfig.Substitutions = substMap
 	}
 
 	// Validate the build.
 	if err := validate.CheckBuild(buildConfig); err != nil {
-		log.Printf("Error validating build: %v", err)
-		return
+		return fmt.Errorf("Error validating build: %v", err)
 	}
 
 	// Apply substitutions.
 	if err := subst.SubstituteBuildFields(buildConfig); err != nil {
-		log.Printf("Error applying substitutions: %v", err)
-		return
+		return fmt.Errorf("Error applying substitutions: %v", err)
 	}
 
 	// Create a volume, a helper container to copy the source, and defer cleaning.
@@ -137,19 +141,16 @@ func main() {
 	if !*dryRun {
 		vol := volume.New(volumeName, r)
 		if err := vol.Setup(); err != nil {
-			log.Printf("Error creating docker volume: %v", err)
-			return
+			return fmt.Errorf("Error creating docker volume: %v", err)
 		}
 		// If the source is a directory, only copy the inner content.
 		if isDir, err := isDirectory(source); err != nil {
-			log.Printf("Error getting directory: %v", err)
-			return
+			return fmt.Errorf("Error getting directory: %v", err)
 		} else if isDir {
 			source = filepath.Clean(source) + "/."
 		}
 		if err := vol.Copy(source); err != nil {
-			log.Printf("Error copying source to docker volume: %v", err)
-			return
+			return fmt.Errorf("Error copying source to docker volume: %v", err)
 		}
 		defer vol.Close()
 	}
@@ -160,8 +161,7 @@ func main() {
 		// Start the spoofed metadata server.
 		log.Println("Starting spoofed metadata server...")
 		if err := metadata.StartLocalServer(r, metadataImageName); err != nil {
-			log.Printf("Failed to start spoofed metadata server: %v", err)
-			return
+			return fmt.Errorf("Failed to start spoofed metadata server: %v", err)
 		}
 		log.Println("Started spoofed metadata server")
 		metadataUpdater := metadata.RealUpdater{Local: true}
@@ -170,20 +170,17 @@ func main() {
 		// Get project info to feed the metadata server.
 		projectInfo, err := gcloud.ProjectInfo(r)
 		if err != nil {
-			log.Printf("Error getting project information from gcloud: %v", err)
-			return
+			return fmt.Errorf("Error getting project information from gcloud: %v", err)
 		}
 		metadataUpdater.SetProjectInfo(projectInfo)
 
 		// Set initial Docker credentials.
 		tok, err := gcloud.AccessToken(r)
 		if err != nil {
-			log.Printf("Error getting access token to set docker credentials: %v", err)
-			return
+			return fmt.Errorf("Error getting access token to set docker credentials: %v", err)
 		}
 		if err := b.SetDockerAccessToken(tok); err != nil {
-			log.Printf("Error setting docker credentials: %v", err)
-			return
+			return fmt.Errorf("Error setting docker credentials: %v", err)
 		}
 
 		// Write initial docker credentials for GCR. This writes the initial
@@ -211,6 +208,7 @@ func main() {
 	if *dryRun {
 		log.Printf("Warning: this was a dry run; add --dryrun=false if you want to run the build locally.")
 	}
+	return nil
 }
 
 // supplyTokenToMetadata gets gcloud token and supply it to the metadata server.

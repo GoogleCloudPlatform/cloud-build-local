@@ -13,32 +13,31 @@ steps:
 - name: 'gcr.io/cloud-builders/go:wheezy'
   args: ['build', '-o', 'container-builder-local', 'github.com/GoogleCloudPlatform/container-builder-local']
 
-# Create a docker image with all the tools needed to test the local builder.
-# The lastest image is pulled first in order to make the next build faster,
-# using --cache-from.
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['pull', 'gcr.io/argo-local-builder/integration-image']
-- name: 'gcr.io/cloud-builders/docker'
-  args:
-  - 'build'
-  - '--cache-from'
-  - 'gcr.io/argo-local-builder/integration-image'
-  - '-t'
-  - 'gcr.io/argo-local-builder/integration-image'
-  - './integration_tests/.'
+# Copy the integration test files to GCS
 
-# Run integration tests.
-- name: 'gcr.io/argo-local-builder/integration-image'
+- name: 'gcr.io/cloud-builders/gsutil'
   entrypoint: 'bash'
   args:
   - '-c'
   - |
-    docker images
-    cp container-builder-local /usr/local/bin/
-    go test ./integration_tests/smoke_test.go \
-     --files_path=$$PWD/integration_tests/
+    gsutil rm gs://container-builder-local-test/*
+    gsutil rm gs://container-builder-local-test-logs/*
+    gsutil copy container-builder-local gs://container-builder-local-test/
+    gsutil copy ./integration_tests/* gs://container-builder-local-test/
 
-# This image is saved to make subsequent build faster if the tools didn't change.
-images: ['gcr.io/argo-local-builder/integration-image']
+# Run integration tests in a VM.
+- name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    gcloud compute instances create ubuntu-integration-tests \
+      --image-family=ubuntu-1404-lts \
+      --image-project=ubuntu-os-cloud \
+      --machine-type=n1-standard-1 \
+      --scopes userinfo-email,cloud-platform \
+      --metadata-from-file startup-script=/google/src/cloud/philmod/argo-local-builder/google3/third_party/argo/local_builder/integration_tests/gce_startup_script.sh \
+      --zone us-central1-f \
+      --metadata zone=us-central1-f
 
 
