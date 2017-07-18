@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	google_metadata "cloud.google.com/go/compute/metadata"
+	computeMetadata "cloud.google.com/go/compute/metadata"
 	"golang.org/x/oauth2"
 	"github.com/google/uuid"
 
@@ -158,50 +158,57 @@ func run(source string) error {
 
 	b := build.New(r, *buildConfig, nil, &buildlog.BuildLog{}, volumeName, true, *push)
 
-	// Do not run the spoofed metadata server on a dryrun or
-	// on GCE where a real one exists.
-	if !*dryRun && !google_metadata.OnGCE() {
-		log.Println("Starting spoofed metadata server...")
-		if err := metadata.StartLocalServer(r, metadataImageName); err != nil {
-			return fmt.Errorf("Failed to start spoofed metadata server: %v", err)
-		}
-		log.Println("Started spoofed metadata server")
-		metadataUpdater := metadata.RealUpdater{Local: true}
-		defer metadataUpdater.Stop(r)
-
-		// Get project info to feed the metadata server.
-		projectInfo, err := gcloud.ProjectInfo(r)
-		if err != nil {
-			return fmt.Errorf("Error getting project information from gcloud: %v", err)
-		}
-		metadataUpdater.SetProjectInfo(projectInfo)
-
-		// Set initial Docker credentials.
-		tok, err := gcloud.AccessToken(r)
-		if err != nil {
-			return fmt.Errorf("Error getting access token to set docker credentials: %v", err)
-		}
-		if err := b.SetDockerAccessToken(tok); err != nil {
-			return fmt.Errorf("Error setting docker credentials: %v", err)
-		}
-
-		// Write initial docker credentials for GCR. This writes the initial
-		// ~/.docker/config.json which is made available to build steps.
-		
-		go func() {
-			for ; ; time.Sleep(tokenRefreshDur) {
-				tok, err := gcloud.AccessToken(r)
-				if err != nil {
-					log.Printf("Error getting access token to update docker credentials: %v", err)
-					continue
-				}
-				if err := b.UpdateDockerAccessToken(tok); err != nil {
-					log.Printf("Error updating docker credentials: %v", err)
-				}
+	// Do not run the spoofed metadata server on a dryrun.
+	if !*dryRun {
+		// On GCE, do not create a spoofed metadata server, use the existing one.
+		// The cloudbuild network is still needed.
+		if computeMetadata.OnGCE() {
+			if err := metadata.CreateCloudbuildNetwork(r, ""); err != nil {
+				return fmt.Errorf("Error creating network: %v", err)
 			}
-		}()
+		} else {
+			log.Println("Starting spoofed metadata server...")
+			if err := metadata.StartLocalServer(r, metadataImageName); err != nil {
+				return fmt.Errorf("Failed to start spoofed metadata server: %v", err)
+			}
+			log.Println("Started spoofed metadata server")
+			metadataUpdater := metadata.RealUpdater{Local: true}
+			defer metadataUpdater.Stop(r)
 
-		go supplyTokenToMetadata(metadataUpdater, r)
+			// Get project info to feed the metadata server.
+			projectInfo, err := gcloud.ProjectInfo(r)
+			if err != nil {
+				return fmt.Errorf("Error getting project information from gcloud: %v", err)
+			}
+			metadataUpdater.SetProjectInfo(projectInfo)
+
+			// Set initial Docker credentials.
+			tok, err := gcloud.AccessToken(r)
+			if err != nil {
+				return fmt.Errorf("Error getting access token to set docker credentials: %v", err)
+			}
+			if err := b.SetDockerAccessToken(tok); err != nil {
+				return fmt.Errorf("Error setting docker credentials: %v", err)
+			}
+
+			// Write initial docker credentials for GCR. This writes the initial
+			// ~/.docker/config.json which is made available to build steps.
+			
+			go func() {
+				for ; ; time.Sleep(tokenRefreshDur) {
+					tok, err := gcloud.AccessToken(r)
+					if err != nil {
+						log.Printf("Error getting access token to update docker credentials: %v", err)
+						continue
+					}
+					if err := b.UpdateDockerAccessToken(tok); err != nil {
+						log.Printf("Error updating docker credentials: %v", err)
+					}
+				}
+			}()
+
+			go supplyTokenToMetadata(metadataUpdater, r)
+		}
 	}
 
 	b.Start()

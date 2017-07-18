@@ -187,29 +187,35 @@ func StartCloudServer(r runner.Runner, metadataImage string) error {
 	return startServer(r, metadataImage, true, metadataHostedIP, metadataHostedSubnet)
 }
 
-func startServer(r runner.Runner, metadataImage string, iptables bool, ip, subnet string) error {
-	// Create the network.
+// CreateCloudbuildNetwork creates a cloud build network to link the build
+// builds.
+func CreateCloudbuildNetwork(r runner.Runner, subnet string) error {
+	if subnet == "" {
+		subnet = metadataLocalSubnet
+	}
 	cmd := []string{"docker", "network", "create", "cloudbuild", "--subnet=" + subnet}
-	log.Println(cmd)
-	if err := r.Run(cmd, nil, os.Stdout, os.Stderr, ""); err != nil {
+	return r.Run(cmd, nil, os.Stdout, os.Stderr, "")
+}
+
+func startServer(r runner.Runner, metadataImage string, iptables bool, ip, subnet string) error {
+	if err := CreateCloudbuildNetwork(r, subnet); err != nil {
 		return fmt.Errorf("Error creating network: %v", err)
 	}
 
 	// Run the spoofed metadata server.
+	var cmd []string
 	if !iptables {
 		// In the local builder, we need to expose the port but it's nice to avoid 80.
 		cmd = []string{"docker", "run", "-d", "-p=8082:80", "--name=metadata", metadataImage}
 	} else {
 		cmd = []string{"docker", "run", "-d", "--name=metadata", metadataImage}
 	}
-	log.Println(cmd)
 	if err := r.Run(cmd, nil, os.Stdout, os.Stderr, ""); err != nil {
 		return err
 	}
 
 	// Redirect requests to metadata.google.internal and the fixed metadata IP to the metadata container.
 	cmd = []string{"docker", "network", "connect", "--alias=metadata", "--alias=metadata.google.internal", "--ip=" + ip, "cloudbuild", "metadata"}
-	log.Println(cmd)
 	if err := r.Run(cmd, nil, os.Stdout, os.Stderr, ""); err != nil {
 		return fmt.Errorf("Error connecting metadata to network: %v", err)
 	}
@@ -225,7 +231,6 @@ func startServer(r runner.Runner, metadataImage string, iptables bool, ip, subne
 			"-j", "DNAT", // This rule does destination NATting,
 			"--to-destination", metadataHostedIP, // to our spoofed metadata container.
 		}
-		log.Println(cmd)
 		if err := r.Run(cmd, nil, os.Stdout, os.Stderr, ""); err != nil {
 			return fmt.Errorf("Error updating iptables: %v", err)
 		}
