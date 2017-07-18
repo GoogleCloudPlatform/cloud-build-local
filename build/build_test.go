@@ -15,6 +15,7 @@
 package build
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
