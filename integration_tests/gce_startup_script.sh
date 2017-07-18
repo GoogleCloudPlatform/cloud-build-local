@@ -71,7 +71,7 @@ install_docker&
 # add the install_docker PID to the list for waiting.
 pids="$! $pids"
 
-wait $pids || successful_startup=1 && exit
+wait $pids || exit
 successful_startup=0 # success
 
 # Fetch some metadata.
