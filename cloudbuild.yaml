@@ -18,5 +18,6 @@ steps:
   - '-c'
   - |
     echo hello world
-    ls
+    container-builder-local --help || exit 1
+    container-builder-local --VERSION || exit 1
 
