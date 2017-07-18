@@ -94,10 +94,11 @@ gsutil cp /root/output.txt gs://container-builder-local-test-logs/output.txt || 
 
 # Run the integration test script. When finished, write to a "success" or "failure" file
 # in GCS so that the test runner can stop immediately.
+echo "--> going to run the tests now..."
 (
   # If the test succeeds, copy the output to success.txt. Else, to failure.txt.
   /root/test-files/test-script.sh &> /root/output.txt && \
-    (gsutil cp /root/output.txt gs://container-builder-local-test-logs/success.txt && successful_test=1) || \
+    (gsutil cp /root/output.txt gs://container-builder-local-test-logs/success.txt && echo "wtf?" && successful_test=1) || \
     gsutil cp /root/output.txt gs://container-builder-local-test-logs/failure.txt
   touch done
 )&
@@ -119,7 +120,7 @@ wait
 uploadLogs
 
 # Set a metadata value about the success of the test script.
-echo successful_test=${successful_test=1}
+echo successful_test=${successful_test}
 gcloud compute instances add-metadata $HOSTNAME --metadata=successful_test=${successful_test}
 
 # Startup script output is successfully archived, kill the VM.
