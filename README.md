@@ -20,28 +20,22 @@ so you have to set the project:
 gcloud config set project my-project
 ```
 
-## Download the binary
+## Install using gcloud
+
+```
+gcloud components install container-builder-local
+```
+
+## Download the latest binaries
 
 The latest binaries are available in a GCS bucket.
 
-First check the latest tag on the [releases page](https://github.com/GoogleCloudPlatform/container-builder-local/releases).
-
-```
-gsutil cp gs://container-builder-local/container-builder-local_{linux,darwin}_{386,amd64}-v<enter_tag> .
-chmod +x container-builder-local_{linux,darwin}_{386,amd64}-v<enter_tag>
-```
-
-For example, to run a build on linux 386 with the `v0.0.1` release:
-
-```
-gsutil cp gs://container-builder-local/container-builder-local_linux_386-v0.0.1 .
-chmod +x container-builder-local_linux_386-v0.0.1
-```
+[Download](https://storage.googleapis.com/container-builder-local/container-builder-local_latest.tar.gz) the latest binaries from GCS.
 
 To run a build:
 
 ```
-./container-builder-local_{linux,darwin}_{386,amd64}-v<enter_tag> --dryrun=false --config=path/to/cloudbuild.yaml path/to/code
+./container-builder-local_{linux,darwin}_{386,amd64}-v<latest_tag> --dryrun=false --config=path/to/cloudbuild.yaml path/to/code
 ```
 
 ## Developing Local Builder
