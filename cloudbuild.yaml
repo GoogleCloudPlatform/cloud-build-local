@@ -8,15 +8,22 @@ steps:
   - '-c'
   - |
     # find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath|integration_tests" | xargs /builder/bin/go.bash test
+
 # Binary creation.
 - name: 'gcr.io/cloud-builders/go:wheezy'
   args: ['build', '-o', 'container-builder-local', 'github.com/GoogleCloudPlatform/container-builder-local']
+
 # Create a docker image with all the tools for local builder.
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'integration-image', './integration_tests/.']
+  args:
+  - 'build'
+  - '--cache-from'
+  - 'gcr.io/argo-local-builder/integration-image:latest'
+  - '-t'
+  - 'gcr.io/argo-local-builder/integration-image:latest'
+  - './integration_tests/.'
+
 # Run integration tests.
-# Probably need to first create a special image that contains: go, gcloud,
-# docker, gsutil, ...
 - name: 'integration-image'
   entrypoint: 'bash'
   args:
@@ -25,6 +32,9 @@ steps:
     docker images
     cp container-builder-local /usr/local/bin/
     go test ./integration_tests/smoke_test.go \
-     --files_path=$$PWD/integration_tests/ \
-     --binary_path=container-builder-local
+     --files_path=$$PWD/integration_tests/
 
+
+
+# This image is saved to make subsequent build faster if the tools didn't change.
+images: ['gcr.io/argo-local-builder/integration-image:latest']

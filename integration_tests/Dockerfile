@@ -1,4 +1,9 @@
-FROM gcr.io/cloud-builders/go:wheezy
+FROM ubuntu:trusty
+
+# Install golang
+RUN \
+   apt-get -y update && \
+   sudo apt-get install -y golang-go
 
 # Install Docker
 # Based on instructions from:
