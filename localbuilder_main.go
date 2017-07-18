@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	volumeNamePrefix  = "cloudbuild_vol_"
+	volumeNamePrefix  = "gcb-local-vol-"
 	tokenRefreshDur   = 10 * time.Minute
 	gcbDockerVersion  = "17.05-ce"
 	metadataImageName = "gcr.io/cloud-builders/metadata"
@@ -96,11 +96,6 @@ func run(source string) error {
 	// Create a runner.
 	r := &runner.RealRunner{
 		DryRun: *dryRun,
-	}
-
-	// Clean leftovers from a previous build.
-	if err := common.Clean(r); err != nil {
-		return fmt.Errorf("Error cleaning: %v", err)
 	}
 
 	// Check installed docker versions.

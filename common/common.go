@@ -16,15 +16,10 @@
 package common
 
 import (
-	"bytes"
 	"fmt"
-	"log"
 	"math/rand"
-	"os"
 	"strings"
 	"time"
-
-	"github.com/GoogleCloudPlatform/container-builder-local/runner"
 )
 
 const (
@@ -78,49 +73,4 @@ func ParseSubstitutionsFlag(substitutions string) (map[string]string, error) {
 		substitutionsMap[strings.TrimSpace(keyValue[0])] = strings.TrimSpace(keyValue[1])
 	}
 	return substitutionsMap, nil
-}
-
-// Clean removes left over containers, networks, volumes from a
-// previous run of the local builder. This happens when ctrl+c is used during
-// a local build.
-// Each cleaning is defined by a get command, a warning to print if the get
-// command returns something, and a delete command to apply in that case.
-func Clean(r runner.Runner) error {
-	items := []struct {
-		getCmd, deleteCmd []string
-		warning           string
-	}{{
-		getCmd:    []string{"docker", "ps", "-a", "-q", "--filter", "name=step_[0-9]+|cloudbuild_|metadata"},
-		deleteCmd: []string{"docker", "rm", "-f"},
-		warning:   "Warning: there are left over step containers from a previous build, cleaning them.",
-	}, {
-		getCmd:    []string{"docker", "network", "ls", "-q", "--filter", "name=cloudbuild"},
-		deleteCmd: []string{"docker", "network", "rm"},
-		warning:   "Warning: a network is left over from a previous build, cleaning it.",
-	}, {
-		getCmd:    []string{"docker", "volume", "ls", "-q", "--filter", "name=homevol|cloudbuild_"},
-		deleteCmd: []string{"docker", "volume", "rm"},
-		warning:   "Warning: there are left over step volumes from a previous build, cleaning it.",
-	}}
-
-	for _, item := range items {
-		var output bytes.Buffer
-		if err := r.Run(item.getCmd, nil, &output, os.Stderr, ""); err != nil {
-			return err
-		}
-
-		str := strings.TrimSpace(output.String())
-		if str == "" {
-			continue
-		}
-		log.Println(item.warning)
-
-		args := strings.Split(str, "\n")
-		deleteCmd := append(item.deleteCmd, args...)
-		if err := r.Run(deleteCmd, nil, nil, os.Stderr, ""); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }

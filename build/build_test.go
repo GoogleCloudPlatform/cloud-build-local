@@ -363,9 +363,9 @@ func TestFetchBuilder(t *testing.T) {
 		buildRequest: commonBuildRequest,
 		wantCommands: []string{
 			"docker inspect gcr.io/my-project/my-compiler",
-			"docker run --name cloudbuild_docker_pull --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-compiler",
+			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-compiler",
 			"docker inspect gcr.io/my-project/my-builder",
-			"docker run --name cloudbuild_docker_pull --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
+			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 		},
 	}, {
 		name: "TestFetchBuilderExists",
@@ -387,7 +387,7 @@ func TestFetchBuilder(t *testing.T) {
 		// no image in remoteImages
 		wantCommands: []string{
 			"docker inspect gcr.io/invalid-build-step",
-			"docker run --name cloudbuild_docker_pull --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
+			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
 		},
 		wantErr: errors.New(`error pulling build step "gcr.io/invalid-build-step": exit status 1 for tag "gcr.io/invalid-build-step"`),
 	}}
@@ -587,10 +587,10 @@ func TestRunBuildSteps(t *testing.T) {
 		buildRequest: commonBuildRequest,
 		wantCommands: []string{
 			"docker inspect gcr.io/my-project/my-compiler",
-			"docker run --name cloudbuild_docker_pull --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-compiler",
+			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-compiler",
 			dockerRunString(0) + " gcr.io/my-project/my-compiler",
 			"docker inspect gcr.io/my-project/my-builder",
-			"docker run --name cloudbuild_docker_pull --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
+			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 			dockerRunInStepDir(1, "foo/baz") +
 				" --env FOO=bar" +
 				" --env BAZ=buz" +
@@ -1430,7 +1430,7 @@ func TestStart(t *testing.T) {
 		wantCommands: []string{
 			"docker volume create --name homevol",
 			"docker inspect gcr.io/my-project/my-builder",
-			"docker run --name cloudbuild_docker_pull --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
+			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 			dockerRunString(0) + " gcr.io/my-project/my-builder a",
 			"docker inspect gcr.io/build",
 			"docker rm -f step_0",
@@ -1450,7 +1450,7 @@ func TestStart(t *testing.T) {
 		wantCommands: []string{
 			"docker volume create --name homevol",
 			"docker inspect gcr.io/my-project/my-builder",
-			"docker run --name cloudbuild_docker_pull --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
+			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 			dockerRunString(0) + " gcr.io/my-project/my-builder a",
 			"docker inspect gcr.io/build",
 			"docker rm -f step_0",
@@ -1508,7 +1508,7 @@ func TestUpdateDockerAccessToken(t *testing.T) {
 
 	got := strings.Join(r.commands, "\n")
 	want := strings.Join([]string{
-		`docker run --name cloudbuild_set_docker_token --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock --entrypoint bash ubuntu -c mkdir -p ~/.docker/ && cat << EOF > ~/.docker/config.json
+		`docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock --entrypoint bash ubuntu -c mkdir -p ~/.docker/ && cat << EOF > ~/.docker/config.json
 {
   "auths": {
     "https://asia.gcr.io": {
@@ -1535,7 +1535,7 @@ func TestUpdateDockerAccessToken(t *testing.T) {
   }
 }
 EOF`,
-		"docker run --name cloudbuild_update_docker_token --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock --entrypoint bash ubuntu -c sed -i 's/b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q=/b2F1dGgyYWNjZXNzdG9rZW46U0VDT05E/g' ~/.docker/config.json",
+		"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock --entrypoint bash ubuntu -c sed -i 's/b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q=/b2F1dGgyYWNjZXNzdG9rZW46U0VDT05E/g' ~/.docker/config.json",
 	}, "\n")
 	if got != want {
 		t.Errorf("Commands didn't match!\n===Want:\n%s\n===Got:\n%s", want, got)
