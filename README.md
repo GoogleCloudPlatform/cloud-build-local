@@ -5,6 +5,17 @@ and integration into local build and test workflows.
 
 ----
 
+## Using Local Builder
+
+### Prerequisites
+- gcloud
+- docker
+- go (if you build the tool yourself)
+
+If you want to access private GCR during the local build (either pulling or 
+pushing an image), use the
+[Docker credential helper for GCR users](https://github.com/GoogleCloudPlatform/docker-credential-gcr).
+
 ## Developing Local Builder
 
 To build and develop Local Builder, you need a working [Go environment].
