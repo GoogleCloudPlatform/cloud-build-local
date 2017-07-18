@@ -165,7 +165,7 @@ func run(source string) error {
 		// The cloudbuild network is still needed.
 		if computeMetadata.OnGCE() {
 			log.Println("Creating cloudbuild network because build run on GCE...")
-			if err := metadata.CreateCloudbuildNetwork(r, ""); err != nil {
+			if err := metadata.CreateCloudbuildNetwork(r, "172.22.0.0/16"); err != nil {
 				return fmt.Errorf("Error creating network: %v", err)
 			}
 		} else {

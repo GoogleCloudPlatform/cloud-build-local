@@ -190,9 +190,6 @@ func StartCloudServer(r runner.Runner, metadataImage string) error {
 // CreateCloudbuildNetwork creates a cloud build network to link the build
 // builds.
 func CreateCloudbuildNetwork(r runner.Runner, subnet string) error {
-	if subnet == "" {
-		subnet = metadataLocalSubnet
-	}
 	cmd := []string{"docker", "network", "create", "cloudbuild", "--subnet=" + subnet}
 	return r.Run(cmd, nil, os.Stdout, os.Stderr, "")
 }
