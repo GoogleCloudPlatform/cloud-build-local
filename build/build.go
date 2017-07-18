@@ -39,6 +39,7 @@ import (
 	"github.com/GoogleCloudPlatform/container-builder-local/volume"
 	"google.golang.org/api/cloudkms/v1"
 	"golang.org/x/oauth2"
+	"github.com/google/uuid"
 )
 
 const (
@@ -275,6 +276,8 @@ func (b *Build) SetDockerAccessToken(tok string) error {
 	// Simply run an "ubuntu" image with $HOME mounted that writes the ~/.docker/config.json file.
 	var buf bytes.Buffer
 	args := []string{"docker", "run",
+		"--name", fmt.Sprintf("cloudbuild_set_docker_token_%s", uuid.New()),
+		"--rm",
 		// Mount in the home volume.
 		"--volume", homeVolume + ":" + homeDir,
 		// Make /builder/home $HOME.
@@ -315,6 +318,8 @@ func (b *Build) UpdateDockerAccessToken(tok string) error {
 	// Simply run an "ubuntu" image with $HOME mounted that runs the sed script.
 	var buf bytes.Buffer
 	args := []string{"docker", "run",
+		"--name", fmt.Sprintf("cloudbuild_update_docker_token_%s", uuid.New()),
+		"--rm",
 		// Mount in the home volume.
 		"--volume", homeVolume + ":" + homeDir,
 		// Make /builder/home $HOME.
@@ -352,6 +357,8 @@ func (b *Build) imageIsLocal(tag string) bool {
 func (b *Build) dockerPull(tag string, outWriter, errWriter io.Writer) (string, error) {
 	// Pull from within a container with $HOME mounted.
 	args := []string{"docker", "run",
+		"--name", fmt.Sprintf("cloudbuild_docker_pull_%s", uuid.New()),
+		"--rm",
 		// Mount in the home volume.
 		"--volume", homeVolume + ":" + homeDir,
 		// Make /builder/home $HOME.
@@ -441,7 +448,7 @@ func (b *Build) dockerPushWithRetries(tag string, attempt int) (string, error) {
 
 	// Push from within a container with $HOME mounted.
 	args := []string{"docker", "run",
-		"--name", "cloudbuild_docker_push",
+		"--name", fmt.Sprintf("cloudbuild_docker_push_%s", uuid.New()),
 		"--rm",
 		// Mount in the home volume.
 		"--volume", homeVolume + ":" + homeDir,

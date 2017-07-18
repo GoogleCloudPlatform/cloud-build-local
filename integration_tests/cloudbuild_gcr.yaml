@@ -1,3 +1,5 @@
+# This test creates a docker image, using cache-from, then pushes to gcr.
+
 steps:
 - name: 'gcr.io/cloud-builders/docker'
   args: ['pull', 'gcr.io/argo-local-builder/test']
@@ -8,8 +10,6 @@ steps:
   - 'gcr.io/argo-local-builder/test'
   - '-t'
   - 'gcr.io/argo-local-builder/test'
-  - '-t'
-  - 'gcr.io/argo-local-builder/test:anothertag'
   - '.'
 
-images: ['gcr.io/argo-local-builder/test', 'gcr.io/argo-local-builder/test:anothertag']
+images: ['gcr.io/argo-local-builder/test']

@@ -18,5 +18,6 @@ container-builder-local --config=cloudbuild_nil.yaml . || exit # happy dryrun ca
 container-builder-local --config=cloudbuild_nil.yaml --dryrun=false . || exit
 container-builder-local --config=cloudbuild_dockerfile.yaml --dryrun=false . || exit
 container-builder-local --config=cloudbuild_gcr.yaml --dryrun=false --push=true . || exit
+container-builder-local --config=cloudbuild_big.yaml --dryrun=false --push=true . || exit
 
 exit 0

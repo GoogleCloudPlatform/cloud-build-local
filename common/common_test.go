@@ -15,11 +15,74 @@
 package common
 
 import (
+	"fmt"
+	"io"
 	"math"
 	"reflect"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 )
+
+const (
+	listIds = `id1
+id2
+`
+)
+
+type mockRunner struct {
+	mu           sync.Mutex
+	t            *testing.T
+	testCaseName string
+	commands     []string
+	projectID    string
+}
+
+func newMockRunner(t *testing.T) *mockRunner {
+	return &mockRunner{
+		t: t,
+	}
+}
+
+// startsWith returns true iff arr startsWith parts.
+func startsWith(arr []string, parts ...string) bool {
+	if len(arr) < len(parts) {
+		return false
+	}
+	for i, p := range parts {
+		if arr[i] != p {
+			return false
+		}
+	}
+	return true
+}
+
+func (r *mockRunner) Run(args []string, in io.Reader, out, err io.Writer, _ string) error {
+	r.mu.Lock()
+	r.commands = append(r.commands, strings.Join(args, " "))
+	r.mu.Unlock()
+
+	if startsWith(args, "docker", "ps", "-a", "-q") ||
+		startsWith(args, "docker", "network", "ls") ||
+		startsWith(args, "docker", "volume", "ls") {
+		fmt.Fprintln(out, listIds)
+	}
+
+	return nil
+}
+
+func (r *mockRunner) MkdirAll(dir string) error {
+	return nil
+}
+
+func (r *mockRunner) WriteFile(path, contents string) error {
+	return nil
+}
+
+func (r *mockRunner) Clean() error {
+	return nil
+}
 
 func TestBackoff(t *testing.T) {
 	var testCases = []struct {
@@ -87,5 +150,23 @@ func TestParseSubstitutionsFlag(t *testing.T) {
 		if test.want != nil && !reflect.DeepEqual(got, test.want) {
 			t.Errorf("ParseSubstitutionsFlag failed; got %+v, want %+v", got, test.want)
 		}
+	}
+}
+
+func TestClean(t *testing.T) {
+	r := newMockRunner(t)
+	err := Clean(r)
+	if err != nil {
+		t.Errorf("Clean failed: %v", err)
+	}
+	got := strings.Join(r.commands, "\n")
+	want := `docker ps -a -q --filter name=step_[0-9]+|cloudbuild_|metadata
+docker rm -f id1 id2
+docker network ls -q --filter name=cloudbuild
+docker network rm id1 id2
+docker volume ls -q --filter name=homevol|cloudbuild_
+docker volume rm id1 id2`
+	if got != want {
+		t.Errorf("Commands didn't match!\n===Want:\n%s\n===Got:\n%s", want, got)
 	}
 }

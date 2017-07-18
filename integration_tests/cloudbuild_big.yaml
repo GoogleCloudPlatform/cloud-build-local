@@ -1,0 +1,34 @@
+# This test targets:
+# - pulling many images concurrently
+# - pushing many images
+
+steps:
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: ['--version']
+  waitFor: ['-']
+- name: 'gcr.io/cloud-builders/git'
+  args: ['--version']
+  waitFor: ['-']
+- name: 'gcr.io/cloud-builders/gsutil'
+  args: ['--version']
+  waitFor: ['-']
+- name: 'gcr.io/cloud-builders/npm'
+  args: ['--version']
+  waitFor: ['-']
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+  - 'build'
+  - '-t'
+  - 'gcr.io/argo-local-builder/test_big:tag1'
+  - '-t'
+  - 'gcr.io/argo-local-builder/test_big:tag2'
+  - '-t'
+  - 'gcr.io/argo-local-builder/test_big:tag3'
+  - '.'
+  waitFor: ['-']
+
+images:
+- 'gcr.io/argo-local-builder/test_big:tag1'
+- 'gcr.io/argo-local-builder/test_big:tag2'
+- 'gcr.io/argo-local-builder/test_big:tag3'
+
