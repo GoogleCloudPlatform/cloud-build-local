@@ -26,6 +26,7 @@ const (
 	projectID  = "valid-project"
 	projectNum = int64(12345)
 	userID     = int64(67890)
+	kmsKeyName = "projects/my-project/locations/global/keyRings/my-key-ring/cryptoKeys/my-crypto-key"
 )
 
 func randSeq(n int) string {

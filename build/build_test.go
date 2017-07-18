@@ -15,7 +15,6 @@
 package build
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -45,6 +44,7 @@ type mockRunner struct {
 	remotePushesFail bool
 	dockerRunHandler func(args []string, out, err io.Writer) error
 	localFiles       map[string]string
+	volumes          map[string]bool
 }
 
 func newMockRunner(t *testing.T, testCaseName string) *mockRunner {
@@ -69,6 +69,7 @@ func newMockRunner(t *testing.T, testCaseName string) *mockRunner {
 			"gcr.io/my-project/my-builder":  true,
 		},
 		localFiles: map[string]string{},
+		volumes:    map[string]bool{},
 	}
 }
 
@@ -181,10 +182,17 @@ ea358092da77: Image successfully pushed
 		return r.dockerRunHandler(args, out, err)
 	}
 	if startsWith(args, "docker", "volume") {
-		if reflect.DeepEqual(args, []string{"docker", "volume", "create", "--name", "homevol"}) {
+		if startsWith(args, "docker", "volume", "create", "--name") {
+			volName := args[len(args)-1]
+			r.volumes[volName] = true
 			return nil
 		}
-		if reflect.DeepEqual(args, []string{"docker", "volume", "rm", "homevol"}) {
+		if startsWith(args, "docker", "volume", "rm") {
+			volName := args[len(args)-1]
+			if r.volumes[volName] {
+				return fmt.Errorf("volume %q has not been created (or was already deleted)", volName)
+			}
+			delete(r.volumes, volName)
 			return nil
 		}
 		r.t.Errorf("Unexpected docker volume call: %v", args)
@@ -354,9 +362,9 @@ func TestFetchBuilder(t *testing.T) {
 		buildRequest: commonBuildRequest,
 		wantCommands: []string{
 			"docker inspect gcr.io/my-project/my-compiler",
-			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-compiler",
+			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-compiler",
 			"docker inspect gcr.io/my-project/my-builder",
-			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
+			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 		},
 	}, {
 		name: "TestFetchBuilderExists",
@@ -378,7 +386,7 @@ func TestFetchBuilder(t *testing.T) {
 		// no image in remoteImages
 		wantCommands: []string{
 			"docker inspect gcr.io/invalid-build-step",
-			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
+			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
 		},
 		wantErr: errors.New(`error pulling build step "gcr.io/invalid-build-step": exit status 1 for tag "gcr.io/invalid-build-step"`),
 	}}
@@ -579,10 +587,10 @@ func TestRunBuildSteps(t *testing.T) {
 		wantCommands: []string{
 			"docker volume create --name homevol",
 			"docker inspect gcr.io/my-project/my-compiler",
-			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-compiler",
+			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-compiler",
 			dockerRunString(0) + " gcr.io/my-project/my-compiler",
 			"docker inspect gcr.io/my-project/my-builder",
-			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
+			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 			dockerRunInStepDir(1, "foo/baz") +
 				" --env FOO=bar" +
 				" --env BAZ=buz" +
@@ -592,6 +600,7 @@ func TestRunBuildSteps(t *testing.T) {
 			"docker inspect gcr.io/build-output-tag-no-digest",
 			"docker volume rm homevol",
 			"docker rm -f step_0 step_1",
+			"docker volume rm homevol",
 		},
 	}, {
 		name:           "TestRunBuilderFailExplicit",
@@ -894,9 +903,9 @@ func TestPushImages(t *testing.T) {
 		buildRequest:     commonBuildRequest,
 		remotePushesFail: false,
 		wantCommands: []string{
-			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-1",
-			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-2",
-			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-no-digest",
+			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-1",
+			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-2",
+			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-no-digest",
 		},
 	}, {
 		name:             "TestPushImagesFail",
@@ -1243,18 +1252,6 @@ func TestStripTagDigest(t *testing.T) {
 	}
 }
 
-type fakeKMS struct {
-	plaintext string
-	err       error
-}
-
-func (k fakeKMS) Decrypt(_, enc string) (string, error) {
-	if _, err := base64.StdEncoding.DecodeString(enc); err != nil {
-		return "", err
-	}
-	return k.plaintext, k.err
-}
-
 func TestPushDigestScraping(t *testing.T) {
 	cases := []struct {
 		desc     string
@@ -1435,12 +1432,13 @@ func TestStart(t *testing.T) {
 		wantCommands: []string{
 			"docker volume create --name homevol",
 			"docker inspect gcr.io/my-project/my-builder",
-			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
+			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 			dockerRunString(0) + " gcr.io/my-project/my-builder a",
 			"docker inspect gcr.io/build",
 			"docker volume rm homevol",
 			"docker rm -f step_0",
-			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build",
+			"docker volume rm homevol",
+			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build",
 		},
 	}, {
 		name: "Build without pushing images",
@@ -1455,11 +1453,12 @@ func TestStart(t *testing.T) {
 		wantCommands: []string{
 			"docker volume create --name homevol",
 			"docker inspect gcr.io/my-project/my-builder",
-			"docker run --volume homevol:/home --env HOME=/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
+			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 			dockerRunString(0) + " gcr.io/my-project/my-builder a",
 			"docker inspect gcr.io/build",
 			"docker volume rm homevol",
 			"docker rm -f step_0",
+			"docker volume rm homevol",
 		},
 	}} {
 		r := newMockRunner(t, tc.name)

@@ -91,6 +91,7 @@ func CheckBuild(b *cb.Build) error {
 			return fmt.Errorf(strings.Join(missingSubs, ";"))
 		}
 	}
+
 	return nil
 }
 

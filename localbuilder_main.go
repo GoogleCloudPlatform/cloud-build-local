@@ -40,7 +40,6 @@ import (
 )
 
 const (
-	usage             = "gcb-local --config=cloudbuild.yaml [--substitutions=_FOO=bar] [--[no]dryrun] [--[no]push] source"
 	volumeNamePrefix  = "gcb-local-vol-"
 	tokenRefreshDur   = 10 * time.Minute
 	gcbDockerVersion  = "17.05"
@@ -49,14 +48,13 @@ const (
 
 var (
 	configFile    = flag.String("config", "cloudconfig.yaml", "cloud build config file path")
-	substitutions = flag.String("substitutions", "", `substitutions keys values separated by comma; for example _FOO=bar,_BAZ=argo`)
+	substitutions = flag.String("substitutions", "", `substitutions key=value pairs separated by comma; for example _FOO=bar,_BAZ=argo`)
 	dryRun        = flag.Bool("dryrun", true, "If true, nothing will be run")
 	push          = flag.Bool("push", false, "If true, the images will be pushed")
-	local         = flag.Bool("local", false, "If false, this is run on GCB")
 )
 
-func exitUsage() {
-	log.Fatalf("Usage: %s", usage)
+func exitUsage(msg string) {
+	log.Fatalf("%s\nUsage: %s --config=cloudbuild.yaml [--substitutions=_FOO=bar] [--[no]dryrun] [--[no]push] source", msg, os.Args[0])
 }
 
 func main() {
@@ -64,11 +62,13 @@ func main() {
 	args := flag.Args()
 
 	if len(args) == 0 {
-		exitUsage()
+		exitUsage("Specify a source")
+	} else if len(args) > 1 {
+		exitUsage("There should be only one positional argument. Pass all the flags before the source.")
 	}
 	dir := args[0]
 	if *configFile == "" {
-		exitUsage()
+		exitUsage("Specify a config file")
 	}
 
 	// Create a runner.
@@ -77,16 +77,18 @@ func main() {
 	}
 
 	// Check installed docker versions.
-	dockerServerVersion, dockerClientVersion, err := dockerVersions(r)
-	if err != nil {
-		log.Printf("Error getting local docker versions: %v", err)
-		return
-	}
-	if dockerServerVersion != gcbDockerVersion {
-		log.Printf("Warning: The server docker version installed (%s) is different from the one used in GCB (%s)", dockerServerVersion, gcbDockerVersion)
-	}
-	if dockerClientVersion != gcbDockerVersion {
-		log.Printf("Warning: The client docker version installed (%s) is different from the one used in GCB (%s)", dockerClientVersion, gcbDockerVersion)
+	if !*dryRun {
+		dockerServerVersion, dockerClientVersion, err := dockerVersions(r)
+		if err != nil {
+			log.Printf("Error getting local docker versions: %v", err)
+			return
+		}
+		if dockerServerVersion != gcbDockerVersion {
+			log.Printf("Warning: The server docker version installed (%s) is different from the one used in GCB (%s)", dockerServerVersion, gcbDockerVersion)
+		}
+		if dockerClientVersion != gcbDockerVersion {
+			log.Printf("Warning: The client docker version installed (%s) is different from the one used in GCB (%s)", dockerClientVersion, gcbDockerVersion)
+		}
 	}
 
 	// Load config file into a build struct.
@@ -120,60 +122,65 @@ func main() {
 
 	// Create a volume, a helper container to copy the source, and defer cleaning.
 	volumeName := fmt.Sprintf("%s%s", volumeNamePrefix, uuid.New())
-	vol := volume.New(volumeName, r)
-	if err := vol.Setup(); err != nil {
-		log.Printf("Error creating docker volume: %v", err)
-		return
+	if !*dryRun {
+		vol := volume.New(volumeName, r)
+		if err := vol.Setup(); err != nil {
+			log.Printf("Error creating docker volume: %v", err)
+			return
+		}
+		if err := vol.Copy(dir); err != nil {
+			log.Printf("Error copying directory to docker volume: %v", err)
+			return
+		}
+		defer vol.Close()
 	}
-	if err := vol.Copy(dir); err != nil {
-		log.Printf("Error copying directory to docker volume: %v", err)
-		return
-	}
-	defer vol.Close()
 
 	b := build.New(r, *buildConfig, nil, &buildlog.BuildLog{}, volumeName, true, *push)
 
-	// Start the spoofed metadata server.
-	log.Println("Starting spoofed metadata server...")
-	if err := metadata.StartServer(r, metadataImageName); err != nil {
-		log.Printf("Failed to start spoofed metadata server: %v", err)
-		return
-	}
-	log.Println("Started spoofed metadata server")
-	metadataUpdater := metadata.RealUpdater{}
-	defer metadataUpdater.Stop(r)
-
-	// Get project info to feed the metadata server.
-	projectInfo, err := gcloud.ProjectInfo(r)
-	if err != nil {
-		log.Printf("Error getting project information from gcloud: %v", err)
-		return
-	}
-	metadataUpdater.SetProjectInfo(projectInfo)
-
-	// Update docker credentials, for build steps that require pulling
-	// private images. This can be either a private build step image or if
-	// we're building a docker image that depends on a private image.
-	
-	go func() {
-		for ; ; time.Sleep(tokenRefreshDur) {
-			tok, err := gcloud.AccessToken(r)
-			if err != nil {
-				log.Printf("Error getting access token to update docker credentials: %v", err)
-				continue
-			}
-			if err := b.UpdateDockerAccessToken(tok); err != nil {
-				log.Printf("Error updating docker credentials: %v", err)
-			}
+  if !*dryRun {
+		// Start the spoofed metadata server.
+		log.Println("Starting spoofed metadata server...")
+		if err := metadata.StartServer(r, metadataImageName); err != nil {
+			log.Printf("Failed to start spoofed metadata server: %v", err)
+			return
 		}
-	}()
+		log.Println("Started spoofed metadata server")
+		metadataUpdater := metadata.RealUpdater{}
+		defer metadataUpdater.Stop(r)
 
-	go supplyTokenToMetadata(metadataUpdater, r)
+		// Get project info to feed the metadata server.
+		projectInfo, err := gcloud.ProjectInfo(r)
+		if err != nil {
+			log.Printf("Error getting project information from gcloud: %v", err)
+			return
+		}
+		metadataUpdater.SetProjectInfo(projectInfo)
+
+		// Update docker credentials, for build steps that require pulling
+		// private images. This can be either a private build step image or if
+		// we're building a docker image that depends on a private image.
+		
+		go func() {
+			for ; ; time.Sleep(tokenRefreshDur) {
+				tok, err := gcloud.AccessToken(r)
+				if err != nil {
+					log.Printf("Error getting access token to update docker credentials: %v", err)
+					continue
+				}
+				if err := b.UpdateDockerAccessToken(tok); err != nil {
+					log.Printf("Error updating docker credentials: %v", err)
+				}
+			}
+		}()
+
+		go supplyTokenToMetadata(metadataUpdater, r)
+
+	}
 
 	b.Start()
 
-	if *dryRun == true {
-		log.Printf("This was a dry run. Add --dryrun=false if you want to run the build.")
+	if *dryRun {
+		log.Printf("Warning: this was a dry run; add --dryrun=false if you want to run the build locally.")
 	}
 }
 
