@@ -3,6 +3,12 @@
 # Set project.
 gcloud config set project $PROJECT_ID
 
+# Install needed components.
+gcloud components install docker-credential-gcr --quiet
+
+# Get gcr credentials.
+docker-credential-gcr config
+
 # Flags tests.
 container-builder-local --version || exit
 container-builder-local --help || exit
