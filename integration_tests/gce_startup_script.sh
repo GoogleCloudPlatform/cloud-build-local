@@ -35,9 +35,10 @@ install_sdk&
 pids="$! $pids"
 
 function install_docker() {
+  # https://docs.docker.com/engine/installation/linux/docker-ce/ubuntu/#uninstall-old-versions
   echo "Installing docker..."
   sudo apt-get update || exit
-  sudo apt-get install \
+  sudo apt-get install -y \
     linux-image-extra-$(uname -r) \
     linux-image-extra-virtual \
     apt-transport-https \
@@ -50,7 +51,7 @@ function install_docker() {
     $(lsb_release -cs) \
     stable" || exit
   sudo apt-get update || exit
-  sudo apt-get install docker-ce || exit
+  sudo apt-get install -y docker-ce || exit
   # Test.
   docker --version || exit
 
