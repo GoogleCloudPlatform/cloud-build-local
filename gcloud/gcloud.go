@@ -28,7 +28,7 @@ import (
 
 // AccessToken gets a fresh access token from gcloud.
 func AccessToken(r runner.Runner) (string, error) {
-	cmd := []string{"gcloud", "auth", "application-default", "print-access-token"}
+	cmd := []string{"gcloud", "config", "config-helper", "--format=value(credential.access_token)"}
 	var tb bytes.Buffer
 	if err := r.Run(cmd, nil, &tb, os.Stderr, ""); err != nil {
 		return "", err
