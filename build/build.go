@@ -654,6 +654,17 @@ func (b *Build) runBuildSteps() error {
 	// running containers.
 	defer b.cleanBuildSteps()
 
+	// Create the home volume.
+	vol := volume.New(homeVolume, b.Runner)
+	if err := vol.Setup(); err != nil {
+		return err
+	}
+	defer func() {
+		if err := vol.Close(); err != nil {
+			log.Printf("Failed to delete homevol: %v", err)
+		}
+	}()
+
 	b.HasMultipleSteps = len(b.Request.Steps) > 1
 	errors := make(chan error)
 	var finishedChannels []chan struct{}
