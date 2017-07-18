@@ -30,7 +30,7 @@ steps:
   args:
   - '-c'
   - |
-    DATE=`date +%Y%m%d_%H%M%S`
+    DATE=`date +%Y%m%d-%H%M%S`
     GCS_PATH=gs://container-builder-local-test/$$DATE
     gsutil -m copy container-builder-local $$GCS_PATH/
     gsutil -m copy ./integration_tests/* $$GCS_PATH/
@@ -38,6 +38,8 @@ steps:
 
     gcloud config set compute/zone us-central1-f
     instance_name=ubuntu-integration-tests-$$DATE
+    echo "1: " $instance_name
+    echo "2: " $$instance_name
     gcloud compute instances create $$instance_name \
       --image-family=ubuntu-1404-lts \
       --image-project=ubuntu-os-cloud \
