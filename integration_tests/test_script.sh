@@ -3,8 +3,9 @@
 # Set project.
 gcloud config set project $PROJECT_ID
 
-# Get gcr credentials.
+# Configure docker with gcr credentials.
 echo "path: " $PATH
+printenv
 docker-credential-gcr configure-docker || exit
 
 
