@@ -1,6 +1,6 @@
 steps:
-# - name: 'gcr.io/cloud-builders/docker'
-#   args: ['pull', 'gcr.io/argo-local-builder/test']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['pull', 'gcr.io/argo-local-builder/test']
 - name: 'gcr.io/cloud-builders/docker'
   args:
   - 'build'
@@ -8,7 +8,8 @@ steps:
   - 'gcr.io/argo-local-builder/test'
   - '-t'
   - 'gcr.io/argo-local-builder/test'
+  - '-t'
+  - 'gcr.io/argo-local-builder/test:anothertag'
   - '.'
 
-images: ['gcr.io/argo-local-builder/test']
-
+images: ['gcr.io/argo-local-builder/test', 'gcr.io/argo-local-builder/test:anothertag']

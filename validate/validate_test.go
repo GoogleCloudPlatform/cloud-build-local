@@ -240,7 +240,7 @@ func TestValidateBuild(t *testing.T) {
 		build: &cb.Build{
 			Id: "check-substitutions-failure",
 			Steps: []*cb.BuildStep{{
-				Name: "$_UNKNOWN_SUBSTITUTIONvalid$_ANOTHER_ONE",
+				Name: "$_UNKNOWN_SUBSTITUTION $_ANOTHER_ONE",
 			}},
 		},
 		valid: false,
@@ -248,33 +248,13 @@ func TestValidateBuild(t *testing.T) {
 		build: &cb.Build{
 			Id: "check-substitutions-failure",
 			Steps: []*cb.BuildStep{{
-				Name: "$_UNKNOWN_SUBSTITUTIONvalid$_ANOTHER_ONE",
+				Name: "$_UNKNOWN_SUBSTITUTION $_ANOTHER_ONE",
 			}},
 			Options: &cb.BuildOptions{
 				SubstitutionOption: cb.BuildOptions_ALLOW_LOOSE,
 			},
 		},
 		valid: true,
-	}, {
-		build: &cb.Build{
-			Id:    "check-build-tags-failure",
-			Steps: []*cb.BuildStep{{Name: "foo"}},
-			Tags:  []string{"%"},
-		},
-		valid: false,
-	}, {
-		build: &cb.Build{
-			Id:     "images-failure",
-			Steps:  []*cb.BuildStep{{Name: "foo"}},
-			Images: []string{""},
-		},
-		valid: false,
-	}, {
-		build: &cb.Build{
-			Id:    "step-name-failure",
-			Steps: []*cb.BuildStep{{Name: ""}},
-		},
-		valid: false,
 	}}
 	for _, tc := range testCases {
 		b := tc.build

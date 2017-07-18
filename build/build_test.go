@@ -586,7 +586,6 @@ func TestRunBuildSteps(t *testing.T) {
 		name:         "TestRunBuilder",
 		buildRequest: commonBuildRequest,
 		wantCommands: []string{
-			"docker volume create --name homevol",
 			"docker inspect gcr.io/my-project/my-compiler",
 			"docker run --name cloudbuild_docker_pull --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-compiler",
 			dockerRunString(0) + " gcr.io/my-project/my-compiler",
@@ -600,7 +599,6 @@ func TestRunBuildSteps(t *testing.T) {
 			"docker inspect gcr.io/build-output-tag-2",
 			"docker inspect gcr.io/build-output-tag-no-digest",
 			"docker rm -f step_0 step_1",
-			"docker volume rm homevol",
 		},
 	}, {
 		name:           "TestRunBuilderFailExplicit",
@@ -903,9 +901,9 @@ func TestPushImages(t *testing.T) {
 		buildRequest:     commonBuildRequest,
 		remotePushesFail: false,
 		wantCommands: []string{
-			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-1",
-			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-2",
-			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-no-digest",
+			"docker run --name cloudbuild_docker_push --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-1",
+			"docker run --name cloudbuild_docker_push --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-2",
+			"docker run --name cloudbuild_docker_push --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-no-digest",
 		},
 	}, {
 		name:             "TestPushImagesFail",
@@ -1436,8 +1434,8 @@ func TestStart(t *testing.T) {
 			dockerRunString(0) + " gcr.io/my-project/my-builder a",
 			"docker inspect gcr.io/build",
 			"docker rm -f step_0",
+			"docker run --name cloudbuild_docker_push --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build",
 			"docker volume rm homevol",
-			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build",
 		},
 	}, {
 		name: "Build without pushing images",

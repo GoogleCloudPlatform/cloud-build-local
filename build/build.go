@@ -148,6 +148,18 @@ func (b *Build) Start() {
 		}
 	}
 
+	// Create the home volume.
+	homeVol := volume.New(homeVolume, b.Runner)
+	if err := homeVol.Setup(); err != nil {
+		b.Failbuild(err)
+		return
+	}
+	defer func() {
+		if err := homeVol.Close(); err != nil {
+			log.Printf("Failed to delete homevol: %v", err)
+		}
+	}()
+
 	// Fetch and run the build steps.
 	b.UpdateStatus(StatusBuild)
 	if err := b.runBuildSteps(); err != nil {
@@ -278,6 +290,7 @@ func (b *Build) SetDockerAccessToken(tok string) error {
 		return fmt.Errorf("failed to set initial docker credentials: %v\n%s", err, buf.String())
 	}
 	b.prevGCRAuth = auth
+	fmt.Println("--> successfully SET initial docker credentials", auth)
 	return nil
 }
 
@@ -320,6 +333,7 @@ func (b *Build) UpdateDockerAccessToken(tok string) error {
 		return fmt.Errorf("failed to update docker credentials: %v\n%s", err, buf.String())
 	}
 	b.prevGCRAuth = auth
+	fmt.Println("--> successfully UPDATED initial docker credentials", auth)
 	return nil
 }
 
@@ -435,6 +449,8 @@ func (b *Build) dockerPushWithRetries(tag string, attempt int) (string, error) {
 
 	// Push from within a container with $HOME mounted.
 	args := []string{"docker", "run",
+		"--name", "cloudbuild_docker_push",
+		"--rm",
 		// Mount in the home volume.
 		"--volume", homeVolume + ":" + homeDir,
 		// Make /builder/home $HOME.
@@ -706,17 +722,6 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 }
 
 func (b *Build) runBuildSteps() error {
-	// Create the home volume.
-	homeVol := volume.New(homeVolume, b.Runner)
-	if err := homeVol.Setup(); err != nil {
-		return err
-	}
-	defer func() {
-		if err := homeVol.Close(); err != nil {
-			log.Printf("Failed to delete homevol: %v", err)
-		}
-	}()
-
 	// Clean the build steps before trying to delete the volume used by the
 	// running containers.
 	defer b.cleanBuildSteps()
@@ -798,6 +803,8 @@ func (b *Build) dockerRunArgs(stepDir string, idx int) []string {
 			"--volume", fmt.Sprintf("%s:%s", "/root/tokencache", "/root/tokencache"),
 		)
 	}
+
+	fmt.Println("--> ", args)
 	return args
 }
 
