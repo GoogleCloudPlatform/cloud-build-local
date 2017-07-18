@@ -7,7 +7,7 @@ steps:
   args:
   - '-c'
   - |
-    find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath" | xargs /builder/bin/go.bash test
+    find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath|integration_tests" | xargs /builder/bin/go.bash test
 # Binary creation.
 - name: 'gcr.io/cloud-builders/go:wheezy'
   args: ['build', '-o', 'container-builder-local', 'github.com/GoogleCloudPlatform/container-builder-local']
@@ -17,7 +17,7 @@ steps:
   args:
   - '-c'
   - |
-    go run ./integrations_tests/smoke_test.go \
-     --files_path=./integrations_tests/smoke_test.go \
+    go test ./integration_tests/smoke_test.go \
+     --files_path=./integration_tests/smoke_test.go \
      --binary_path=./container-builder-local
 
