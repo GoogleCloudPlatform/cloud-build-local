@@ -41,4 +41,7 @@ steps:
       --zone us-central1-f \
       --metadata zone=us-central1-f
 
+    # Pull the status then delete the instance.
+    # gcloud compute instances delete ubuntu-integration-tests --quiet
+
 
