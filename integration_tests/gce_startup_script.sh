@@ -1,43 +1,20 @@
 successful_startup=0
 
-yo=$(curl -H"Metadata-flavor: Google" metadata.google.internal/computeMetadata/v1/instance/attributes/gcs_path)
-echo "--> au debut: " $yo
+# Fetch some metadata.
+zone=$(curl -H"Metadata-flavor: Google" metadata.google.internal/computeMetadata/v1/instance/attributes/zone)
+gcs_path=$(curl -H"Metadata-flavor: Google" metadata.google.internal/computeMetadata/v1/instance/attributes/gcs_path)
+gcs_logs_path=$(curl -H"Metadata-flavor: Google" metadata.google.internal/computeMetadata/v1/instance/attributes/gcs_logs_path)
 
 function uploadLogs() {
   sudo fgrep startup-script /var/log/syslog > startuplog
   # Rename the file .txt so that it opens rather than downloading when clicked in Pantheon.
-  echo "--> au moment de startup logs: " $gcs_path
-  gsutil cp startuplog gs://container-builder-local-test-logs/startup.txt
+  gsutil cp startuplog $gcs_logs_path/startup.txt
   [[ $successful_startup == 0 ]] && (
-    gsutil cp startuplog gs://container-builder-local-test-logs/startup-failure.txt ||
-    "$DOWNLOAD_DIR/old_sdk"/bin/gsutil cp startuplog gs://container-builder-local-test-logs/startup-failure.txt
+    gsutil cp startuplog $gcs_logs_path/startup-failure.txt ||
+    "$DOWNLOAD_DIR/old_sdk"/bin/gsutil cp startuplog $gcs_logs_path/startup-failure.txt
   )
 }
 trap uploadLogs EXIT INT TERM
-
-# Install Stackdriver Logging Agent https://cloud.google.com/logging/docs/agent/installation
-curl -sSO https://dl.google.com/cloudagents/install-logging-agent.sh || exit
-echo '8db836510cf65f3fba44a3d49265ed7932e731e7747c6163da1c06bf2063c301  install-logging-agent.sh' > checksum
-sha256sum -c checksum || exit
-bash install-logging-agent.sh || exit
-rm -rf install-logging-agent.sh checksum
-
-# Configure Stackdriver Logging Agent to capture our logs.
-# https://cloud.google.com/logging/docs/agent/installation#configure
-cat > /etc/google-fluentd/config.d/gcetesting.conf << EOF
-<source>
-  type tail
-  format none
-  path /root/output.txt
-  pos_file /var/lib/google-fluentd/pos/gcetesting.pos
-  read_from_head true
-  tag gcetesting
-</source>
-EOF
-chmod 0644 /etc/google-fluentd/config.d/gcetesting.conf
-
-# Pick up the configuration change.
-service google-fluentd reload
 
 set -x
 
@@ -77,10 +54,6 @@ pids="$! $pids"
 wait $pids || exit
 successful_startup=1
 
-# Fetch some metadata.
-zone=$(curl -H"Metadata-flavor: Google" metadata.google.internal/computeMetadata/v1/instance/attributes/zone)
-gcs_path=$(curl -H"Metadata-flavor: Google" metadata.google.internal/computeMetadata/v1/instance/attributes/gcs_path)
-
 # Set a metadata value about the success of the startup script.
 gcloud config set compute/zone ${zone}
 gcloud compute instances add-metadata $HOSTNAME --metadata=successful_startup=1
@@ -94,7 +67,7 @@ chmod +x /root/test-files/test-script.sh || exit
 
 # Copy up an empty output.txt as a signal to the runner that the script is starting.
 touch /root/output.txt || exit
-gsutil cp /root/output.txt gs://container-builder-local-test-logs/output.txt || exit
+gsutil cp /root/output.txt $gcs_logs_path/output.txt || exit
 
 # Run the integration test script. When finished, write to a "success" or "failure" file
 # in GCS so that the test runner can stop immediately.
@@ -102,8 +75,8 @@ gsutil cp /root/output.txt gs://container-builder-local-test-logs/output.txt || 
   # If the test succeeds, copy the output to success.txt. Else, to failure.txt.
   cd /root/test-files
   ./test-script.sh &> /root/output.txt && \
-    gsutil cp /root/output.txt gs://container-builder-local-test-logs/success.txt || \
-    gsutil cp /root/output.txt gs://container-builder-local-test-logs/failure.txt
+    gsutil cp /root/output.txt $gcs_logs_path/success.txt || \
+    gsutil cp /root/output.txt $gcs_logs_path/failure.txt
   touch done
 )&
 
@@ -113,7 +86,7 @@ gsutil cp /root/output.txt gs://container-builder-local-test-logs/output.txt || 
   # Every 1s, write the output-to-date into GCS for inspection.
   while [[ ! -f done ]]; do
     sleep 1s
-    gsutil cp /root/output.txt gs://container-builder-local-test-logs/output.txt
+    gsutil cp /root/output.txt $gcs_logs_path/output.txt
   done
 )&
 

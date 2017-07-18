@@ -32,6 +32,7 @@ steps:
   - |
     DATE=`date +%Y%m%d-%H%M%S`
     GCS_PATH=gs://container-builder-local-test/$$DATE
+    GCS_LOGS_PATH=gs://container-builder-local-test-logs/$$DATE
     gsutil -m copy container-builder-local $$GCS_PATH/
     gsutil -m copy ./integration_tests/* $$GCS_PATH/
     gsutil rm gs://container-builder-local-test-logs/*
@@ -44,7 +45,7 @@ steps:
       --machine-type=n1-standard-2 \
       --scopes default,userinfo-email,useraccounts-ro,cloud-platform \
       --metadata-from-file startup-script=integration_tests/gce_startup_script.sh \
-      --metadata zone=us-central1-f,gcs_path=$$GCS_PATH || exit
+      --metadata zone=us-central1-f,gcs_path=$$GCS_PATH,gcs_logs_path=$$GCS_LOGS_PATH || exit
 
     # Wait until either the success or failure file is written to GCS.
     status=0
