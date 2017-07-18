@@ -4,7 +4,7 @@
 gcloud config set project $PROJECT_ID
 
 # Get gcr credentials.
-docker-credential-gcr config
+docker-credential-gcr configure-docker || exit
 
 # Flags tests.
 container-builder-local --version || exit

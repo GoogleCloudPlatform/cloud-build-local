@@ -32,7 +32,7 @@ function install_sdk() {
   curl https://sdk.cloud.google.com | bash || exit
 
   # Install needed components.
-  gcloud components install docker-credential-gcr --quiet
+  gcloud components install docker-credential-gcr --quiet || exit
 }
 install_sdk&
 # add the install_sdk PID to the list for waiting.
