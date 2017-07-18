@@ -13,18 +13,18 @@ steps:
 - name: 'gcr.io/cloud-builders/go:wheezy'
   args: ['build', '-o', 'container-builder-local', 'github.com/GoogleCloudPlatform/container-builder-local']
 
-# Create a docker image with all the tools for local builder.
+# Create a docker image with all the tools needed to test the local builder.
 - name: 'gcr.io/cloud-builders/docker'
   args:
   - 'build'
   - '--cache-from'
-  - 'gcr.io/argo-local-builder/integration-image:latest'
+  - 'gcr.io/argo-local-builder/integration-image'
   - '-t'
-  - 'gcr.io/argo-local-builder/integration-image:latest'
+  - 'gcr.io/argo-local-builder/integration-image'
   - './integration_tests/.'
 
 # Run integration tests.
-- name: 'integration-image'
+- name: 'gcr.io/argo-local-builder/integration-image'
   entrypoint: 'bash'
   args:
   - '-c'
@@ -37,4 +37,4 @@ steps:
 
 
 # This image is saved to make subsequent build faster if the tools didn't change.
-images: ['gcr.io/argo-local-builder/integration-image:latest']
+images: ['gcr.io/argo-local-builder/integration-image']
