@@ -38,7 +38,7 @@ steps:
     go test ./integration_tests/smoke_test.go \
      --files_path=$$PWD/integration_tests/
 
-
-
 # This image is saved to make subsequent build faster if the tools didn't change.
 images: ['gcr.io/argo-local-builder/integration-image']
+
+
