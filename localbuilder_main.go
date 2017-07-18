@@ -137,7 +137,7 @@ func main() {
 
 	b := build.New(r, *buildConfig, nil, &buildlog.BuildLog{}, volumeName, true, *push)
 
-	if !*dryRun {
+  if !*dryRun {
 
 		// Start the spoofed metadata server.
 		log.Println("Starting spoofed metadata server...")
@@ -175,7 +175,6 @@ func main() {
 		}()
 
 		go supplyTokenToMetadata(metadataUpdater, r)
-
 	}
 
 	b.Start()
