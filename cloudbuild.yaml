@@ -36,7 +36,7 @@ steps:
       --image-project=ubuntu-os-cloud \
       --machine-type=n1-standard-1 \
       --scopes userinfo-email,cloud-platform \
-      --metadata-from-file startup-script=/google/src/cloud/philmod/argo-local-builder/google3/third_party/argo/local_builder/integration_tests/gce_startup_script.sh \
+      --metadata-from-file startup-script=integration_tests/gce_startup_script.sh \
       --zone us-central1-f \
       --metadata zone=us-central1-f
 
