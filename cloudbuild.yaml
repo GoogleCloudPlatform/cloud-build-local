@@ -18,7 +18,7 @@ steps:
 # run integration tests in a VM.
 - name: 'gcr.io/cloud-builders/gcloud'
   entrypoint: 'bash'
-  args: ['-c', 'ls', 'integration_tests']
+  args: ['-c', 'ls', '-alh', 'integration_tests/']
 - name: 'gcr.io/cloud-builders/gcloud'
   entrypoint: 'bash'
   args: ['-c', './integration_tests/run_tests_on_vm.sh']
