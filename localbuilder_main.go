@@ -161,7 +161,7 @@ func run(source string) error {
 	// Do not run the spoofed metadata server on a dryrun.
 	if !*dryRun {
 		// On GCE, do not create a spoofed metadata server, use the existing one.
-		// The cloudbuild network is still needed.
+		// The cloudbuild network is still needed, with a private subnet.
 		if computeMetadata.OnGCE() {
 			if err := metadata.CreateCloudbuildNetwork(r, "172.22.0.0/16"); err != nil {
 				return fmt.Errorf("Error creating network: %v", err)
