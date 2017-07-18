@@ -189,6 +189,7 @@ func run(source string) error {
 
 			go supplyTokenToMetadata(metadataUpdater, r)
 		}
+
 		// Set initial Docker credentials.
 		tok, err := gcloud.AccessToken(r)
 		if err != nil {

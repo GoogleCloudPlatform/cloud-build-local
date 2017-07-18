@@ -25,8 +25,6 @@ gcloud info || exit
 function install_sdk() {
   export CLOUDSDK_CORE_DISABLE_PROMPTS=1
   export CLOUDSDK_INSTALL_DIR=/usr/lib
-  export PATH=$PATH:$CLOUDSDK_INSTALL_DIR/google-cloud-sdk/bin
-  echo "path 1: " $PATH
 
   # We use the public installer.
   rm -rf "$CLOUDSDK_INSTALL_DIR/google-cloud-sdk"
@@ -37,7 +35,7 @@ function install_sdk() {
 }
 install_sdk&
 export PATH=$PATH:/usr/lib/google-cloud-sdk/bin
-echo "path 2: " $PATH
+
 # add the install_sdk PID to the list for waiting.
 pids="$! $pids"
 
