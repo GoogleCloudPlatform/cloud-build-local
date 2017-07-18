@@ -12,12 +12,3 @@ steps:
 - name: 'gcr.io/cloud-builders/go:wheezy'
   args: ['build', '-o', 'container-builder-local', 'github.com/GoogleCloudPlatform/container-builder-local']
 
-- name: 'ubuntu'
-  entrypoint: 'bash'
-  args:
-  - '-c'
-  - |
-    echo hello world
-    container-builder-local --help || exit 1
-    container-builder-local --VERSION || exit 1
-
