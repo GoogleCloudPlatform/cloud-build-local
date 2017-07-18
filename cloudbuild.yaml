@@ -23,8 +23,8 @@ steps:
   - |
     gsutil rm gs://container-builder-local-test/*
     gsutil rm gs://container-builder-local-test-logs/*
-    gsutil copy container-builder-local gs://container-builder-local-test/
-    gsutil copy ./integration_tests/* gs://container-builder-local-test/
+    gsutil -m copy container-builder-local gs://container-builder-local-test/
+    gsutil -m copy ./integration_tests/* gs://container-builder-local-test/
 
 # Run integration tests in a VM.
 - name: 'gcr.io/cloud-builders/gcloud'
@@ -36,7 +36,7 @@ steps:
     gcloud compute instances create ubuntu-integration-tests \
       --image-family=ubuntu-1404-lts \
       --image-project=ubuntu-os-cloud \
-      --machine-type=n1-standard-1 \
+      --machine-type=n1-standard-2 \
       --scopes userinfo-email,cloud-platform \
       --metadata-from-file startup-script=integration_tests/gce_startup_script.sh \
       --metadata zone=us-central1-f
