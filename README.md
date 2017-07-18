@@ -5,10 +5,6 @@ and integration into local build and test workflows.
 
 ----
 
-## Using Local Builder
-
-Support for Local Builder with the `gcloud` command-line tool is coming soon.
-
 ## Developing Local Builder
 
 To build and develop Local Builder, you need a working [Go environment].
@@ -29,6 +25,10 @@ To run the tests (without the vendored libraries):
 ```
 go test $(go list github.com/GoogleCloudPlatform/container-builder-local/... | grep -v vendor)
 ```
+
+## Limitation
+
+Only one build can be run at a time on a given host.
 
 ## Support
 

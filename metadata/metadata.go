@@ -184,7 +184,20 @@ func StartLocalServer(r runner.Runner, metadataImage string) error {
 // The container listens on local port 8082, which is where RealUpdater POSTs
 // to.
 func StartCloudServer(r runner.Runner, metadataImage string) error {
-	return startServer(r, metadataImage, true, metadataHostedIP, metadataHostedSubnet)
+	if err := startServer(r, metadataImage, true, metadataHostedIP, metadataHostedSubnet); err != nil {
+		return err
+	}
+
+	// In a separate goroutine, attach to the metadata server container so its
+	// logs get printed to the worker's logs and ferried up to the foreman after
+	// the build is done.
+	go func() {
+		if err := r.Run([]string{"docker", "attach", "metadata"}, nil, os.Stdout, os.Stderr, ""); err != nil {
+			log.Printf("docker attach failed: %v", err)
+		}
+	}()
+
+	return nil
 }
 
 // CreateCloudbuildNetwork creates a cloud build network to link the build
@@ -207,13 +220,15 @@ func startServer(r runner.Runner, metadataImage string, iptables bool, ip, subne
 	} else {
 		cmd = []string{"docker", "run", "-d", "--name=metadata", metadataImage}
 	}
-	if err := r.Run(cmd, nil, os.Stdout, os.Stderr, ""); err != nil {
+	log.Println(cmd)
+	if err := r.Run(cmd, nil, nil, os.Stderr, ""); err != nil {
 		return err
 	}
 
 	// Redirect requests to metadata.google.internal and the fixed metadata IP to the metadata container.
 	cmd = []string{"docker", "network", "connect", "--alias=metadata", "--alias=metadata.google.internal", "--ip=" + ip, "cloudbuild", "metadata"}
-	if err := r.Run(cmd, nil, os.Stdout, os.Stderr, ""); err != nil {
+	log.Println(cmd)
+	if err := r.Run(cmd, nil, nil, os.Stderr, ""); err != nil {
 		return fmt.Errorf("Error connecting metadata to network: %v", err)
 	}
 
@@ -228,33 +243,25 @@ func startServer(r runner.Runner, metadataImage string, iptables bool, ip, subne
 			"-j", "DNAT", // This rule does destination NATting,
 			"--to-destination", metadataHostedIP, // to our spoofed metadata container.
 		}
+		log.Println(cmd)
 		if err := r.Run(cmd, nil, os.Stdout, os.Stderr, ""); err != nil {
 			return fmt.Errorf("Error updating iptables: %v", err)
 		}
 	}
-
-	// In a separate goroutine, attach to the metadata server container so its
-	// logs get printed to the worker's logs and ferried up to the foreman after
-	// the build is done.
-	go func() {
-		if err := r.Run([]string{"docker", "attach", "metadata"}, nil, os.Stdout, os.Stderr, ""); err != nil {
-			log.Printf("docker attach failed: %v", err)
-		}
-	}()
 
 	return nil
 }
 
 // CleanCloudbuildNetwork delete the cloudbuild network.
 func CleanCloudbuildNetwork(r runner.Runner) error {
-	return r.Run([]string{"docker", "network", "rm", "cloudbuild"}, nil, os.Stdout, os.Stderr, "")
+	return r.Run([]string{"docker", "network", "rm", "cloudbuild"}, nil, nil, os.Stderr, "")
 }
 
 // Stop stops the metadata server container and tears down the docker cloudbuild
 // network used to route traffic to it.
 // Try to clean both the container and the network before returning an error.
 func (RealUpdater) Stop(r runner.Runner) error {
-	errContainer := r.Run([]string{"docker", "rm", "-f", "metadata"}, nil, os.Stdout, os.Stderr, "")
+	errContainer := r.Run([]string{"docker", "rm", "-f", "metadata"}, nil, nil, os.Stderr, "")
 	errNetwork := CleanCloudbuildNetwork(r)
 	if errContainer != nil {
 		return errContainer

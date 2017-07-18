@@ -54,18 +54,6 @@ function install_docker() {
   sudo apt-get install -y docker-ce || exit
   # Test.
   docker --version || exit
-
-  # # Add docker-engine, using directions at https://docs.docker.com/engine/installation/ubuntulinux/
-  # sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D || exit
-  # echo "deb https://apt.dockerproject.org/repo ubuntu-trusty main" >> /etc/apt/sources.list.d/docker.list || exit
-  # # apt-get update appears to be a bit flakey with requests to our GCS
-  # # mirrors timing out. Try a few times just in case.
-  # sudo apt-get update || sudo apt-get update || sudo apt-get update || exit
-  # # The docker-engine= is the key to setting the version. If you set up apt to
-  # # use the https://apt.dockerproject.org/repo ubuntu-trusty as described
-  # # above, "apt-cache madison docker-engine" will give you a list of the
-  # # currently available versions.
-  # sudo apt-get install -y docker-engine=17.05.0~ce-0~ubuntu-trusty unzip tcpdump || exit
 }
 install_docker&
 # add the install_docker PID to the list for waiting.
@@ -74,14 +62,13 @@ pids="$! $pids"
 wait $pids || exit
 successful_startup=1
 
-# Set a metadata value about the success of the startup script.
+# Set gcloud zone
 gcloud config set compute/zone ${zone}
-gcloud compute instances add-metadata $HOSTNAME --metadata=successful_startup=1
 
 # Fetch test files from gcs.
 mkdir /root/test-files
 gsutil -m copy ${gcs_path}/* /root/test-files/
-chmod +x /root/test-files/test-script.sh || exit
+chmod +x /root/test-files/test_script.sh || exit
 
 # Copy local builder binary to bin.
 chmod +x /root/test-files/container-builder-local || exit
@@ -96,7 +83,8 @@ gsutil cp /root/output.txt $gcs_logs_path/output.txt || exit
 (
   # If the test succeeds, copy the output to success.txt. Else, to failure.txt.
   cd /root/test-files
-  ./test-script.sh &> /root/output.txt && \
+  export PROJECT_ID=argo-local-builder
+  ./test_script.sh &> /root/output.txt && \
     gsutil cp /root/output.txt $gcs_logs_path/success.txt || \
     gsutil cp /root/output.txt $gcs_logs_path/failure.txt
   touch done
