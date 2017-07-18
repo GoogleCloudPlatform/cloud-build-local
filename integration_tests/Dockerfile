@@ -8,9 +8,7 @@ RUN \
 # Install Docker
 # Based on instructions from:
 # https://docs.docker.com/engine/installation/linux/ubuntu/
-RUN \
-   apt-get -y update && \
-   apt-get -y install apt-transport-https ca-certificates curl \
+RUN apt-get -y install apt-transport-https ca-certificates curl \
        # These are necessary for add-apt-respository
        software-properties-common python-software-properties && \
    curl -fsSL https://yum.dockerproject.org/gpg | sudo apt-key add - && \
@@ -25,8 +23,7 @@ ARG DOCKER_VERSION=17.05.0~ce-0~ubuntu-trusty
 RUN apt-get -y install docker-engine=${DOCKER_VERSION}
 
 # Install gcloud
-RUN apt-get -y update && \
-    apt-get -y install gcc python2.7 python-dev python-setuptools wget ca-certificates \
+RUN apt-get -y install gcc python2.7 python-dev python-setuptools wget ca-certificates \
        # These are necessary for add-apt-respository
        software-properties-common python-software-properties && \
 
