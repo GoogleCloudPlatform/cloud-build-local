@@ -6,12 +6,13 @@ gcs_path=$(curl -H"Metadata-flavor: Google" metadata.google.internal/computeMeta
 gcs_logs_path=$(curl -H"Metadata-flavor: Google" metadata.google.internal/computeMetadata/v1/instance/attributes/gcs_logs_path)
 
 function uploadLogs() {
-  sudo fgrep startup-script /var/log/syslog > startuplog
+  touch startuplog.txt || exit
+  sudo fgrep startup-script /var/log/syslog > startuplog.txt
   # Rename the file .txt so that it opens rather than downloading when clicked in Pantheon.
-  gsutil cp startuplog $gcs_logs_path/startup.txt
+  gsutil cp startuplog.txt $gcs_logs_path/startup.txt
   [[ $successful_startup == 0 ]] && (
-    gsutil cp startuplog $gcs_logs_path/startup-failure.txt ||
-    "$DOWNLOAD_DIR/old_sdk"/bin/gsutil cp startuplog $gcs_logs_path/startup-failure.txt
+    gsutil cp startuplog.txt $gcs_logs_path/startup-failure.txt ||
+    "$DOWNLOAD_DIR/old_sdk"/bin/gsutil cp startuplog.txt $gcs_logs_path/startup-failure.txt
   )
 }
 trap uploadLogs EXIT INT TERM
@@ -61,9 +62,11 @@ gcloud compute instances add-metadata $HOSTNAME --metadata=successful_startup=1
 # Fetch test files from gcs.
 mkdir /root/test-files
 gsutil -m copy ${gcs_path}/* /root/test-files/
+chmod +x /root/test-files/test-script.sh || exit
+
+# Copy local builder binary to bin.
 chmod +x /root/test-files/container-builder-local || exit
 mv /root/test-files/container-builder-local /usr/local/bin/
-chmod +x /root/test-files/test-script.sh || exit
 
 # Copy up an empty output.txt as a signal to the runner that the script is starting.
 touch /root/output.txt || exit
@@ -95,4 +98,3 @@ wait
 # Copy the output of this script into GCS as well. Note that we can't rely on
 # the above TRAP to upload because we're about to kill the VM.
 uploadLogs
-

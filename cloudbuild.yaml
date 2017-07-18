@@ -14,15 +14,6 @@ steps:
 - name: 'gcr.io/cloud-builders/go:wheezy'
   args: ['build', '-o', 'container-builder-local', 'github.com/GoogleCloudPlatform/container-builder-local']
 
-# Copy the integration test files to GCS.
-
-- name: 'gcr.io/cloud-builders/gsutil'
-  entrypoint: 'bash'
-  args:
-  - '-c'
-  - |
-    gsutil rm gs://container-builder-local-test-logs/*
-
 # Copy the integration test files to GCS and
 # run integration tests in a VM.
 - name: 'gcr.io/cloud-builders/gcloud'
@@ -35,7 +26,6 @@ steps:
     GCS_LOGS_PATH=gs://container-builder-local-test-logs/$$DATE
     gsutil -m copy container-builder-local $$GCS_PATH/
     gsutil -m copy ./integration_tests/* $$GCS_PATH/
-    gsutil rm gs://container-builder-local-test-logs/*
 
     gcloud config set compute/zone us-central1-f
     instance_name=ubuntu-integration-tests-$$DATE
