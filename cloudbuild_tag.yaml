@@ -10,7 +10,7 @@ steps:
     find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath" | xargs /builder/bin/go.bash test
 # Set TAG_NAME as version.
 - name: 'ubuntu'
-  args: ['sed', '-i', 's/const version = "HEAD"/const version = "$TAG_NAME"/g', 'version.go']
+  args: ['sed', '-i', 's/HEAD/$TAG_NAME/g', 'version.go']
 # Create binaries.
 - name: 'gcr.io/cloud-builders/go:wheezy'
   entrypoint: 'bash'

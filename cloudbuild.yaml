@@ -12,3 +12,11 @@ steps:
 - name: 'gcr.io/cloud-builders/go:wheezy'
   args: ['install', 'github.com/GoogleCloudPlatform/container-builder-local']
 
+- name: 'ubuntu'
+  entrypoin: 'bash'
+  args:
+  - '-c'
+  - |
+    echo hello world
+    ls *
+

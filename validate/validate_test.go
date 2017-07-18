@@ -496,3 +496,117 @@ func makeTestBuild(buildID string) *cb.Build {
 		Images: []string{"gcr.io/some/image/tag", "gcr.io/some/image/tag2"},
 	}
 }
+
+func TestCheckImageTags(t *testing.T) {
+	validTags := []string{
+		"subdomain.gcr.io/works/folder/folder",
+		"gcr.io/works/folder:tag",
+		"gcr.io/works/folder",
+		"quay.io/blah/blah:blah",
+		"quay.io/blah",
+		"sub.quay.io/blah",
+		"sub.sub.quay.io/blah",
+		"quay.io/blah:blah",
+	}
+	invalidTags := []string{
+		"",
+		"gcr.io/z",
+		"gcr.io/broken/noth:",
+		"gcr.io/broken:image",
+		"subdom.gcr.io/project/image.name.here@digest.here",
+		"gcr.io/broken:tag",
+		"gcr.io/:broken",
+		"gcr.io/projoect/Broken",
+		"gcr.o/broken/folder:tag",
+		"baddomaingcr.io/doesntwork",
+		"sub.sub.gcr.io/baddomain/blah",
+	}
+	for _, tag := range validTags {
+		tags := []string{tag}
+		if err := checkImageTags(tags); err != nil {
+			t.Errorf("checkImageTags(%v) got unexpected error: %v", tags, err)
+
+		}
+	}
+	for _, tag := range invalidTags {
+		tags := []string{tag}
+		if err := checkImageTags(tags); err == nil {
+			t.Errorf("checkImageTags(%v) did not return error", tags)
+		}
+	}
+}
+
+func TestCheckBuildStepName(t *testing.T) {
+	validNames := []string{
+		"gcr.o/works/folder:tag",
+		"gcr.io/z",
+		"subdomain.gcr.io/works/folder/folder",
+		"gcr.io/works:tag",
+		"gcr.io/works/folder:tag",
+		"ubuntu",
+		"ubuntu:latest",
+		"gcr.io/cloud-builders/docker@sha256:blah",
+	}
+	invalidNames := []string{
+		"",
+		"gcr.io/cloud-builders/docker@sha256:",
+		"gcr.io/cloud-builders/docker@sha56:blah",
+		"ubnutu::latest",
+		"gcr.io/:broken",
+		"gcr.io/project/Broken",
+	}
+
+	for _, name := range validNames {
+		step := &cb.BuildStep{Name: name}
+		steps := []*cb.BuildStep{step}
+		if err := checkBuildStepNames(steps); err != nil {
+			t.Errorf("checkBuildStepNames(%v) got unexpected error: %v", steps, err)
+		}
+	}
+	for _, name := range invalidNames {
+		step := &cb.BuildStep{Name: name}
+		steps := []*cb.BuildStep{step}
+		if err := checkBuildStepNames(steps); err == nil {
+			t.Errorf("checkBuildStepNames(%v) did not return error", steps)
+		}
+	}
+}
+
+func TestCheckBuildTags(t *testing.T) {
+	var hugeTagList []string
+	for i := 0; i < maxNumTags+1; i++ {
+		hugeTagList = append(hugeTagList, randSeq(1))
+	}
+
+	for _, c := range []struct {
+		tags    []string
+		wantErr bool
+	}{{
+		tags:    []string{},
+		wantErr: false,
+	}, {
+		tags:    []string{"ABCabc-._"},
+		wantErr: false,
+	}, {
+		tags:    []string{"_"},
+		wantErr: false,
+	}, {
+		tags:    []string{""},
+		wantErr: true,
+	}, {
+		tags:    []string{"%"},
+		wantErr: true,
+	}, {
+		tags:    []string{randSeq(128 + 1)}, // 128 is the max tag length
+		wantErr: true,
+	}, {
+		tags:    hugeTagList,
+		wantErr: true,
+	}} {
+		if err := checkBuildTags(c.tags); err == nil && c.wantErr {
+			t.Errorf("checkBuildTags(%v) did not return error", c.tags)
+		} else if err != nil && !c.wantErr {
+			t.Errorf("checkBuildTags(%v) got unexpected error: %v", c.tags, err)
+		}
+	}
+}

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -67,7 +68,6 @@ func main() {
 		flag.PrintDefaults()
 		return
 	}
-  
 	if *versionFlag {
 		log.Printf("Version: %s", version)
 		return
@@ -78,7 +78,7 @@ func main() {
 	} else if len(args) > 1 {
 		exitUsage("There should be only one positional argument. Pass all the flags before the source.")
 	}
-	dir := args[0]
+	source := args[0]
 	if *configFile == "" {
 		exitUsage("Specify a config file")
 	}
@@ -140,8 +140,15 @@ func main() {
 			log.Printf("Error creating docker volume: %v", err)
 			return
 		}
-		if err := vol.Copy(dir); err != nil {
-			log.Printf("Error copying directory to docker volume: %v", err)
+		// If the source is a directory, only copy the inner content.
+		if isDir, err := isDirectory(source); err != nil {
+			log.Printf("Error getting directory: %v", err)
+			return
+		} else if isDir {
+			source = filepath.Clean(source) + "/."
+		}
+		if err := vol.Copy(source); err != nil {
+			log.Printf("Error copying source to docker volume: %v", err)
 			return
 		}
 		defer vol.Close()
@@ -242,4 +249,13 @@ func dockerVersions(r runner.Runner) (string, string, error) {
 	}
 
 	return strings.TrimSpace(serverb.String()), strings.TrimSpace(clientb.String()), nil
+}
+
+func isDirectory(path string) (bool, error) {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
+	mode := fileInfo.Mode()
+	return mode.IsDir(), nil
 }
