@@ -10,7 +10,9 @@ container-builder-local . --config cloudbuild_nil.yaml && exit # flags after sou
 container-builder-local --config donotexist.yaml && exit # unexisting config file
 container-builder-local --config cloudbuild_nil.yaml . || exit # happy dryrun case
 
-# Full tests.
+# End to end tests.
 container-builder-local --config cloudbuild_nil.yaml --dryrun=false . || exit
+container-builder-local --config cloudbuild_dockerfile.yaml --dryrun=false . || exit
+container-builder-local --config cloudbuild_gcr.yaml --dryrun=false . || exit
 
 exit 0
