@@ -41,8 +41,25 @@ steps:
       --zone us-central1-f \
       --metadata zone=us-central1-f
 
-    # Pull the status then delete the instance.
-    # We could print the logs here.
-    # gcloud compute instances delete ubuntu-integration-tests --quiet
+    # Wait until either the success or failure file is written to GCS.
+    status=0
+    while true
+    do
+      if gsutil stat gs://container-builder-local-test-logs/success.txt; then
+        gsutil cat gs://container-builder-local-test-logs/success.txt
+        break
+      fi
+      if gsutil stat gs://container-builder-local-test-logs/failure.txt; then
+        gsutil cat gs://container-builder-local-test-logs/failure.txt
+        status=1
+        break
+      fi
+      echo "tests not finished yet, checking in a few seconds"
+      sleep 2
+    done
+
+    # Delete the VM and return the status
+    gcloud compute instances delete ubuntu-integration-tests --quiet
+    return status
 
 

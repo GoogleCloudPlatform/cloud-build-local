@@ -1,11 +1,10 @@
-successful_startup=-1
-successful_test=-1
+successful_startup=0
 
 function uploadLogs() {
   sudo fgrep startup-script /var/log/syslog > startuplog
   # Rename the file .txt so that it opens rather than downloading when clicked in Pantheon.
   gsutil cp startuplog gs://container-builder-local-test-logs/startup.txt
-  [[ $successful_startup == -1 ]] && (
+  [[ $successful_startup == 0 ]] && (
     gsutil cp startuplog gs://container-builder-local-test-logs/startup-failure.txt ||
     "$DOWNLOAD_DIR/old_sdk"/bin/gsutil cp startuplog gs://container-builder-local-test-logs/startup-failure.txt
   )
@@ -72,14 +71,13 @@ install_docker&
 pids="$! $pids"
 
 wait $pids || exit
-successful_startup=0 # success
 
 # Fetch some metadata.
 zone=$(curl -H"Metadata-flavor: Google" metadata.google.internal/computeMetadata/v1/instance/attributes/zone)
 
 # Set a metadata value about the success of the startup script.
 gcloud config set compute/zone ${zone}
-gcloud compute instances add-metadata $HOSTNAME --metadata=successful_startup=${successful_startup}
+gcloud compute instances add-metadata $HOSTNAME --metadata=successful_startup=1
 
 # Fetch test files from gcs.
 mkdir /root/test-files
@@ -98,22 +96,20 @@ gsutil cp /root/output.txt gs://container-builder-local-test-logs/output.txt || 
   # If the test succeeds, copy the output to success.txt. Else, to failure.txt.
   cd /root/test-files
   ./test-script.sh &> /root/output.txt && \
-    (gsutil cp /root/output.txt gs://container-builder-local-test-logs/success.txt && successful_test=0) || \
-    (gsutil cp /root/output.txt gs://container-builder-local-test-logs/failure.txt && successful_test=1)
-  echo "did it work? " $successful_test
-  gcloud compute instances add-metadata $HOSTNAME --metadata=successful_test=${successful_test}
+    gsutil cp /root/output.txt gs://container-builder-local-test-logs/success.txt || \
+    gsutil cp /root/output.txt gs://container-builder-local-test-logs/failure.txt
   touch done
 )&
 
 # Concurrently with the test, periodically copy the output to GCS so that it can be
 # inspected.
-# (
-#   # Every 1s, write the output-to-date into GCS for inspection.
-#   while [[ ! -f done ]]; do
-#     sleep 1s
-#     gsutil cp /root/output.txt gs://container-builder-local-test-logs/output.txt
-#   done
-# )&
+(
+  # Every 1s, write the output-to-date into GCS for inspection.
+  while [[ ! -f done ]]; do
+    sleep 1s
+    gsutil cp /root/output.txt gs://container-builder-local-test-logs/output.txt
+  done
+)&
 
 wait
 
