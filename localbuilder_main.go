@@ -66,11 +66,11 @@ func main() {
 
 	if *help {
 		flag.PrintDefaults()
-		return
+		os.Exit(0)
 	}
 	if *versionFlag {
 		log.Printf("Version: %s", version)
-		return
+		os.Exit(0)
 	}
 
 	if len(args) == 0 {
@@ -204,6 +204,11 @@ func run(source string) error {
 	}
 
 	b.Start()
+	<-b.Done
+
+	if b.Summary().Status == build.StatusError {
+		return fmt.Errorf("Build finished with ERROR status")
+	}
 
 	if *dryRun {
 		log.Printf("Warning: this was a dry run; add --dryrun=false if you want to run the build locally.")

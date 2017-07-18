@@ -54,12 +54,12 @@ steps:
         status=1
         break
       fi
-      echo "tests not finished yet, checking in a few seconds"
-      sleep 2
+      echo "tests are still running, checking in a few seconds..."
+      sleep 5
     done
 
     # Delete the VM and return the status
-    gcloud compute instances delete ubuntu-integration-tests --quiet
-    return $status
+    # gcloud compute instances delete ubuntu-integration-tests --quiet
+    exit $status
 
 
