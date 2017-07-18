@@ -290,7 +290,7 @@ func (b *Build) SetDockerAccessToken(tok string) error {
 		return fmt.Errorf("failed to set initial docker credentials: %v\n%s", err, buf.String())
 	}
 	b.prevGCRAuth = auth
-	fmt.Println("docker access token SET: ", auth)
+	fmt.Println("--> docker access token SET: ", auth)
 	return nil
 }
 
@@ -333,7 +333,7 @@ func (b *Build) UpdateDockerAccessToken(tok string) error {
 		return fmt.Errorf("failed to update docker credentials: %v\n%s", err, buf.String())
 	}
 	b.prevGCRAuth = auth
-	fmt.Println("docker access token UPDATED: ", auth)
+	fmt.Println("--> docker access token UPDATED: ", auth)
 	return nil
 }
 

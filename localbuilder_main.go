@@ -187,33 +187,32 @@ func run(source string) error {
 			}
 			metadataUpdater.SetProjectInfo(projectInfo)
 
-			// Set initial Docker credentials.
-			tok, err := gcloud.AccessToken(r)
-			if err != nil {
-				return fmt.Errorf("Error getting access token to set docker credentials: %v", err)
-			}
-			if err := b.SetDockerAccessToken(tok); err != nil {
-				return fmt.Errorf("Error setting docker credentials: %v", err)
-			}
-
-			// Write initial docker credentials for GCR. This writes the initial
-			// ~/.docker/config.json which is made available to build steps.
-			
-			go func() {
-				for ; ; time.Sleep(tokenRefreshDur) {
-					tok, err := gcloud.AccessToken(r)
-					if err != nil {
-						log.Printf("Error getting access token to update docker credentials: %v", err)
-						continue
-					}
-					if err := b.UpdateDockerAccessToken(tok); err != nil {
-						log.Printf("Error updating docker credentials: %v", err)
-					}
-				}
-			}()
-
 			go supplyTokenToMetadata(metadataUpdater, r)
 		}
+		// Set initial Docker credentials.
+		tok, err := gcloud.AccessToken(r)
+		if err != nil {
+			return fmt.Errorf("Error getting access token to set docker credentials: %v", err)
+		}
+		if err := b.SetDockerAccessToken(tok); err != nil {
+			return fmt.Errorf("Error setting docker credentials: %v", err)
+		}
+
+		// Write initial docker credentials for GCR. This writes the initial
+		// ~/.docker/config.json which is made available to build steps.
+		
+		go func() {
+			for ; ; time.Sleep(tokenRefreshDur) {
+				tok, err := gcloud.AccessToken(r)
+				if err != nil {
+					log.Printf("Error getting access token to update docker credentials: %v", err)
+					continue
+				}
+				if err := b.UpdateDockerAccessToken(tok); err != nil {
+					log.Printf("Error updating docker credentials: %v", err)
+				}
+			}
+		}()
 	}
 
 	b.Start()
