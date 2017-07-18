@@ -11,4 +11,6 @@ container-builder-local --config donotexist.yaml && exit # unexisting config fil
 container-builder-local --config cloudbuild.yaml . || exit # happy dryrun case
 
 # Full test
-container-builder-local --config cloudbuild.yaml --dryrun=false .
+container-builder-local --config cloudbuild.yaml --dryrun=false . || exit
+
+exit 0
