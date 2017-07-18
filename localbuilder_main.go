@@ -159,10 +159,12 @@ func run(source string) error {
 	b := build.New(r, *buildConfig, nil, &buildlog.BuildLog{}, volumeName, true, *push)
 
 	// Do not run the spoofed metadata server on a dryrun.
+	fmt.Println("--> hello mod OnGCE: ", computeMetadata.OnGCE())
 	if !*dryRun {
 		// On GCE, do not create a spoofed metadata server, use the existing one.
 		// The cloudbuild network is still needed.
 		if computeMetadata.OnGCE() {
+			log.Println("Creating cloudbuild network because build run on GCE...")
 			if err := metadata.CreateCloudbuildNetwork(r, ""); err != nil {
 				return fmt.Errorf("Error creating network: %v", err)
 			}

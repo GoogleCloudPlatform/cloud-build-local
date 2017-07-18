@@ -12,7 +12,7 @@ container-builder-local --config=cloudbuild_nil.yaml . || exit # happy dryrun ca
 
 # End to end tests.
 echo "MOD 2"
-container-builder-local --config=cloudbuild_nil.yaml --dryrun=false . || exit
+container-builder-local --config=cloudbuild_nil.yaml --dryrun=false . || (echo "it should exit here" && exit)
 echo "MOD 3"
 #container-builder-local --config=cloudbuild_dockerfile.yaml --dryrun=false . || exit
 echo "MOD 4"

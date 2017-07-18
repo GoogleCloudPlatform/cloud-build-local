@@ -38,8 +38,6 @@ steps:
 
     gcloud config set compute/zone us-central1-f
     instance_name=ubuntu-integration-tests-$$DATE
-    echo "1: " $instance_name
-    echo "2: " $$instance_name
     gcloud compute instances create $$instance_name \
       --image-family=ubuntu-1404-lts \
       --image-project=ubuntu-os-cloud \
