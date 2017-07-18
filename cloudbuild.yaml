@@ -7,20 +7,24 @@ steps:
   args:
   - '-c'
   - |
-    find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath|integration_tests" | xargs /builder/bin/go.bash test
+    # find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath|integration_tests" | xargs /builder/bin/go.bash test
 # Binary creation.
 - name: 'gcr.io/cloud-builders/go:wheezy'
   args: ['build', '-o', 'container-builder-local', 'github.com/GoogleCloudPlatform/container-builder-local']
+# Create a docker image with all the tools for local builder.
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'integration-image', './integration_tests/.']
 # Run integration tests.
 # Probably need to first create a special image that contains: go, gcloud,
 # docker, gsutil, ...
-- name: 'gcr.io/cloud-builders/go:wheezy'
+- name: 'integration-image'
   entrypoint: 'bash'
   args:
   - '-c'
   - |
+    docker images
     cp container-builder-local /usr/local/bin/
     go test ./integration_tests/smoke_test.go \
-     --files_path=./integration_tests/ \
+     --files_path=$$PWD/integration_tests/ \
      --binary_path=container-builder-local
 
