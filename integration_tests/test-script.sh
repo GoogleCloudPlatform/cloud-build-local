@@ -18,3 +18,5 @@ echo "MOD 3"
 echo "MOD 4"
 #container-builder-local --config=cloudbuild_gcr.yaml --dryrun=false . || exit
 echo "MOD 5"
+
+exit 0
