@@ -21,14 +21,13 @@
 package smoke_test
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"google3/base/go/flag"
 )
 
 var (
