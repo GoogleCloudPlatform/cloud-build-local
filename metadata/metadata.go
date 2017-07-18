@@ -245,12 +245,17 @@ func startServer(r runner.Runner, metadataImage string, iptables bool, ip, subne
 	return nil
 }
 
+// CleanCloudbuildNetwork delete the cloudbuild network.
+func CleanCloudbuildNetwork(r runner.Runner) error {
+	return r.Run([]string{"docker", "network", "rm", "cloudbuild"}, nil, os.Stdout, os.Stderr, "")
+}
+
 // Stop stops the metadata server container and tears down the docker cloudbuild
 // network used to route traffic to it.
 // Try to clean both the container and the network before returning an error.
 func (RealUpdater) Stop(r runner.Runner) error {
 	errContainer := r.Run([]string{"docker", "rm", "-f", "metadata"}, nil, os.Stdout, os.Stderr, "")
-	errNetwork := r.Run([]string{"docker", "network", "rm", "cloudbuild"}, nil, os.Stdout, os.Stderr, "")
+	errNetwork := CleanCloudbuildNetwork(r)
 	if errContainer != nil {
 		return errContainer
 	}

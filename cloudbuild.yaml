@@ -41,12 +41,12 @@ steps:
     status=0
     while true
     do
-      if gsutil stat gs://container-builder-local-test-logs/success.txt 2> /dev/null; then
-        gsutil cat gs://container-builder-local-test-logs/success.txt
+      if gsutil stat $$GCS_LOGS_PATH/success.txt 2> /dev/null; then
+        gsutil cat $$GCS_LOGS_PATH/success.txt
         break
       fi
-      if gsutil stat gs://container-builder-local-test-logs/failure.txt 2> /dev/null; then
-        gsutil cat gs://container-builder-local-test-logs/failure.txt
+      if gsutil stat $$GCS_LOGS_PATH/failure.txt 2> /dev/null; then
+        gsutil cat $$GCS_LOGS_PATH/failure.txt
         status=1
         break
       fi
