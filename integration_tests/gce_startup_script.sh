@@ -64,7 +64,7 @@ function install_docker() {
   # use the https://apt.dockerproject.org/repo ubuntu-trusty as described
   # above, "apt-cache madison docker-engine" will give you a list of the
   # currently available versions.
-  sudo apt-get install -y docker-engine=17.05-ce unzip tcpdump || exit
+  sudo apt-get install -y docker-engine=17.05.0~ce-0~ubuntu-trusty unzip tcpdump || exit
 }
 install_docker&
 # add the install_docker PID to the list for waiting.
