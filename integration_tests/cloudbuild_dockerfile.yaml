@@ -1,5 +1,5 @@
 steps:
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'gcr.io/argo-local-builder/test', '.']
+  args: ['build', '-t', 'gcr.io/$PROJECT_ID/test', '.']
 
-images: ['gcr.io/argo-local-builder/test']
+images: ['gcr.io/$PROJECT_ID/test']

@@ -49,7 +49,7 @@ const (
 )
 
 var (
-	configFile    = flag.String("config", "cloudconfig.yaml", "cloud build config file path")
+	configFile    = flag.String("config", "cloudbuild.yaml", "cloud build config file path")
 	substitutions = flag.String("substitutions", "", `substitutions key=value pairs separated by comma; for example _FOO=bar,_BAZ=argo`)
 	dryRun        = flag.Bool("dryrun", true, "If true, nothing will be run")
 	push          = flag.Bool("push", false, "If true, the images will be pushed")
