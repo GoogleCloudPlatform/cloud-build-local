@@ -8,6 +8,7 @@ echo "path: " $PATH
 printenv
 docker-credential-gcr configure-docker || exit
 
+docker pull gcr.io/argo-local-builder/test || exit
 
 # Flags tests.
 container-builder-local --version || exit
