@@ -55,7 +55,7 @@ steps:
     done
 
     # Delete the VM and return the status
-    gcloud compute instances delete $$instance_name --quiet
+    # gcloud compute instances delete $$instance_name --quiet
     exit $$status
 
 

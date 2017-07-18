@@ -36,17 +36,35 @@ pids="$! $pids"
 
 function install_docker() {
   echo "Installing docker..."
-  # Add docker-engine, using directions at https://docs.docker.com/engine/installation/ubuntulinux/
-  sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D || exit
-  echo "deb https://apt.dockerproject.org/repo ubuntu-trusty main" >> /etc/apt/sources.list.d/docker.list || exit
-  # apt-get update appears to be a bit flakey with requests to our GCS
-  # mirrors timing out. Try a few times just in case.
-  sudo apt-get update || sudo apt-get update || sudo apt-get update || exit
-  # The docker-engine= is the key to setting the version. If you set up apt to
-  # use the https://apt.dockerproject.org/repo ubuntu-trusty as described
-  # above, "apt-cache madison docker-engine" will give you a list of the
-  # currently available versions.
-  sudo apt-get install -y docker-engine=17.05.0~ce-0~ubuntu-trusty unzip tcpdump || exit
+  sudo apt-get update || exit
+  sudo apt-get install \
+    linux-image-extra-$(uname -r) \
+    linux-image-extra-virtual \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    software-properties-common || exit
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add - || exit
+  sudo add-apt-repository \
+    "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+    $(lsb_release -cs) \
+    stable" || exit
+  sudo apt-get update || exit
+  sudo apt-get install docker-ce || exit
+  # Test.
+  docker --version || exit
+
+  # # Add docker-engine, using directions at https://docs.docker.com/engine/installation/ubuntulinux/
+  # sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D || exit
+  # echo "deb https://apt.dockerproject.org/repo ubuntu-trusty main" >> /etc/apt/sources.list.d/docker.list || exit
+  # # apt-get update appears to be a bit flakey with requests to our GCS
+  # # mirrors timing out. Try a few times just in case.
+  # sudo apt-get update || sudo apt-get update || sudo apt-get update || exit
+  # # The docker-engine= is the key to setting the version. If you set up apt to
+  # # use the https://apt.dockerproject.org/repo ubuntu-trusty as described
+  # # above, "apt-cache madison docker-engine" will give you a list of the
+  # # currently available versions.
+  # sudo apt-get install -y docker-engine=17.05.0~ce-0~ubuntu-trusty unzip tcpdump || exit
 }
 install_docker&
 # add the install_docker PID to the list for waiting.
