@@ -1,5 +1,6 @@
 # This build is triggered on push to the release branch in order to ensure that
 # code compiles prior to creating a Pull Request to the master branch.
+
 steps:
 # Run unit tests in all subdirectories (except those excluded by the grep).
 - name: 'gcr.io/cloud-builders/go:wheezy'
@@ -13,7 +14,7 @@ steps:
 - name: 'gcr.io/cloud-builders/go:wheezy'
   args: ['build', '-o', 'container-builder-local', 'github.com/GoogleCloudPlatform/container-builder-local']
 
-# Copy the integration test files to GCS
+# Copy the integration test files to GCS.
 
 - name: 'gcr.io/cloud-builders/gsutil'
   entrypoint: 'bash'

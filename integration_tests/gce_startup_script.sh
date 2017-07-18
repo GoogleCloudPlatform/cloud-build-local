@@ -83,10 +83,10 @@ gcloud compute instances add-metadata $HOSTNAME --metadata=successful_startup=${
 
 # Fetch test files from gcs.
 mkdir /root/test-files
-gsutil copy gs://container-builder-local-test/* /root/test-files/
+gsutil -m copy gs://container-builder-local-test/* /root/test-files/
 chmod +x /root/test-files/container-builder-local || exit
 mv /root/test-files/container-builder-local /usr/local/bin/
-chmod +x /root/test-files/test-script || exit
+chmod +x /root/test-files/test-script.sh || exit
 
 # Copy up an empty output.txt as a signal to the runner that the script is starting.
 touch /root/output.txt || exit
@@ -96,7 +96,7 @@ gsutil cp /root/output.txt gs://container-builder-local-test-logs/output.txt || 
 # in GCS so that the test runner can stop immediately.
 (
   # If the test succeeds, copy the output to success.txt. Else, to failure.txt.
-  /root/test-files/test-script &> /root/output.txt && \
+  /root/test-files/test-script.sh &> /root/output.txt && \
     (gsutil cp /root/output.txt gs://container-builder-local-test-logs/success.txt && successful_test=1) || \
     gsutil cp /root/output.txt gs://container-builder-local-test-logs/failure.txt
   touch done
