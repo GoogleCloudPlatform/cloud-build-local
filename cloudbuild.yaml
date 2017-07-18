@@ -16,8 +16,8 @@ steps:
 # Create a docker image with all the tools needed to test the local builder.
 # The lastest image is pulled first in order to make the next build faster,
 # using --cache-from.
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['pull', 'gcr.io/argo-local-builder/integration-image']
+# - name: 'gcr.io/cloud-builders/docker'
+#   args: ['pull', 'gcr.io/argo-local-builder/integration-image']
 - name: 'gcr.io/cloud-builders/docker'
   args:
   - 'build'
@@ -26,6 +26,8 @@ steps:
   - '-t'
   - 'gcr.io/argo-local-builder/integration-image'
   - './integration_tests/.'
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'gcr.io/argo-local-builder/integration-image']
 
 # Run integration tests.
 - name: 'gcr.io/argo-local-builder/integration-image'
