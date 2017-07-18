@@ -10,7 +10,7 @@ steps:
     find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath" | xargs /builder/bin/go.bash test
 # Binary creation.
 - name: 'gcr.io/cloud-builders/go:wheezy'
-  args: ['install', 'github.com/GoogleCloudPlatform/container-builder-local']
+  args: ['build', '-o', 'container-builder-local', 'github.com/GoogleCloudPlatform/container-builder-local']
 
 - name: 'ubuntu'
   entrypoint: 'bash'
@@ -18,5 +18,5 @@ steps:
   - '-c'
   - |
     echo hello world
-    ls *
+    ls
 
