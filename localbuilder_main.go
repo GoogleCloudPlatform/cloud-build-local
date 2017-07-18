@@ -51,6 +51,7 @@ var (
 	substitutions = flag.String("substitutions", "", `substitutions key=value pairs separated by comma; for example _FOO=bar,_BAZ=argo`)
 	dryRun        = flag.Bool("dryrun", true, "If true, nothing will be run")
 	push          = flag.Bool("push", false, "If true, the images will be pushed")
+	help          = flag.Bool("help", false, "If true, print the help message")
 )
 
 func exitUsage(msg string) {
@@ -60,6 +61,11 @@ func exitUsage(msg string) {
 func main() {
 	flag.Parse()
 	args := flag.Args()
+
+	if *help {
+		flag.PrintDefaults()
+		return
+	}
 
 	if len(args) == 0 {
 		exitUsage("Specify a source")
@@ -137,7 +143,7 @@ func main() {
 
 	b := build.New(r, *buildConfig, nil, &buildlog.BuildLog{}, volumeName, true, *push)
 
-  if !*dryRun {
+	if !*dryRun {
 
 		// Start the spoofed metadata server.
 		log.Println("Starting spoofed metadata server...")
@@ -175,6 +181,7 @@ func main() {
 		}()
 
 		go supplyTokenToMetadata(metadataUpdater, r)
+
 	}
 
 	b.Start()
