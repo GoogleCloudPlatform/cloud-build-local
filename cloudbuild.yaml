@@ -59,7 +59,7 @@ steps:
     done
 
     # Delete the VM and return the status
-    gcloud compute instances delete ubuntu-integration-tests --quiet
+    #gcloud compute instances delete ubuntu-integration-tests --quiet
     exit $status
 
 
