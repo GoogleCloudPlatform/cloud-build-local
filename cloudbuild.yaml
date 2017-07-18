@@ -32,24 +32,24 @@ steps:
   args:
   - '-c'
   - |
+    gcloud config set compute/zone us-central1-f
     gcloud compute instances create ubuntu-integration-tests \
       --image-family=ubuntu-1404-lts \
       --image-project=ubuntu-os-cloud \
       --machine-type=n1-standard-1 \
       --scopes userinfo-email,cloud-platform \
       --metadata-from-file startup-script=integration_tests/gce_startup_script.sh \
-      --zone us-central1-f \
       --metadata zone=us-central1-f
 
     # Wait until either the success or failure file is written to GCS.
     status=0
     while true
     do
-      if gsutil stat gs://container-builder-local-test-logs/success.txt; then
+      if gsutil stat gs://container-builder-local-test-logs/success.txt 2> /dev/null; then
         gsutil cat gs://container-builder-local-test-logs/success.txt
         break
       fi
-      if gsutil stat gs://container-builder-local-test-logs/failure.txt; then
+      if gsutil stat gs://container-builder-local-test-logs/failure.txt 2> /dev/null; then
         gsutil cat gs://container-builder-local-test-logs/failure.txt
         status=1
         break
@@ -60,6 +60,6 @@ steps:
 
     # Delete the VM and return the status
     gcloud compute instances delete ubuntu-integration-tests --quiet
-    return status
+    return $status
 
 
