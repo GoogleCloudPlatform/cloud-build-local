@@ -1478,3 +1478,67 @@ func TestStart(t *testing.T) {
 		}
 	}
 }
+
+// TestUpdateDockerAccessToken tests the commands executed when setting and
+// updating Docker access tokens.
+func TestUpdateDockerAccessToken(t *testing.T) {
+	t.Parallel()
+	r := newMockRunner(t, "TestUpdateDockerAccessToken")
+	r.dockerRunHandler = func(args []string, _, _ io.Writer) error { return nil }
+	b := New(r, cb.Build{}, nil, nil, "", false, false)
+
+	// If UpdateDockerAccessToken is called before SetDockerAccessToken, we
+	// should get an error.
+	if err := b.UpdateDockerAccessToken("INVALID"); err == nil {
+		t.Errorf("Expected error when calling UpdateDockerAccessToken first, got none: %v", err)
+	}
+
+	if err := b.SetDockerAccessToken("FIRST"); err != nil {
+		t.Errorf("SetDockerAccessToken: %v", err)
+	}
+	if got, want := b.prevGCRAuth, base64.StdEncoding.EncodeToString([]byte("oauth2accesstoken:FIRST")); got != want {
+		t.Errorf("After SetDockerAccessToken, GCR auth is %q, want %q", got, want)
+	}
+
+	if err := b.UpdateDockerAccessToken("SECOND"); err != nil {
+		t.Errorf("UpdateDockerAccessToken: %v", err)
+	}
+	if got, want := b.prevGCRAuth, base64.StdEncoding.EncodeToString([]byte("oauth2accesstoken:SECOND")); got != want {
+		t.Errorf("After SetDockerAccessToken, GCR auth is %q, want %q", got, want)
+	}
+
+	got := strings.Join(r.commands, "\n")
+	want := strings.Join([]string{
+		`docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock --entrypoint bash ubuntu -c mkdir -p ~/.docker/ && cat << EOF > ~/.docker/config.json
+{
+  "auths": {
+    "https://asia.gcr.io": {
+      "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
+    },
+    "https://b.gcr.io": {
+      "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
+    },
+    "https://bucket.gcr.io": {
+      "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
+    },
+    "https://eu.gcr.io": {
+      "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
+    },
+    "https://gcr-staging.sandbox.google.com": {
+      "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
+    },
+    "https://gcr.io": {
+      "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
+    },
+    "https://us.gcr.io": {
+      "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
+    }
+  }
+}
+EOF`,
+		"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock --entrypoint bash ubuntu -c sed -i 's/b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q=/b2F1dGgyYWNjZXNzdG9rZW46U0VDT05E/g' ~/.docker/config.json",
+	}, "\n")
+	if got != want {
+		t.Errorf("Commands didn't match!\n===Want:\n%s\n===Got:\n%s", want, got)
+	}
+}
