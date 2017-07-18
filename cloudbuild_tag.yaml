@@ -7,7 +7,7 @@ steps:
   args:
   - '-c'
   - |
-    find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath|integration_tests" | xargs /builder/bin/go.bash test
+    find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath" | xargs /builder/bin/go.bash test
 # Set TAG_NAME as version.
 - name: 'ubuntu'
   args: ['sed', '-i', 's/HEAD/$TAG_NAME/g', 'version.go']
