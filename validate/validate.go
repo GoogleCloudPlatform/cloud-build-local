@@ -98,9 +98,6 @@ func CheckBuild(b *cb.Build) error {
 		}
 	}
 
-	if err := checkSecrets(b); err != nil {
-		return fmt.Errorf("invalid .secrets field: %v", err)
-	}
 	return nil
 }
 
@@ -331,84 +328,5 @@ func CheckBuildSteps(steps []*cb.BuildStep) error {
 		}
 	}
 
-	return nil
-}
-
-func checkSecrets(b *cb.Build) error {
-	// Collect set of all used secret_envs. Also make sure a step doesn't use the
-	// same secret_env twice.
-	usedSecretEnvs := map[string]struct{}{}
-	for i, step := range b.Steps {
-		thisStepSecretEnvs := map[string]struct{}{}
-		for _, se := range step.SecretEnv {
-			usedSecretEnvs[se] = struct{}{}
-			if _, found := thisStepSecretEnvs[se]; found {
-				return fmt.Errorf("Step %d uses the secretEnv %q more than once", i, se)
-			}
-			thisStepSecretEnvs[se] = struct{}{}
-		}
-	}
-
-	// Collect set of all defined secret_envs, and check that secret_envs are not
-	// defined by more than one secret. Also check that only one Secret specifies
-	// any given KMS key name.
-	definedSecretEnvs := map[string]struct{}{}
-	definedSecretKeys := map[string]struct{}{}
-	for i, sec := range b.Secrets {
-		if _, found := definedSecretKeys[sec.KmsKeyName]; found {
-			return fmt.Errorf("kmsKeyName %q is used by more than one secret", sec.KmsKeyName)
-		}
-		definedSecretKeys[sec.KmsKeyName] = struct{}{}
-
-		if len(sec.SecretEnv) == 0 {
-			return fmt.Errorf("secret %d defines no secretEnvs", i)
-		}
-		for k := range sec.SecretEnv {
-			if _, found := definedSecretEnvs[k]; found {
-				return fmt.Errorf("secretEnv %q is defined more than once", k)
-			}
-			definedSecretEnvs[k] = struct{}{}
-		}
-	}
-
-	// Check that all used secret_envs are defined.
-	for used := range usedSecretEnvs {
-		if _, found := definedSecretEnvs[used]; !found {
-			return fmt.Errorf("secretEnv %q is used without being defined", used)
-		}
-	}
-	// Check that all defined secret_envs are used at least once.
-	for defined := range definedSecretEnvs {
-		if _, found := usedSecretEnvs[defined]; !found {
-			return fmt.Errorf("secretEnv %q is defined without being used", defined)
-		}
-	}
-	if len(definedSecretEnvs) > 10 {
-		return errors.New("build defines more than ten secret values")
-	}
-
-	// Check secret_env max size.
-	for _, sec := range b.Secrets {
-		for k, v := range sec.SecretEnv {
-			if len(v) > 1024 {
-				return fmt.Errorf("secretEnv value for %q cannot exceed 1KB", k)
-			}
-		}
-	}
-
-	// Check that no step's env and secretEnv specify the same variable.
-	for i, step := range b.Steps {
-		envs := map[string]struct{}{}
-		for _, e := range step.Env {
-			// Previous validation ensures that envs include "=".
-			k := e[:strings.Index(e, "=")]
-			envs[k] = struct{}{}
-		}
-		for _, se := range step.SecretEnv {
-			if _, found := envs[se]; found {
-				return fmt.Errorf("step %d has secret and non-secret env %q", i, se)
-			}
-		}
-	}
 	return nil
 }

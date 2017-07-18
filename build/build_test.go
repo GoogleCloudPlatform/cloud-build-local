@@ -15,7 +15,6 @@
 package build
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -1254,18 +1253,6 @@ func TestStripTagDigest(t *testing.T) {
 			t.Errorf("For %q: got %q, want %q", c.in, got, c.out)
 		}
 	}
-}
-
-type fakeKMS struct {
-	plaintext string
-	err       error
-}
-
-func (k fakeKMS) Decrypt(_, enc string) (string, error) {
-	if _, err := base64.StdEncoding.DecodeString(enc); err != nil {
-		return "", err
-	}
-	return k.plaintext, k.err
 }
 
 func TestPushDigestScraping(t *testing.T) {
