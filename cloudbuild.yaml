@@ -13,7 +13,7 @@ steps:
   args: ['install', 'github.com/GoogleCloudPlatform/container-builder-local']
 
 - name: 'ubuntu'
-  entrypoin: 'bash'
+  entrypoint: 'bash'
   args:
   - '-c'
   - |
