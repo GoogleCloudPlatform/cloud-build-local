@@ -71,9 +71,11 @@ install_docker&
 pids="$! $pids"
 
 wait $pids || exit
+successful_startup=1
 
 # Fetch some metadata.
 zone=$(curl -H"Metadata-flavor: Google" metadata.google.internal/computeMetadata/v1/instance/attributes/zone)
+gcs_path=$(curl -H"Metadata-flavor: Google" metadata.google.internal/computeMetadata/v1/instance/attributes/gcs_path)
 
 # Set a metadata value about the success of the startup script.
 gcloud config set compute/zone ${zone}
@@ -81,7 +83,7 @@ gcloud compute instances add-metadata $HOSTNAME --metadata=successful_startup=1
 
 # Fetch test files from gcs.
 mkdir /root/test-files
-gsutil -m copy gs://container-builder-local-test/* /root/test-files/
+gsutil -m copy $gcs_path/* /root/test-files/
 chmod +x /root/test-files/container-builder-local || exit
 mv /root/test-files/container-builder-local /usr/local/bin/
 chmod +x /root/test-files/test-script.sh || exit

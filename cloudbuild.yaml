@@ -21,25 +21,29 @@ steps:
   args:
   - '-c'
   - |
-    gsutil rm gs://container-builder-local-test/*
     gsutil rm gs://container-builder-local-test-logs/*
-    gsutil -m copy container-builder-local gs://container-builder-local-test/
-    gsutil -m copy ./integration_tests/* gs://container-builder-local-test/
 
-# Run integration tests in a VM.
+# Copy the integration test files to GCS and
+# run integration tests in a VM.
 - name: 'gcr.io/cloud-builders/gcloud'
   entrypoint: 'bash'
   args:
   - '-c'
   - |
+    DATE=`date +%Y%m%d_%H%M%S`
+    GCS_PATH=gs://container-builder-local-test/$$DATE/
+    gsutil -m copy container-builder-local $$GCS_PATH
+    gsutil -m copy ./integration_tests/* $$GCS_PATH
+    gsutil rm gs://container-builder-local-test-logs/*
+
     gcloud config set compute/zone us-central1-f
     gcloud compute instances create ubuntu-integration-tests \
       --image-family=ubuntu-1404-lts \
       --image-project=ubuntu-os-cloud \
-      --machine-type=n1-standard-2 \
-      --scopes userinfo-email,cloud-platform \
+      --machine-type=n1-standard-4 \
+      --scopes default,userinfo-email,useraccounts-ro,cloud-platform \
       --metadata-from-file startup-script=integration_tests/gce_startup_script.sh \
-      --metadata zone=us-central1-f
+      --metadata zone=us-central1-f,gcs_path=$$GCS_PATH
 
     # Wait until either the success or failure file is written to GCS.
     status=0
@@ -59,7 +63,7 @@ steps:
     done
 
     # Delete the VM and return the status
-    gcloud compute instances delete ubuntu-integration-tests --quiet
+    #gcloud compute instances delete ubuntu-integration-tests --quiet
     exit $status
 
 

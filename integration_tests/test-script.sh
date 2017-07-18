@@ -1,4 +1,5 @@
-ls
+# Set project.
+gcloud config set project argo-local-builder
 
 # Flags tests.
 container-builder-local --version || exit
@@ -13,7 +14,7 @@ container-builder-local --config=cloudbuild_nil.yaml . || exit # happy dryrun ca
 echo "MOD 2"
 container-builder-local --config=cloudbuild_nil.yaml --dryrun=false . || exit
 echo "MOD 3"
-container-builder-local --config=cloudbuild_dockerfile.yaml --dryrun=false . || exit
+#container-builder-local --config=cloudbuild_dockerfile.yaml --dryrun=false . || exit
 echo "MOD 4"
-container-builder-local --config=cloudbuild_gcr.yaml --dryrun=false . || exit
+#container-builder-local --config=cloudbuild_gcr.yaml --dryrun=false . || exit
 echo "MOD 5"
