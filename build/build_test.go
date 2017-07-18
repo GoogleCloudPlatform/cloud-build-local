@@ -334,11 +334,10 @@ var commonBuildRequest = cb.Build{
 	Steps: []*cb.BuildStep{{
 		Name: "gcr.io/my-project/my-compiler",
 	}, {
-		Name:    "gcr.io/my-project/my-builder",
-		Env:     []string{"FOO=bar", "BAZ=buz"},
-		Args:    []string{"a", "b", "c"},
-		Dir:     "foo/bar/../baz",
-		Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+		Name: "gcr.io/my-project/my-builder",
+		Env:  []string{"FOO=bar", "BAZ=buz"},
+		Args: []string{"a", "b", "c"},
+		Dir:  "foo/bar/../baz",
 	}},
 	Images: []string{"gcr.io/build-output-tag-1", "gcr.io/build-output-tag-2", "gcr.io/build-output-tag-no-digest"},
 }
@@ -587,7 +586,6 @@ func TestRunBuildSteps(t *testing.T) {
 		buildRequest: commonBuildRequest,
 		wantCommands: []string{
 			"docker volume create --name homevol",
-			"docker volume create --name myvol",
 			"docker inspect gcr.io/my-project/my-compiler",
 			"docker run --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-compiler",
 			dockerRunString(0) + " gcr.io/my-project/my-compiler",
@@ -596,13 +594,11 @@ func TestRunBuildSteps(t *testing.T) {
 			dockerRunInStepDir(1, "foo/baz") +
 				" --env FOO=bar" +
 				" --env BAZ=buz" +
-				" --volume myvol:/foo" +
 				" gcr.io/my-project/my-builder a b c",
 			"docker inspect gcr.io/build-output-tag-1",
 			"docker inspect gcr.io/build-output-tag-2",
 			"docker inspect gcr.io/build-output-tag-no-digest",
 			"docker rm -f step_0 step_1",
-			"docker volume rm myvol",
 			"docker volume rm homevol",
 		},
 	}, {

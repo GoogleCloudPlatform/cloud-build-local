@@ -61,12 +61,6 @@ var (
 		"REVISION_ID": struct{}{},
 		"COMMIT_SHA":  struct{}{},
 	}
-	validVolumeNameRE   = regexp.MustCompile("^[a-zA-Z0-9][a-zA-Z0-9_.-]+$")
-	reservedVolumePaths = map[string]struct{}{
-		"/workspace":           struct{}{},
-		"/builder/home":        struct{}{},
-		"/var/run/docker.sock": struct{}{},
-	}
 )
 
 // CheckBuild returns no error if build is valid,
@@ -222,7 +216,6 @@ func CheckBuildSteps(steps []*cb.BuildStep) error {
 	knownSteps := map[string]bool{
 		StartStep: true,
 	}
-	volumesUsed := map[string]int{} // Maps volume name -> # of times used.
 	for i, s := range steps {
 		if s.Name == "" {
 			return fmt.Errorf("build step %d must specify name", i)
@@ -280,51 +273,6 @@ func CheckBuildSteps(steps []*cb.BuildStep) error {
 			if !strings.Contains(e, "=") {
 				return fmt.Errorf(`build step #%d - %q: the Env entry %q must be of the form "KEY=VALUE"`, i, s.Id, e)
 			}
-		}
-
-		stepVolumes, stepPaths := map[string]bool{}, map[string]bool{}
-		for _, vol := range s.Volumes {
-			volName, volPath := vol.Name, vol.Path
-
-			// Check valid volume name.
-			if !validVolumeNameRE.MatchString(volName) {
-				return fmt.Errorf("build step #%d - %q: volume name %q must match %q", i, s.Id, volName, validVolumeNameRE.String())
-			}
-
-			p := path.Clean(volPath)
-			// Clean and check valid volume path.
-			if !path.IsAbs(path.Clean(p)) {
-				return fmt.Errorf("build step #%d - %q: volume path %q is not valid, must be absolute", i, s.Id, volPath)
-			}
-
-			// Check volume path blacklist.
-			if _, found := reservedVolumePaths[p]; found {
-				return fmt.Errorf("build step #%d - %q: volume path %q is reserved", i, s.Id, volPath)
-			}
-			// Check volume path doesn't start with /cloudbuild/ to allow future paths.
-			if strings.HasPrefix(p, "/cloudbuild/") {
-				return fmt.Errorf("build step #%d - %q: volume path %q cannot start with /cloudbuild/", i, s.Id, volPath)
-			}
-
-			// Check volume name uniqueness.
-			if stepVolumes[volName] {
-				return fmt.Errorf("build step #%d - %q: the Volumes entry must contain unique names (%q)", i, s.Id, volName)
-			}
-			stepVolumes[volName] = true
-
-			// Check volume path uniqueness.
-			if stepPaths[p] {
-				return fmt.Errorf("build step #%d - %q: the Volumes entry must contain unique paths (%q)", i, s.Id, p)
-			}
-			stepPaths[p] = true
-			volumesUsed[volName]++
-		}
-	}
-
-	// Check that all volumes are referenced by at least two steps.
-	for volume, used := range volumesUsed {
-		if used < 2 {
-			return fmt.Errorf("Volume %q is only used by one step", volume)
 		}
 	}
 

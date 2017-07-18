@@ -622,9 +622,6 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 	for _, env := range step.Env {
 		args = append(args, "--env", env)
 	}
-	for _, vol := range step.Volumes {
-		args = append(args, "--volume", fmt.Sprintf("%s:%s", vol.Name, vol.Path))
-	}
 	if step.Entrypoint != "" {
 		args = append(args, "--entrypoint", step.Entrypoint)
 	}
@@ -652,26 +649,6 @@ func (b *Build) runBuildSteps() error {
 			log.Printf("Failed to delete homevol: %v", err)
 		}
 	}()
-
-	// Create all the volumes referenced by all steps and defer cleanup.
-	
-	allVolumes := map[string]bool{}
-	for _, step := range b.Request.Steps {
-		for _, v := range step.Volumes {
-			if !allVolumes[v.Name] {
-				allVolumes[v.Name] = true
-				vol := volume.New(v.Name, b.Runner)
-				if err := vol.Setup(); err != nil {
-					return err
-				}
-				defer func(v *volume.Volume, volName string) {
-					if err := v.Close(); err != nil {
-						log.Printf("Failed to delete volume %q: %v", volName, err)
-					}
-				}(vol, v.Name)
-			}
-		}
-	}
 
 	// Clean the build steps before trying to delete the volume used by the
 	// running containers.
