@@ -181,7 +181,6 @@ func main() {
 		}()
 
 		go supplyTokenToMetadata(metadataUpdater, r)
-
 	}
 
 	b.Start()
