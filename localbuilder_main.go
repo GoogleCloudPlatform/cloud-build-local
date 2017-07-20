@@ -67,6 +67,7 @@ func main() {
 		flag.PrintDefaults()
 		return
 	}
+  
 	if *versionFlag {
 		log.Printf("Version: %s", version)
 		return
