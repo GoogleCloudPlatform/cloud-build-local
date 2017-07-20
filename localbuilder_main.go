@@ -52,6 +52,7 @@ var (
 	dryRun        = flag.Bool("dryrun", true, "If true, nothing will be run")
 	push          = flag.Bool("push", false, "If true, the images will be pushed")
 	help          = flag.Bool("help", false, "If true, print the help message")
+	versionFlag   = flag.Bool("version", false, "If true, print the local builder version")
 )
 
 func exitUsage(msg string) {
@@ -64,6 +65,11 @@ func main() {
 
 	if *help {
 		flag.PrintDefaults()
+		return
+	}
+  
+	if *versionFlag {
+		log.Printf("Version: %s", version)
 		return
 	}
 
@@ -144,15 +150,14 @@ func main() {
 	b := build.New(r, *buildConfig, nil, &buildlog.BuildLog{}, volumeName, true, *push)
 
 	if !*dryRun {
-
 		// Start the spoofed metadata server.
 		log.Println("Starting spoofed metadata server...")
-		if err := metadata.StartServer(r, metadataImageName); err != nil {
+		if err := metadata.StartLocalServer(r, metadataImageName); err != nil {
 			log.Printf("Failed to start spoofed metadata server: %v", err)
 			return
 		}
 		log.Println("Started spoofed metadata server")
-		metadataUpdater := metadata.RealUpdater{}
+		metadataUpdater := metadata.RealUpdater{Local: true}
 		defer metadataUpdater.Stop(r)
 
 		// Get project info to feed the metadata server.
@@ -163,9 +168,19 @@ func main() {
 		}
 		metadataUpdater.SetProjectInfo(projectInfo)
 
-		// Update docker credentials, for build steps that require pulling
-		// private images. This can be either a private build step image or if
-		// we're building a docker image that depends on a private image.
+		// Set initial Docker credentials.
+		tok, err := gcloud.AccessToken(r)
+		if err != nil {
+			log.Printf("Error getting access token to set docker credentials: %v", err)
+			return
+		}
+		if err := b.SetDockerAccessToken(tok); err != nil {
+			log.Printf("Error setting docker credentials: %v", err)
+			return
+		}
+
+		// Write initial docker credentials for GCR. This writes the initial
+		// ~/.docker/config.json which is made available to build steps.
 		
 		go func() {
 			for ; ; time.Sleep(tokenRefreshDur) {
@@ -181,6 +196,7 @@ func main() {
 		}()
 
 		go supplyTokenToMetadata(metadataUpdater, r)
+
 	}
 
 	b.Start()

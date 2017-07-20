@@ -13,6 +13,17 @@
 // limitations under the License.
 
 // Package metadata provides methods to deal with a metadata container server.
+//
+// In order to imitate the GCE environment to provide credentials and some
+// other project metadata, we run a metadata service container and make it
+// available to build steps as metadata.google.internal, metadata, and
+// the fixed IP 169.254.169.254.
+//
+// The GCE metadata service is documented here:
+//  https://cloud.google.com/compute/docs/storing-retrieving-metadata
+// The imitation metadata service we run offers a subset of the true
+// metadata functionality, focused on providing credentials to client
+// libraries.
 package metadata
 
 import (
@@ -30,6 +41,25 @@ import (
 	"github.com/GoogleCloudPlatform/container-builder-local/runner"
 
 	"golang.org/x/oauth2"
+)
+
+const (
+	// fixedMetadataIP is the fixed IP available on all GCE instances that serves
+	// metadata on port 80. Some client libraries connect directly to this IP,
+	// rather than metadata.google.internal, so we need to listen on this IP.
+	fixedMetadataIP = "169.254.169.254"
+	// This subnet captures the fixed metadata IP. This subnet is a reserved link-local subnet.
+	metadataLocalSubnet = "169.254.0.0/16"
+
+	// metadataHostedIP is the IP that the metadata spoofer listens to in the
+	// hosted cloudbuild environment. iptables is used to route tcp connections going to
+	// 169.254.169.254 port 80 to this IP instead.
+	metadataHostedIP = "192.168.10.5"
+	// This subnet captures metadataHostedIP. This subnet is a reserved private subnet.
+	// This is the subnet used to create the cloudbuild docker network in the hosted
+	// container builder environment. All build steps are run connected to the
+	// cloudbuild docker network.
+	metadataHostedSubnet = "192.168.10.0/24"
 )
 
 // Updater encapsulates updating the spoofed metadata server.
@@ -54,10 +84,19 @@ type Token struct {
 }
 
 // RealUpdater actually sends POST requests to update spoofed metadata.
-type RealUpdater struct{}
+type RealUpdater struct {
+	Local bool
+}
+
+func (r RealUpdater) getAddress() string {
+	if r.Local {
+		return "localhost:8082"
+	}
+	return metadataHostedIP
+}
 
 // SetToken updates the spoofed metadata server's credentials.
-func (RealUpdater) SetToken(tok oauth2.Token) error {
+func (r RealUpdater) SetToken(tok oauth2.Token) error {
 	scopes, err := getScopes(tok.AccessToken)
 	if err != nil {
 		return err
@@ -71,7 +110,8 @@ func (RealUpdater) SetToken(tok oauth2.Token) error {
 	if err := json.NewEncoder(&buf).Encode(t); err != nil {
 		return err
 	}
-	if resp, err := http.Post("http://localhost:8082/token", "application/json", &buf); err != nil {
+
+	if resp, err := http.Post("http://"+r.getAddress()+"/token", "application/json", &buf); err != nil {
 		return err
 	} else if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("Got HTTP %d from spoofed metadata", resp.StatusCode)
@@ -108,13 +148,13 @@ func getScopes(tok string) ([]string, error) {
 	return strings.Split(r.Scope, " "), nil
 }
 
-// SetBuild updates the spoofed metadata server's project information.
-func (RealUpdater) SetProjectInfo(b ProjectInfo) error {
+// SetProjectInfo updates the spoofed metadata server's project information.
+func (r RealUpdater) SetProjectInfo(b ProjectInfo) error {
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(b); err != nil {
 		return err
 	}
-	if resp, err := http.Post("http://localhost:8082/build", "application/json", &buf); err != nil {
+	if resp, err := http.Post("http://"+r.getAddress()+"/build", "application/json", &buf); err != nil {
 		return err
 	} else if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
@@ -124,16 +164,71 @@ func (RealUpdater) SetProjectInfo(b ProjectInfo) error {
 	return nil
 }
 
-// StartServer starts the metadata server container.
+// StartLocalServer starts the metadata server container for VMs running as
+// part of the container builder service.
 //
-// The container is mapped to hostPort 8082, which is where RealUpdater POSTs
+// This version of Start*Server does not update iptables.
+//
+// The container listens on local port 8082, which is where RealUpdater POSTs
 // to.
-func StartServer(r runner.Runner, metadataImage string) error {
-	// Run the spoofed metadata server, mapped to localhost:8082
-	cmd := []string{"docker", "run", "-d", "-p=8082:80", "--name=metadata", metadataImage}
+func StartLocalServer(r runner.Runner, metadataImage string) error {
+	return startServer(r, metadataImage, false, fixedMetadataIP, metadataLocalSubnet)
+}
+
+// StartCloudServer starts the metadata server container for VMs running as
+// part of the container builder service.
+//
+// This version of Start*Server needs to make iptables rules that we don't
+// want (or need) on a user's local machine.
+//
+// The container listens on local port 8082, which is where RealUpdater POSTs
+// to.
+func StartCloudServer(r runner.Runner, metadataImage string) error {
+	return startServer(r, metadataImage, true, metadataHostedIP, metadataHostedSubnet)
+}
+
+func startServer(r runner.Runner, metadataImage string, iptables bool, ip, subnet string) error {
+	// Create the network.
+	cmd := []string{"docker", "network", "create", "cloudbuild", "--subnet=" + subnet}
+	log.Println(cmd)
+	if err := r.Run(cmd, nil, os.Stdout, os.Stderr, ""); err != nil {
+		log.Fatalf("Error creating network: %v", err)
+	}
+
+	// Run the spoofed metadata server.
+	if !iptables {
+		// In the local builder, we need to expose the port but it's nice to avoid 80.
+		cmd = []string{"docker", "run", "-d", "-p=8082:80", "--name=metadata", metadataImage}
+	} else {
+		cmd = []string{"docker", "run", "-d", "--name=metadata", metadataImage}
+	}
 	log.Println(cmd)
 	if err := r.Run(cmd, nil, os.Stdout, os.Stderr, ""); err != nil {
 		return err
+	}
+
+	// Redirect requests to metadata.google.internal and the fixed metadata IP to the metadata container.
+	cmd = []string{"docker", "network", "connect", "--alias=metadata", "--alias=metadata.google.internal", "--ip=" + ip, "cloudbuild", "metadata"}
+	log.Println(cmd)
+	if err := r.Run(cmd, nil, os.Stdout, os.Stderr, ""); err != nil {
+		log.Fatalf("Error connecting metadata to network: %v", err)
+	}
+
+	if iptables {
+		// Route the "real" metadata IP to the IP of our metadata spoofer.
+		cmd = []string{"iptables",
+			"-t", "nat", // In the nat table,
+			"-A", "PREROUTING", // append this rule to the PREROUTING chain,
+			"-p", "tcp", // for connections using TCP,
+			"--destination", fixedMetadataIP, // intended for the metadata service,
+			"--dport", "80", // intended for port 80.
+			"-j", "DNAT", // This rule does destination NATting,
+			"--to-destination", metadataHostedIP, // to our spoofed metadata container.
+		}
+		log.Println(cmd)
+		if err := r.Run(cmd, nil, os.Stdout, os.Stderr, ""); err != nil {
+			log.Fatalf("Error updating iptables: %v", err)
+		}
 	}
 
 	// In a separate goroutine, attach to the metadata server container so its
@@ -148,8 +243,14 @@ func StartServer(r runner.Runner, metadataImage string) error {
 	return nil
 }
 
-// Stop stops the metadata server container.
+// Stop stops the metadata server container and tears down the docker cloudbuild
+// network used to route traffic to it.
 func (RealUpdater) Stop(r runner.Runner) error {
-	cmd := []string{"docker", "rm", "-f", "metadata"}
-	return r.Run(cmd, nil, os.Stdout, os.Stderr, "")
+	if err := r.Run([]string{"docker", "rm", "-f", "metadata"}, nil, os.Stdout, os.Stderr, ""); err != nil {
+		return err
+	}
+	if err := r.Run([]string{"docker", "network", "rm", "cloudbuild"}, nil, os.Stdout, os.Stderr, ""); err != nil {
+		return err
+	}
+	return nil
 }

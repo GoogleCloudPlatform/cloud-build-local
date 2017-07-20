@@ -17,6 +17,7 @@ package build
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -101,6 +102,9 @@ type Build struct {
 	hostWorkspaceDir string
 	local            bool
 	push             bool
+
+	// For UpdateDockerAccessToken, previous GCR auth value to replace.
+	prevGCRAuth string
 }
 
 type kms interface {
@@ -233,28 +237,85 @@ var gcrHosts = []string{
 	"https://us.gcr.io",
 }
 
+// SetDockerAccessToken sets the initial Docker config with the credentials we
+// use to authorize requests to GCR.
+// https://cloud.google.com/container-registry/docs/advanced-authentication#using_an_access_token
+func (b *Build) SetDockerAccessToken(tok string) error {
+	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("oauth2accesstoken:%s", tok)))
+
+	// Construct the minimal ~/.docker/config.json with auth configs for all GCR
+	// hosts.
+	type authEntry struct {
+		Auth string `json:"auth"`
+	}
+	type config struct {
+		Auths map[string]authEntry `json:"auths"`
+	}
+	cfg := config{map[string]authEntry{}}
+	for _, host := range gcrHosts {
+		cfg.Auths[host] = authEntry{auth}
+	}
+	configJSON, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	// Simply run an "ubuntu" image with $HOME mounted that writes the ~/.docker/config.json file.
+	var buf bytes.Buffer
+	args := []string{"docker", "run",
+		// Mount in the home volume.
+		"--volume", homeVolume + ":" + homeDir,
+		// Make /builder/home $HOME.
+		"--env", "HOME=" + homeDir,
+		// Make sure the container uses the correct docker daemon.
+		"--volume", "/var/run/docker.sock:/var/run/docker.sock",
+		"--entrypoint", "bash",
+		"ubuntu",
+		"-c", "mkdir -p ~/.docker/ && cat << EOF > ~/.docker/config.json\n" + string(configJSON) + "\nEOF"}
+	if err := b.Runner.Run(args, nil, &buf, &buf, ""); err != nil {
+		return fmt.Errorf("failed to set initial docker credentials: %v\n%s", err, buf.String())
+	}
+	b.prevGCRAuth = auth
+	return nil
+}
+
 // UpdateDockerAccessToken updates the credentials we use to authorize requests
 // to GCR.
 // https://cloud.google.com/container-registry/docs/advanced-authentication#using_an_access_token
 func (b *Build) UpdateDockerAccessToken(tok string) error {
-	for _, host := range gcrHosts {
-		var buf bytes.Buffer
-		args := []string{"docker", "run",
-			// Mount in the home volume.
-			"--volume", homeVolume + ":" + homeDir,
-			// Make /builder/home $HOME.
-			"--env", "HOME=" + homeDir,
-			// Make sure the container uses the correct docker daemon.
-			"--volume", "/var/run/docker.sock:/var/run/docker.sock",
-			"gcr.io/cloud-builders/docker",
-			"login",
-			"--username=oauth2accesstoken",
-			"--password=" + tok,
-			host}
-		if err := b.Runner.Run(args, nil, &buf, &buf, ""); err != nil {
-			return fmt.Errorf("failed to update docker credentials: %v\n%s", err, buf.String())
-		}
+	if b.prevGCRAuth == "" {
+		return errors.New("UpdateDockerAccessToken called before SetDockerAccessToken")
 	}
+
+	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("oauth2accesstoken:%s", tok)))
+
+	// Update contents of ~/.docker/config.json in the homevol Docker volume.
+	// Using "docker login" would work, but incurs an overhead on each host that
+	// we update, because it reaches out to GCR to validate the token. Instead,
+	// we can just assume the token is valid (since we just generated it) and
+	// write the file directly. We need to take care not to disturb anything else
+	// the user might have written to ~/.docker/config.json.
+
+	// This sed script replaces the entire per-host config in "auths" with a new
+	// per-host config with the new token, for each host.
+	script := fmt.Sprintf("sed -i 's/%s/%s/g' ~/.docker/config.json", b.prevGCRAuth, auth)
+
+	// Simply run an "ubuntu" image with $HOME mounted that runs the sed script.
+	var buf bytes.Buffer
+	args := []string{"docker", "run",
+		// Mount in the home volume.
+		"--volume", homeVolume + ":" + homeDir,
+		// Make /builder/home $HOME.
+		"--env", "HOME=" + homeDir,
+		// Make sure the container uses the correct docker daemon.
+		"--volume", "/var/run/docker.sock:/var/run/docker.sock",
+		"--entrypoint", "bash",
+		"ubuntu",
+		"-c", script}
+	if err := b.Runner.Run(args, nil, &buf, &buf, ""); err != nil {
+		return fmt.Errorf("failed to update docker credentials: %v\n%s", err, buf.String())
+	}
+	b.prevGCRAuth = auth
 	return nil
 }
 
@@ -720,8 +781,8 @@ func (b *Build) dockerRunArgs(stepDir string, idx int) []string {
 		"--volume", homeVolume+":"+homeDir,
 		// Make /builder/home $HOME.
 		"--env", "HOME="+homeDir,
-		// Link in the spoofed metadata container to provide GCE metadata.
-		"--link", "metadata:metadata.google.internal",
+		// Connect to the network for metadata.
+		"--network", "cloudbuild",
 		// Run in privileged mode per discussion in b/31267381.
 		"--privileged",
 	)
