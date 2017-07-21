@@ -24,6 +24,7 @@ import (
 
 	cb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 	"github.com/GoogleCloudPlatform/container-builder-local/subst"
+	"github.com/docker/distribution/reference"
 )
 
 const (
@@ -48,6 +49,7 @@ const (
 	// Name of the permission required to use a key to decrypt data.
 	// Documented at https://cloud.google.com/kms/docs/reference/permissions-and-roles
 	cloudkmsDecryptPermission = "cloudkms.cryptoKeyVersions.useToDecrypt"
+	maxNumTags                = 64 // max length of the list of tags.
 )
 
 var (
@@ -61,6 +63,13 @@ var (
 		"REVISION_ID": struct{}{},
 		"COMMIT_SHA":  struct{}{},
 	}
+	validTagRE = regexp.MustCompile(`^(` + reference.TagRegexp.String() + `)$`)
+	// validImageTagRE ensures only proper characters are used in name and tag.
+	validImageTagRE = regexp.MustCompile(`^(` + reference.NameRegexp.String() + `(@sha256:` + reference.TagRegexp.String() + `|:` + reference.TagRegexp.String() + `)?)$`)
+	// validGCRImageRE ensures proper domain and folder level image for gcr.io. More lenient on the actual characters other than folder structure and domain.
+	validGCRImageRE  = regexp.MustCompile(`^([^\.]+\.)?gcr\.io/[^/]+(/[^/]+)+$`)
+	validQuayImageRE = regexp.MustCompile(`^(.+\.)?quay\.io/.+$`)
+	validBuildTagRE  = regexp.MustCompile(`^(` + reference.TagRegexp.String() + `)$`)
 )
 
 // CheckBuild returns no error if build is valid,
@@ -90,6 +99,10 @@ func CheckBuild(b *cb.Build) error {
 		if b.GetOptions().GetSubstitutionOption() != cb.BuildOptions_ALLOW_LOOSE {
 			return fmt.Errorf(strings.Join(missingSubs, ";"))
 		}
+	}
+
+	if err := checkBuildTags(b.Tags); err != nil {
+		return err
 	}
 
 	return nil
@@ -276,5 +289,42 @@ func CheckBuildSteps(steps []*cb.BuildStep) error {
 		}
 	}
 
+	return nil
+}
+
+// checkImageTags validates the image tag flag.
+func checkImageTags(imageTags []string) error {
+	for _, imageTag := range imageTags {
+		if !validImageTagRE.MatchString(imageTag) {
+			return fmt.Errorf("invalid image tag %q: must match format %q", imageTag, validImageTagRE)
+		}
+		if !validGCRImageRE.MatchString(imageTag) && !validQuayImageRE.MatchString(imageTag) {
+			return fmt.Errorf("invalid image tag %q: must match format %q", imageTag, validGCRImageRE)
+		}
+	}
+	return nil
+}
+
+// checkBuildStepNames validates the build step names.
+func checkBuildStepNames(steps []*cb.BuildStep) error {
+	for _, step := range steps {
+		name := step.Name
+		if !validImageTagRE.MatchString(name) {
+			return fmt.Errorf("invalid build step name %q: must match format %q", name, validImageTagRE)
+		}
+	}
+	return nil
+}
+
+// checkBuildTags validates the tags list.
+func checkBuildTags(tags []string) error {
+	if len(tags) > maxNumTags {
+		return fmt.Errorf("number of tags %d exceeded (max: %d)", len(tags), maxNumTags)
+	}
+	for _, t := range tags {
+		if !validBuildTagRE.MatchString(t) {
+			return fmt.Errorf("invalid build tag %q: must match format %q", t, validBuildTagRE)
+		}
+	}
 	return nil
 }
