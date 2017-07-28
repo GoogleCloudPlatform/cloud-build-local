@@ -939,36 +939,6 @@ func (ac *addrConn) resetTransport(drain bool) error {
 			t.Close()
 		}
 	}
-	return ac.state, nil
-}
-
-// resetTransport recreates a transport to the address for ac.
-// For the old transport:
-// - if drain is true, it will be gracefully closed.
-// - otherwise, it will be closed.
-func (ac *addrConn) resetTransport(drain bool) error {
-	ac.mu.Lock()
-	if ac.state == Shutdown {
-		ac.mu.Unlock()
-		return errConnClosing
-	}
-	ac.printf("connecting")
-	if ac.down != nil {
-		ac.down(downErrorf(false, true, "%v", errNetworkIO))
-		ac.down = nil
-	}
-	ac.state = Connecting
-	ac.stateCV.Broadcast()
-	t := ac.transport
-	ac.transport = nil
-	ac.mu.Unlock()
-	if t != nil {
-		if drain {
-			t.GracefulClose()
-		} else {
-			t.Close()
-		}
-	}
 	ac.cc.mu.RLock()
 	ac.dopts.copts.KeepaliveParams = ac.cc.mkp
 	ac.cc.mu.RUnlock()
