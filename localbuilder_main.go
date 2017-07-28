@@ -155,8 +155,16 @@ func run(source string) error {
 		} else if isDir {
 			source = filepath.Clean(source) + "/."
 		}
+		// If the source is a directory, only copy the inner content.
+		if isDir, err := isDirectory(source); err != nil {
+			log.Printf("Error getting directory: %v", err)
+			return
+		} else if isDir {
+			source = filepath.Clean(source) + "/."
+		}
 		if err := vol.Copy(source); err != nil {
-			return fmt.Errorf("Error copying source to docker volume: %v", err)
+			log.Printf("Error copying source to docker volume: %v", err)
+			return
 		}
 		defer vol.Close()
 	}
