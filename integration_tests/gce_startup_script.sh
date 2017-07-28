@@ -29,8 +29,13 @@ function install_sdk() {
   # We use the public installer.
   rm -rf "$CLOUDSDK_INSTALL_DIR/google-cloud-sdk"
   curl https://sdk.cloud.google.com | bash || exit
+
+  # Install needed components.
+  gcloud components install docker-credential-gcr --quiet || exit
 }
 install_sdk&
+export PATH=$PATH:/usr/lib/google-cloud-sdk/bin
+
 # add the install_sdk PID to the list for waiting.
 pids="$! $pids"
 
