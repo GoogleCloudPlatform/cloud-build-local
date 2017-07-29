@@ -12,9 +12,14 @@ and integration into local build and test workflows.
 - docker
 - go (if you build the tool yourself)
 
-If you want to access private GCR during the local build (either pulling or 
-pushing an image), use the
+If the build needs to access a private GCR registry, install and configure the
 [Docker credential helper for GCR users](https://github.com/GoogleCloudPlatform/docker-credential-gcr).
+
+The local builder uses gcloud information to set up a spoofed metadata server,
+so you have to set the project:
+```
+gcloud config set project my-project
+```
 
 ## Developing Local Builder
 

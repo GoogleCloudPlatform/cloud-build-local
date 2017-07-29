@@ -23,6 +23,7 @@ import (
 	"log"
 	"net/http"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -33,6 +34,10 @@ import (
 	"golang.org/x/oauth2"
 
 	cb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
+)
+
+const (
+	uuidRegex = "([a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[8|9|aA|bB][a-fA-F0-9]{3}-[a-fA-F0-9]{12})"
 )
 
 type mockRunner struct {
@@ -363,9 +368,9 @@ func TestFetchBuilder(t *testing.T) {
 		buildRequest: commonBuildRequest,
 		wantCommands: []string{
 			"docker inspect gcr.io/my-project/my-compiler",
-			"docker run --name cloudbuild_docker_pull --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-compiler",
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-compiler",
 			"docker inspect gcr.io/my-project/my-builder",
-			"docker run --name cloudbuild_docker_pull --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 		},
 	}, {
 		name: "TestFetchBuilderExists",
@@ -387,7 +392,7 @@ func TestFetchBuilder(t *testing.T) {
 		// no image in remoteImages
 		wantCommands: []string{
 			"docker inspect gcr.io/invalid-build-step",
-			"docker run --name cloudbuild_docker_pull --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
 		},
 		wantErr: errors.New(`error pulling build step "gcr.io/invalid-build-step": exit status 1 for tag "gcr.io/invalid-build-step"`),
 	}}
@@ -415,7 +420,7 @@ func TestFetchBuilder(t *testing.T) {
 		if tc.wantCommands != nil {
 			got := strings.Join(r.commands, "\n")
 			want := strings.Join(tc.wantCommands, "\n")
-			if got != want {
+			if match, _ := regexp.MatchString(want, got); !match {
 				t.Errorf("%s: Commands didn't match!\n===Want:\n%s\n===Got:\n%s", tc.name, want, got)
 			}
 		}
@@ -587,10 +592,10 @@ func TestRunBuildSteps(t *testing.T) {
 		buildRequest: commonBuildRequest,
 		wantCommands: []string{
 			"docker inspect gcr.io/my-project/my-compiler",
-			"docker run --name cloudbuild_docker_pull --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-compiler",
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-compiler",
 			dockerRunString(0) + " gcr.io/my-project/my-compiler",
 			"docker inspect gcr.io/my-project/my-builder",
-			"docker run --name cloudbuild_docker_pull --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 			dockerRunInStepDir(1, "foo/baz") +
 				" --env FOO=bar" +
 				" --env BAZ=buz" +
@@ -637,7 +642,7 @@ func TestRunBuildSteps(t *testing.T) {
 		if tc.wantCommands != nil {
 			got := strings.Join(r.commands, "\n")
 			want := strings.Join(tc.wantCommands, "\n")
-			if got != want {
+			if match, _ := regexp.MatchString(want, got); !match {
 				t.Errorf("%s: Commands didn't match!\n===Want:\n%s\n===Got:\n%s", tc.name, want, got)
 			}
 		}
@@ -901,9 +906,9 @@ func TestPushImages(t *testing.T) {
 		buildRequest:     commonBuildRequest,
 		remotePushesFail: false,
 		wantCommands: []string{
-			"docker run --name cloudbuild_docker_push --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-1",
-			"docker run --name cloudbuild_docker_push --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-2",
-			"docker run --name cloudbuild_docker_push --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-no-digest",
+			"docker run --name cloudbuild_docker_push_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-1",
+			"docker run --name cloudbuild_docker_push_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-2",
+			"docker run --name cloudbuild_docker_push_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build-output-tag-no-digest",
 		},
 	}, {
 		name:             "TestPushImagesFail",
@@ -922,7 +927,7 @@ func TestPushImages(t *testing.T) {
 		if tc.wantCommands != nil {
 			got := strings.Join(r.commands, "\n")
 			want := strings.Join(tc.wantCommands, "\n")
-			if got != want {
+			if match, _ := regexp.MatchString(want, got); !match {
 				t.Errorf("%s: Commands didn't match!\n===Want:\n%s\n===Got:\n%s", tc.name, want, got)
 			}
 			// Validate side-effects of pushing docker images.
@@ -1430,11 +1435,11 @@ func TestStart(t *testing.T) {
 		wantCommands: []string{
 			"docker volume create --name homevol",
 			"docker inspect gcr.io/my-project/my-builder",
-			"docker run --name cloudbuild_docker_pull --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 			dockerRunString(0) + " gcr.io/my-project/my-builder a",
 			"docker inspect gcr.io/build",
 			"docker rm -f step_0",
-			"docker run --name cloudbuild_docker_push --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build",
+			"docker run --name cloudbuild_docker_push_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker push gcr.io/build",
 			"docker volume rm homevol",
 		},
 	}, {
@@ -1450,7 +1455,7 @@ func TestStart(t *testing.T) {
 		wantCommands: []string{
 			"docker volume create --name homevol",
 			"docker inspect gcr.io/my-project/my-builder",
-			"docker run --name cloudbuild_docker_pull --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 			dockerRunString(0) + " gcr.io/my-project/my-builder a",
 			"docker inspect gcr.io/build",
 			"docker rm -f step_0",
@@ -1472,7 +1477,7 @@ func TestStart(t *testing.T) {
 
 		got := strings.Join(r.commands, "\n")
 		want := strings.Join(tc.wantCommands, "\n")
-		if got != want {
+		if match, _ := regexp.MatchString(want, got); !match {
 			t.Errorf("%s: Commands didn't match!\n===Want:\n%s\n===Got:\n%s", tc.name, want, got)
 		}
 	}
@@ -1508,7 +1513,7 @@ func TestUpdateDockerAccessToken(t *testing.T) {
 
 	got := strings.Join(r.commands, "\n")
 	want := strings.Join([]string{
-		`docker run --name cloudbuild_set_docker_token --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock --entrypoint bash ubuntu -c mkdir -p ~/.docker/ && cat << EOF > ~/.docker/config.json
+		`docker run --name cloudbuild_set_docker_token_` + uuidRegex + ` --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock --entrypoint bash ubuntu -c mkdir -p ~/.docker/ && cat << EOF > ~/.docker/config.json
 {
   "auths": {
     "https://asia.gcr.io": {
@@ -1535,9 +1540,9 @@ func TestUpdateDockerAccessToken(t *testing.T) {
   }
 }
 EOF`,
-		"docker run --name cloudbuild_update_docker_token --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock --entrypoint bash ubuntu -c sed -i 's/b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q=/b2F1dGgyYWNjZXNzdG9rZW46U0VDT05E/g' ~/.docker/config.json",
+		"docker run --name cloudbuild_update_docker_token_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock --entrypoint bash ubuntu -c sed -i 's/b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q=/b2F1dGgyYWNjZXNzdG9rZW46U0VDT05E/g' ~/.docker/config.json",
 	}, "\n")
-	if got != want {
+	if match, _ := regexp.MatchString(want, got); !match {
 		t.Errorf("Commands didn't match!\n===Want:\n%s\n===Got:\n%s", want, got)
 	}
 }

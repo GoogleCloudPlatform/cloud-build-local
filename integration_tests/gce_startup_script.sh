@@ -34,7 +34,7 @@ function install_sdk() {
   gcloud components install docker-credential-gcr --quiet || exit
 }
 install_sdk&
-export PATH=$PATH:/usr/lib/google-cloud-sdk/bin
+export PATH=/usr/lib/google-cloud-sdk/bin:$PATH
 
 # add the install_sdk PID to the list for waiting.
 pids="$! $pids"
