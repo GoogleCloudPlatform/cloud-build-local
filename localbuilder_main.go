@@ -132,6 +132,14 @@ func run(source string) error {
 		buildConfig.Substitutions = substMap
 	}
 
+	// Get the ProjectId to feed both the build and the metadata server.
+	// This command uses a runner without dryrun to return the real project.
+	projectInfo, err := gcloud.ProjectInfo(&runner.RealRunner{})
+	if err != nil {
+		return fmt.Errorf("Error getting project information from gcloud: %v", err)
+	}
+	buildConfig.ProjectId = projectInfo.ProjectID
+
 	// Validate the build.
 	if err := validate.CheckBuild(buildConfig); err != nil {
 		return fmt.Errorf("Error validating build: %v", err)
@@ -180,11 +188,7 @@ func run(source string) error {
 			metadataUpdater := metadata.RealUpdater{Local: true}
 			defer metadataUpdater.Stop(r)
 
-			// Get project info to feed the metadata server.
-			projectInfo, err := gcloud.ProjectInfo(r)
-			if err != nil {
-				return fmt.Errorf("Error getting project information from gcloud: %v", err)
-			}
+			// Feed the project info to the metadata server.
 			metadataUpdater.SetProjectInfo(projectInfo)
 
 			go supplyTokenToMetadata(metadataUpdater, r)
