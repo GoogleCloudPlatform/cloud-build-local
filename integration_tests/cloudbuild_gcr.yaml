@@ -2,14 +2,14 @@
 
 steps:
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['pull', 'gcr.io/argo-local-builder/test']
+  args: ['pull', 'gcr.io/$PROJECT_ID/test']
 - name: 'gcr.io/cloud-builders/docker'
   args:
   - 'build'
   - '--cache-from'
-  - 'gcr.io/argo-local-builder/test'
+  - 'gcr.io/$PROJECT_ID/test'
   - '-t'
-  - 'gcr.io/argo-local-builder/test'
+  - 'gcr.io/$PROJECT_ID/test'
   - '.'
 
-images: ['gcr.io/argo-local-builder/test']
+images: ['gcr.io/$PROJECT_ID/test']

@@ -49,7 +49,7 @@ const (
 )
 
 var (
-	configFile    = flag.String("config", "cloudconfig.yaml", "cloud build config file path")
+	configFile    = flag.String("config", "cloudbuild.yaml", "cloud build config file path")
 	substitutions = flag.String("substitutions", "", `substitutions key=value pairs separated by comma; for example _FOO=bar,_BAZ=argo`)
 	dryRun        = flag.Bool("dryrun", true, "If true, nothing will be run")
 	push          = flag.Bool("push", false, "If true, the images will be pushed")
@@ -97,6 +97,11 @@ func run(source string) error {
 	r := &runner.RealRunner{
 		DryRun: *dryRun,
 	}
+
+	// Channel to tell goroutines to stop.
+	// Do not defer the close() because we want this stop to happen before other
+	// defer functions.
+	stopchan := make(chan struct{})
 
 	// Clean leftovers from a previous build.
 	if err := common.Clean(r); err != nil {
@@ -191,7 +196,7 @@ func run(source string) error {
 			// Feed the project info to the metadata server.
 			metadataUpdater.SetProjectInfo(projectInfo)
 
-			go supplyTokenToMetadata(metadataUpdater, r)
+			go supplyTokenToMetadata(metadataUpdater, r, stopchan)
 		}
 
 		// Set initial Docker credentials.
@@ -206,8 +211,8 @@ func run(source string) error {
 		// Write initial docker credentials for GCR. This writes the initial
 		// ~/.docker/config.json which is made available to build steps.
 		
-		go func() {
-			for ; ; time.Sleep(tokenRefreshDur) {
+		go func(stopchan <-chan struct{}) {
+			for {
 				tok, err := gcloud.AccessToken(r)
 				if err != nil {
 					log.Printf("Error getting access token to update docker credentials: %v", err)
@@ -216,12 +221,20 @@ func run(source string) error {
 				if err := b.UpdateDockerAccessToken(tok); err != nil {
 					log.Printf("Error updating docker credentials: %v", err)
 				}
+				select {
+				case <-time.After(tokenRefreshDur):
+					continue
+				case <-stopchan:
+					return
+				}
 			}
-		}()
+		}(stopchan)
 	}
 
 	b.Start()
 	<-b.Done
+
+	close(stopchan)
 
 	if b.Summary().Status == build.StatusError {
 		return fmt.Errorf("Build finished with ERROR status")
@@ -234,8 +247,8 @@ func run(source string) error {
 }
 
 // supplyTokenToMetadata gets gcloud token and supply it to the metadata server.
-func supplyTokenToMetadata(metadataUpdater metadata.RealUpdater, r runner.Runner) {
-	for ; ; time.Sleep(tokenRefreshDur) {
+func supplyTokenToMetadata(metadataUpdater metadata.RealUpdater, r runner.Runner, stopchan <-chan struct{}) {
+	for {
 		accessToken, err := gcloud.AccessToken(r)
 		if err != nil {
 			log.Printf("Error getting gcloud token: %v", err)
@@ -250,6 +263,12 @@ func supplyTokenToMetadata(metadataUpdater metadata.RealUpdater, r runner.Runner
 		if err := metadataUpdater.SetToken(token); err != nil {
 			log.Printf("Error updating token in metadata server: %v", err)
 			continue
+		}
+		select {
+		case <-time.After(tokenRefreshDur):
+			continue
+		case <-stopchan:
+			return
 		}
 	}
 }
