@@ -1255,6 +1255,7 @@ func TestStripTagDigest(t *testing.T) {
 	}
 }
 
+
 func TestPushDigestScraping(t *testing.T) {
 	cases := []struct {
 		desc     string

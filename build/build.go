@@ -704,9 +704,12 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 	for _, env := range step.Env {
 		args = append(args, "--env", env)
 	}
+
+
 	if step.Entrypoint != "" {
 		args = append(args, "--entrypoint", step.Entrypoint)
 	}
+
 
 	args = append(args, runTarget)
 	args = append(args, step.Args...)
@@ -721,6 +724,7 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 }
 
 func (b *Build) runBuildSteps() error {
+
 	// Clean the build steps before trying to delete the volume used by the
 	// running containers.
 	defer b.cleanBuildSteps()

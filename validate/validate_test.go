@@ -15,6 +15,7 @@
 package validate
 
 import (
+	"errors"
 	"math/rand"
 	"strings"
 	"testing"
@@ -496,6 +497,7 @@ func makeTestBuild(buildID string) *cb.Build {
 		Images: []string{"gcr.io/some/image/tag", "gcr.io/some/image/tag2"},
 	}
 }
+
 
 func TestCheckImageTags(t *testing.T) {
 	validTags := []string{

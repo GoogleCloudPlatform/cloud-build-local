@@ -104,7 +104,6 @@ func CheckBuild(b *cb.Build) error {
 	if err := checkBuildTags(b.Tags); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -287,10 +286,13 @@ func CheckBuildSteps(steps []*cb.BuildStep) error {
 				return fmt.Errorf(`build step #%d - %q: the Env entry %q must be of the form "KEY=VALUE"`, i, s.Id, e)
 			}
 		}
+
 	}
+
 
 	return nil
 }
+
 
 // checkImageTags validates the image tag flag.
 func checkImageTags(imageTags []string) error {
