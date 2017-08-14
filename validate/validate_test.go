@@ -15,7 +15,6 @@
 package validate
 
 import (
-	"errors"
 	"math/rand"
 	"strings"
 	"testing"
