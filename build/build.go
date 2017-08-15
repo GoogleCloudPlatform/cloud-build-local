@@ -704,12 +704,43 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 	for _, env := range step.Env {
 		args = append(args, "--env", env)
 	}
-
-
+	for _, vol := range step.Volumes {
+		args = append(args, "--volume", fmt.Sprintf("%s:%s", vol.Name, vol.Path))
+	}
 	if step.Entrypoint != "" {
 		args = append(args, "--entrypoint", step.Entrypoint)
 	}
 
+	// If the step specifies any secrets, decrypt them and pass the plaintext
+	// values as envs.
+	if len(step.SecretEnv) > 0 {
+		kms, err := b.getKMSClient()
+		if err != nil {
+			errors <- err
+			return
+		}
+		for _, se := range step.SecretEnv {
+			// Figure out which KMS key to use to decrypt the value. Admin's validations in CreateBuild
+			// previously validated that one and only one secret is defined for each secretEnv.
+			for _, sec := range b.Request.Secrets {
+				if val, found := sec.SecretEnv[se]; found {
+					kmsKeyName := sec.KmsKeyName
+					plaintext, err := kms.Decrypt(kmsKeyName, base64.StdEncoding.EncodeToString(val))
+					if err != nil {
+						errors <- fmt.Errorf("Failed to decrypt %q using key %q: %v", se, kmsKeyName, err)
+						return
+					}
+					dec, err := base64.StdEncoding.DecodeString(plaintext)
+					if err != nil {
+						errors <- fmt.Errorf("Plaintext was not base64-decodeable: %v", err)
+						return
+					}
+					args = append(args, "--env", fmt.Sprintf("%s=%s", se, string(dec)))
+					break
+				}
+			}
+		}
+	}
 
 	args = append(args, runTarget)
 	args = append(args, step.Args...)
@@ -724,6 +755,25 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 }
 
 func (b *Build) runBuildSteps() error {
+	// Create all the volumes referenced by all steps and defer cleanup.
+	
+	allVolumes := map[string]bool{}
+	for _, step := range b.Request.Steps {
+		for _, v := range step.Volumes {
+			if !allVolumes[v.Name] {
+				allVolumes[v.Name] = true
+				vol := volume.New(v.Name, b.Runner)
+				if err := vol.Setup(); err != nil {
+					return err
+				}
+				defer func(v *volume.Volume, volName string) {
+					if err := v.Close(); err != nil {
+						log.Printf("Failed to delete volume %q: %v", volName, err)
+					}
+				}(vol, v.Name)
+			}
+		}
+	}
 
 	// Clean the build steps before trying to delete the volume used by the
 	// running containers.
