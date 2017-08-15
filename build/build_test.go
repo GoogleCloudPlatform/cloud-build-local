@@ -340,10 +340,11 @@ var commonBuildRequest = cb.Build{
 	Steps: []*cb.BuildStep{{
 		Name: "gcr.io/my-project/my-compiler",
 	}, {
-		Name: "gcr.io/my-project/my-builder",
-		Env:  []string{"FOO=bar", "BAZ=buz"},
-		Args: []string{"a", "b", "c"},
-		Dir:  "foo/bar/../baz",
+		Name:    "gcr.io/my-project/my-builder",
+		Env:     []string{"FOO=bar", "BAZ=buz"},
+		Args:    []string{"a", "b", "c"},
+		Dir:     "foo/bar/../baz",
+		Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
 	}},
 	Images: []string{"gcr.io/build-output-tag-1", "gcr.io/build-output-tag-2", "gcr.io/build-output-tag-no-digest"},
 }
@@ -591,6 +592,7 @@ func TestRunBuildSteps(t *testing.T) {
 		name:         "TestRunBuilder",
 		buildRequest: commonBuildRequest,
 		wantCommands: []string{
+			"docker volume create --name myvol",
 			"docker inspect gcr.io/my-project/my-compiler",
 			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-compiler",
 			dockerRunString(0) + " gcr.io/my-project/my-compiler",
@@ -599,11 +601,13 @@ func TestRunBuildSteps(t *testing.T) {
 			dockerRunInStepDir(1, "foo/baz") +
 				" --env FOO=bar" +
 				" --env BAZ=buz" +
+				" --volume myvol:/foo" +
 				" gcr.io/my-project/my-builder a b c",
 			"docker inspect gcr.io/build-output-tag-1",
 			"docker inspect gcr.io/build-output-tag-2",
 			"docker inspect gcr.io/build-output-tag-no-digest",
 			"docker rm -f step_0 step_1",
+			"docker volume rm myvol",
 		},
 	}, {
 		name:           "TestRunBuilderFailExplicit",
@@ -1253,6 +1257,79 @@ func TestStripTagDigest(t *testing.T) {
 			t.Errorf("For %q: got %q, want %q", c.in, got, c.out)
 		}
 	}
+}
+
+func TestSecrets(t *testing.T) {
+	t.Parallel()
+	kmsKeyName := "projects/my-project/locations/global/keyRings/my-key-ring/cryptoKeys/my-crypto-key"
+	for _, c := range []struct {
+		name        string
+		plaintext   string
+		kmsErr      error
+		wantErr     error
+		wantCommand string
+	}{{
+		name: "Happy case",
+		wantCommand: dockerRunInStepDir(0, "") +
+			" --env MY_SECRET=sup3rs3kr1t" +
+			" gcr.io/my-project/my-builder",
+		plaintext: base64.StdEncoding.EncodeToString([]byte("sup3rs3kr1t")),
+		kmsErr:    nil,
+	}, {
+		name:    "KMS returns error",
+		kmsErr:  errors.New("kms failure"),
+		wantErr: fmt.Errorf(`Failed to decrypt "MY_SECRET" using key %q: kms failure`, kmsKeyName),
+	}, {
+		name:      "KMS returns non-base64 response",
+		plaintext: "This is not valid base64!",
+		kmsErr:    nil,
+		wantErr:   fmt.Errorf("Plaintext was not base64-decodeable: illegal base64 data at input byte 4"),
+	}} {
+		// All tests use the same build request.
+		buildRequest := cb.Build{
+			Steps: []*cb.BuildStep{{
+				Name:      "gcr.io/my-project/my-builder",
+				SecretEnv: []string{"MY_SECRET"},
+			}},
+			Secrets: []*cb.Secret{{
+				KmsKeyName: kmsKeyName,
+				SecretEnv: map[string][]byte{
+					"MY_SECRET": []byte("this is encrypted"),
+				},
+			}},
+		}
+
+		var gotCommand string
+		r := newMockRunner(t, c.name)
+		r.dockerRunHandler = func(args []string, _, _ io.Writer) error {
+			gotCommand = strings.Join(args, " ")
+			return nil
+		}
+		b := New(r, buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, false)
+		b.kms = fakeKMS{
+			plaintext: c.plaintext,
+			err:       c.kmsErr,
+		}
+
+		if err := b.runBuildSteps(); !reflect.DeepEqual(err, c.wantErr) {
+			t.Errorf("%s: Unexpected error\n got %v\nwant %v", c.name, err, c.wantErr)
+		}
+		if !reflect.DeepEqual(gotCommand, c.wantCommand) {
+			t.Errorf("%s: Unexpected command\n got %s\nwant: %s", c.name, c.wantCommand, gotCommand)
+		}
+	}
+}
+
+type fakeKMS struct {
+	plaintext string
+	err       error
+}
+
+func (k fakeKMS) Decrypt(_, enc string) (string, error) {
+	if _, err := base64.StdEncoding.DecodeString(enc); err != nil {
+		return "", err
+	}
+	return k.plaintext, k.err
 }
 
 func TestPushDigestScraping(t *testing.T) {

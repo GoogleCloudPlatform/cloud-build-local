@@ -63,6 +63,12 @@ var (
 		"REVISION_ID": struct{}{},
 		"COMMIT_SHA":  struct{}{},
 	}
+	validVolumeNameRE   = regexp.MustCompile("^[a-zA-Z0-9][a-zA-Z0-9_.-]+$")
+	reservedVolumePaths = map[string]struct{}{
+		"/workspace":           struct{}{},
+		"/builder/home":        struct{}{},
+		"/var/run/docker.sock": struct{}{},
+	}
 	validTagRE = regexp.MustCompile(`^(` + reference.TagRegexp.String() + `)$`)
 	// validImageTagRE ensures only proper characters are used in name and tag.
 	validImageTagRE = regexp.MustCompile(`^(` + reference.NameRegexp.String() + `(@sha256:` + reference.TagRegexp.String() + `|:` + reference.TagRegexp.String() + `)?)$`)
@@ -105,6 +111,9 @@ func CheckBuild(b *cb.Build) error {
 		return err
 	}
 
+	if err := checkSecrets(b); err != nil {
+		return fmt.Errorf("invalid .secrets field: %v", err)
+	}
 	return nil
 }
 
@@ -229,6 +238,7 @@ func CheckBuildSteps(steps []*cb.BuildStep) error {
 	knownSteps := map[string]bool{
 		StartStep: true,
 	}
+	volumesUsed := map[string]int{} // Maps volume name -> # of times used.
 	for i, s := range steps {
 		if s.Name == "" {
 			return fmt.Errorf("build step %d must specify name", i)
@@ -287,8 +297,132 @@ func CheckBuildSteps(steps []*cb.BuildStep) error {
 				return fmt.Errorf(`build step #%d - %q: the Env entry %q must be of the form "KEY=VALUE"`, i, s.Id, e)
 			}
 		}
+
+		stepVolumes, stepPaths := map[string]bool{}, map[string]bool{}
+		for _, vol := range s.Volumes {
+			volName, volPath := vol.Name, vol.Path
+
+			// Check valid volume name.
+			if !validVolumeNameRE.MatchString(volName) {
+				return fmt.Errorf("build step #%d - %q: volume name %q must match %q", i, s.Id, volName, validVolumeNameRE.String())
+			}
+
+			p := path.Clean(volPath)
+			// Clean and check valid volume path.
+			if !path.IsAbs(path.Clean(p)) {
+				return fmt.Errorf("build step #%d - %q: volume path %q is not valid, must be absolute", i, s.Id, volPath)
+			}
+
+			// Check volume path blacklist.
+			if _, found := reservedVolumePaths[p]; found {
+				return fmt.Errorf("build step #%d - %q: volume path %q is reserved", i, s.Id, volPath)
+			}
+			// Check volume path doesn't start with /cloudbuild/ to allow future paths.
+			if strings.HasPrefix(p, "/cloudbuild/") {
+				return fmt.Errorf("build step #%d - %q: volume path %q cannot start with /cloudbuild/", i, s.Id, volPath)
+			}
+
+			// Check volume name uniqueness.
+			if stepVolumes[volName] {
+				return fmt.Errorf("build step #%d - %q: the Volumes entry must contain unique names (%q)", i, s.Id, volName)
+			}
+			stepVolumes[volName] = true
+
+			// Check volume path uniqueness.
+			if stepPaths[p] {
+				return fmt.Errorf("build step #%d - %q: the Volumes entry must contain unique paths (%q)", i, s.Id, p)
+			}
+			stepPaths[p] = true
+			volumesUsed[volName]++
+		}
 	}
 
+	// Check that all volumes are referenced by at least two steps.
+	for volume, used := range volumesUsed {
+		if used < 2 {
+			return fmt.Errorf("Volume %q is only used by one step", volume)
+		}
+	}
+
+	return nil
+}
+
+func checkSecrets(b *cb.Build) error {
+	// Collect set of all used secret_envs. Also make sure a step doesn't use the
+	// same secret_env twice.
+	usedSecretEnvs := map[string]struct{}{}
+	for i, step := range b.Steps {
+		thisStepSecretEnvs := map[string]struct{}{}
+		for _, se := range step.SecretEnv {
+			usedSecretEnvs[se] = struct{}{}
+			if _, found := thisStepSecretEnvs[se]; found {
+				return fmt.Errorf("Step %d uses the secretEnv %q more than once", i, se)
+			}
+			thisStepSecretEnvs[se] = struct{}{}
+		}
+	}
+
+	// Collect set of all defined secret_envs, and check that secret_envs are not
+	// defined by more than one secret. Also check that only one Secret specifies
+	// any given KMS key name.
+	definedSecretEnvs := map[string]struct{}{}
+	definedSecretKeys := map[string]struct{}{}
+	for i, sec := range b.Secrets {
+		if _, found := definedSecretKeys[sec.KmsKeyName]; found {
+			return fmt.Errorf("kmsKeyName %q is used by more than one secret", sec.KmsKeyName)
+		}
+		definedSecretKeys[sec.KmsKeyName] = struct{}{}
+
+		if len(sec.SecretEnv) == 0 {
+			return fmt.Errorf("secret %d defines no secretEnvs", i)
+		}
+		for k := range sec.SecretEnv {
+			if _, found := definedSecretEnvs[k]; found {
+				return fmt.Errorf("secretEnv %q is defined more than once", k)
+			}
+			definedSecretEnvs[k] = struct{}{}
+		}
+	}
+
+	// Check that all used secret_envs are defined.
+	for used := range usedSecretEnvs {
+		if _, found := definedSecretEnvs[used]; !found {
+			return fmt.Errorf("secretEnv %q is used without being defined", used)
+		}
+	}
+	// Check that all defined secret_envs are used at least once.
+	for defined := range definedSecretEnvs {
+		if _, found := usedSecretEnvs[defined]; !found {
+			return fmt.Errorf("secretEnv %q is defined without being used", defined)
+		}
+	}
+	if len(definedSecretEnvs) > 10 {
+		return errors.New("build defines more than ten secret values")
+	}
+
+	// Check secret_env max size.
+	for _, sec := range b.Secrets {
+		for k, v := range sec.SecretEnv {
+			if len(v) > 1024 {
+				return fmt.Errorf("secretEnv value for %q cannot exceed 1KB", k)
+			}
+		}
+	}
+
+	// Check that no step's env and secretEnv specify the same variable.
+	for i, step := range b.Steps {
+		envs := map[string]struct{}{}
+		for _, e := range step.Env {
+			// Previous validation ensures that envs include "=".
+			k := e[:strings.Index(e, "=")]
+			envs[k] = struct{}{}
+		}
+		for _, se := range step.SecretEnv {
+			if _, found := envs[se]; found {
+				return fmt.Errorf("step %d has secret and non-secret env %q", i, se)
+			}
+		}
+	}
 	return nil
 }
 

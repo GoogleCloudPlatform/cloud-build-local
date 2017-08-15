@@ -58,7 +58,7 @@ var (
 )
 
 func exitUsage(msg string) {
-	log.Fatalf("%s\nUsage: %s --config=cloudbuild.yaml [--substitutions=_FOO=bar] [--[no]dryrun] [--[no]push] source", msg, os.Args[0])
+	log.Fatalf("%s\nUsage: %s --config=cloudbuild.yaml [--substitutions=_FOO=bar] [--dryrun=true/false] [--push=true/false] source", msg, os.Args[0])
 }
 
 func main() {
