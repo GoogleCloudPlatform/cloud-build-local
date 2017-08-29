@@ -166,7 +166,7 @@ func TestValidateBuild(t *testing.T) {
 		build: &cb.Build{
 			Id: "step-absolute-dir",
 			Steps: []*cb.BuildStep{{
-				Name: "gcr.io/test-argo/dockerize",
+				Name: "test",
 				Dir:  "/a/b/c",
 			}},
 		},
@@ -176,7 +176,7 @@ func TestValidateBuild(t *testing.T) {
 		build: &cb.Build{
 			Id: "step-parent-dir",
 			Steps: []*cb.BuildStep{{
-				Name: "gcr.io/test-argo/dockerize",
+				Name: "test",
 				Dir:  "../b/c",
 			}},
 		},
@@ -186,7 +186,7 @@ func TestValidateBuild(t *testing.T) {
 		build: &cb.Build{
 			Id: "step-parent-dir2",
 			Steps: []*cb.BuildStep{{
-				Name: "gcr.io/test-argo/dockerize",
+				Name: "test",
 				Dir:  "a/../b/../../c",
 			}},
 		},
@@ -196,7 +196,7 @@ func TestValidateBuild(t *testing.T) {
 		build: &cb.Build{
 			Id: "startstep-id",
 			Steps: []*cb.BuildStep{{
-				Name: "gcr.io/test-argo/dockerize",
+				Name: "test",
 				Id:   StartStep,
 			}},
 		},

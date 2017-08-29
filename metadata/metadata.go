@@ -38,9 +38,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/container-builder-local/runner"
-
 	"golang.org/x/oauth2"
+
+	"github.com/GoogleCloudPlatform/container-builder-local/runner"
 )
 
 const (
@@ -64,7 +64,7 @@ const (
 
 // Updater encapsulates updating the spoofed metadata server.
 type Updater interface {
-	SetToken(oauth2.Token) error
+	SetToken(*Token) error
 	SetProjectInfo(ProjectInfo) error
 }
 
@@ -75,12 +75,22 @@ type ProjectInfo struct {
 	ProjectNum int64  `json:"project_num"`
 }
 
-// Token represents the OAuth token request containing the access token and the
-// time it expires.
+// Token represents an OAuth token including the access token, account email,
+// expiration, and scopes.
 type Token struct {
 	AccessToken string    `json:"access_token"`
 	Expiry      time.Time `json:"expiry"`
+	Email       string    `json:"email"`
 	Scopes      []string
+}
+
+// Oauth2 converts a Token to a standard oauth2.Token.
+func (t Token) Oauth2() *oauth2.Token {
+	return &oauth2.Token{
+		AccessToken: t.AccessToken,
+		Expiry:      t.Expiry,
+		TokenType:   "Bearer",
+	}
 }
 
 // RealUpdater actually sends POST requests to update spoofed metadata.
@@ -96,18 +106,14 @@ func (r RealUpdater) getAddress() string {
 }
 
 // SetToken updates the spoofed metadata server's credentials.
-func (r RealUpdater) SetToken(tok oauth2.Token) error {
+func (r RealUpdater) SetToken(tok *Token) error {
 	scopes, err := getScopes(tok.AccessToken)
 	if err != nil {
 		return err
 	}
-	t := Token{
-		AccessToken: tok.AccessToken,
-		Expiry:      tok.Expiry,
-		Scopes:      scopes,
-	}
+	tok.Scopes = scopes
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(t); err != nil {
+	if err := json.NewEncoder(&buf).Encode(tok); err != nil {
 		return err
 	}
 

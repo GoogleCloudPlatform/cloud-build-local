@@ -17,28 +17,71 @@ package gcloud
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/GoogleCloudPlatform/container-builder-local/metadata"
 	"github.com/GoogleCloudPlatform/container-builder-local/runner"
 )
 
+var (
+	errTokenNotFound = errors.New("failed to find access token")
+	errAcctNotFound  = errors.New("failed to find credentials account")
+	errTokenExpired  = errors.New("gcloud token is expired")
+)
+
 // AccessToken gets a fresh access token from gcloud.
-func AccessToken(r runner.Runner) (string, error) {
-	cmd := []string{"gcloud", "config", "config-helper", "--format=value(credential.access_token)"}
-	var tb bytes.Buffer
-	if err := r.Run(cmd, nil, &tb, os.Stderr, ""); err != nil {
-		return "", err
+func AccessToken(r runner.Runner) (*metadata.Token, error) {
+	// config struct matches the json output of the cmd below.
+	var config struct {
+		Credential struct {
+			AccessToken string `json:"access_token"`
+			TokenExpiry string `json:"token_expiry"`
+		}
+		Configuration struct {
+			Properties struct {
+				Core struct {
+					Account string
+				}
+			}
+		}
 	}
-	return strings.TrimSpace(tb.String()), nil
+
+	cmd := []string{"gcloud", "config", "config-helper", "--format=json"}
+	var b bytes.Buffer
+	if err := r.Run(cmd, nil, &b, os.Stderr, ""); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(b.Bytes(), &config); err != nil {
+		return nil, err
+	}
+	if config.Credential.AccessToken == "" {
+		return nil, errTokenNotFound
+	}
+	if config.Configuration.Properties.Core.Account == "" {
+		return nil, errAcctNotFound
+	}
+	expiration, err := time.Parse(time.RFC3339, config.Credential.TokenExpiry)
+	if err != nil {
+		return nil, err
+	}
+	if expiration.Before(time.Now()) {
+		return nil, errTokenExpired
+	}
+	return &metadata.Token{
+		AccessToken: config.Credential.AccessToken,
+		Expiry:      expiration,
+		Email:       config.Configuration.Properties.Core.Account,
+	}, nil
 }
 
 // ProjectInfo gets the project id and number from local gcloud.
 func ProjectInfo(r runner.Runner) (metadata.ProjectInfo, error) {
-
 	cmd := []string{"gcloud", "config", "list", "--format", "value(core.project)"}
 	var idb, numb bytes.Buffer
 	if err := r.Run(cmd, nil, &idb, os.Stderr, ""); err != nil {

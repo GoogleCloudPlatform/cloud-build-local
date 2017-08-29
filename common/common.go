@@ -124,3 +124,17 @@ func Clean(r runner.Runner) error {
 
 	return nil
 }
+
+// For unit tests.
+var now = time.Now
+
+// RefreshDuration calculates when to refresh the access token. We refresh a
+// bit prior to the token's expiration.
+func RefreshDuration(expiration time.Time) time.Duration {
+	d := expiration.Sub(now())
+	if d > 4*time.Second {
+		d = time.Duration(float64(d)*.75) + time.Second
+	}
+
+	return d
+}

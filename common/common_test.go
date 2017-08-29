@@ -129,11 +129,11 @@ func TestParseSubstitutionsFlag(t *testing.T) {
 		input: "_FOO=",
 		want:  map[string]string{"_FOO": ""},
 	}, {
-		input: "_FOO=bar,_BAR=argo",
-		want:  map[string]string{"_FOO": "bar", "_BAR": "argo"},
+		input: "_FOO=bar,_BAR=baz",
+		want:  map[string]string{"_FOO": "bar", "_BAR": "baz"},
 	}, {
-		input: "_FOO=bar, _BAR=argo", // space between the pair
-		want:  map[string]string{"_FOO": "bar", "_BAR": "argo"},
+		input: "_FOO=bar, _BAR=baz", // space between the pair
+		want:  map[string]string{"_FOO": "bar", "_BAR": "baz"},
 	}, {
 		input:   "_FOO",
 		wantErr: true,
@@ -168,5 +168,37 @@ docker volume ls -q --filter name=homevol|cloudbuild_
 docker volume rm id1 id2`
 	if got != want {
 		t.Errorf("Commands didn't match!\n===Want:\n%s\n===Got:\n%s", want, got)
+	}
+}
+
+func TestRefreshDuration(t *testing.T) {
+	start := time.Now()
+
+	// control time.Now for tests.
+	now = func() time.Time {
+		return start
+	}
+
+	for _, tc := range []struct {
+		desc       string
+		expiration time.Time
+		want       time.Duration
+	}{{
+		desc:       "long case",
+		expiration: start.Add(time.Hour),
+		want:       45*time.Minute + time.Second,
+	}, {
+		desc:       "short case",
+		expiration: start.Add(4 * time.Minute),
+		want:       3*time.Minute + time.Second,
+	}, {
+		desc:       "pathologically short",
+		expiration: start.Add(time.Second),
+		want:       time.Second,
+	}} {
+		got := RefreshDuration(tc.expiration)
+		if got != tc.want {
+			t.Errorf("%s: got %q; want %q", tc.desc, got, tc.want)
+		}
 	}
 }

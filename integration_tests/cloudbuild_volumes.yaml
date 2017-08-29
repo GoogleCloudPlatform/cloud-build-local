@@ -1,0 +1,22 @@
+steps:
+- name: 'ubuntu'
+  entrypoint: 'bash'
+  args: ['-c', 'echo some stuff > /foo/stuff']
+  volumes:
+  - name: 'myvol'
+    path: '/foo'
+- name: 'ubuntu'
+  args: ['cat', '/foo/stuff']
+  volumes:
+  - name: 'myvol'
+    path: '/foo'
+# Volume can be mounted at a different path.
+- name: 'ubuntu'
+  args: ['cat', '/bar/stuff']
+  volumes:
+  - name: 'myvol'
+    path: '/bar'
+# Without the volume, the file doesn't exist.
+- name: 'ubuntu'
+  entrypoint: 'bash'
+  args: ['-c', 'test -f /foo/stuff || echo $?']
