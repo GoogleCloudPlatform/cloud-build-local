@@ -203,75 +203,75 @@ func TestUserSubstitutions(t *testing.T) {
 		desc:     "variable should be substituted",
 		template: "Hello $_VAR",
 		substitutions: map[string]string{
-			"_VAR": "Argo",
+			"_VAR": "World",
 		},
-		want: "Hello Argo",
+		want: "Hello World",
 	}, {
 		desc:     "only full variable should be substituted",
 		template: "Hello $_VAR_FOO, $_VAR",
 		substitutions: map[string]string{
-			"_VAR": "Argo",
+			"_VAR": "World",
 		},
-		want: "Hello , Argo",
+		want: "Hello , World",
 	}, {
 		desc:     "variable should be substituted if sticked with a char respecting [^A-Z0-9_]",
 		template: "Hello $_VARfoo",
 		substitutions: map[string]string{
-			"_VAR": "Argo",
+			"_VAR": "World",
 		},
-		want: "Hello Argofoo",
+		want: "Hello Worldfoo",
 	}, {
 		desc:     "curly braced variable should be substituted",
 		template: "Hello ${_VAR}_FOO",
 		substitutions: map[string]string{
-			"_VAR": "Argo",
+			"_VAR": "World",
 		},
-		want: "Hello Argo_FOO",
+		want: "Hello World_FOO",
 	}, {
 		desc:     "variable should be substituted",
 		template: "Hello, 世界  FOO$_VAR",
 		substitutions: map[string]string{
-			"_VAR": "Argo",
+			"_VAR": "World",
 		},
-		want: "Hello, 世界  FOOArgo",
+		want: "Hello, 世界  FOOWorld",
 	}, {
 		desc:     "variable should be substituted, even if sticked",
 		template: `Hello $_VAR$_VAR`,
 		substitutions: map[string]string{
-			"_VAR": "Argo",
+			"_VAR": "World",
 		},
-		want: `Hello ArgoArgo`,
+		want: `Hello WorldWorld`,
 	}, {
 		desc:     "variable should be substituted, even if preceded by $$",
 		template: `$$$_VAR`,
 		substitutions: map[string]string{
-			"_VAR": "Argo",
+			"_VAR": "World",
 		},
-		want: `$Argo`,
+		want: `$World`,
 	}, {
 		desc:     "escaped variable should not be substituted",
 		template: `Hello $${_VAR}_FOO, $_VAR`,
 		substitutions: map[string]string{
-			"_VAR": "Argo",
+			"_VAR": "World",
 		},
-		want: `Hello ${_VAR}_FOO, Argo`,
+		want: `Hello ${_VAR}_FOO, World`,
 	}, {
 		desc:     "escaped variable should not be substituted",
 		template: `Hello $$$$_VAR $$$_VAR, $_VAR, $$_VAR`,
 		substitutions: map[string]string{
-			"_VAR": "Argo",
+			"_VAR": "World",
 		},
-		want: `Hello $$_VAR $Argo, Argo, $_VAR`,
+		want: `Hello $$_VAR $World, World, $_VAR`,
 	}, {
 		desc:     "escaped variable should not be substituted",
 		template: `$$_VAR`,
 		substitutions: map[string]string{
-			"_VAR": "Argo",
+			"_VAR": "World",
 		},
 		want: `$_VAR`,
 	}, {
 		desc:          "unmatched keys in the template for a built-in substitution will result in an empty string",
-		template:      `Hello $ARGO_DEFINED_VARIABLE`,
+		template:      `Hello $BUILTIN_DEFINED_VARIABLE`,
 		substitutions: map[string]string{},
 		want:          "Hello ",
 	}}

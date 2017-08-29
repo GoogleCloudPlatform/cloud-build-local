@@ -19,5 +19,17 @@ container-builder-local --config=cloudbuild_nil.yaml --dryrun=false . || exit
 container-builder-local --config=cloudbuild_dockerfile.yaml --dryrun=false . || exit
 container-builder-local --config=cloudbuild_gcr.yaml --dryrun=false --push=true . || exit
 container-builder-local --config=cloudbuild_big.yaml --dryrun=false --push=true . || exit
+container-builder-local --config=cloudbuild_volumes.yaml --dryrun=false . || exit
+
+# Confirm that we set up credentials account correctly.
+WANT=$(gcloud config list --format="value(core.account)")
+OUT=$(container-builder-local --config=cloudbuild_auth.yaml --dryrun=false .)
+if [[ ${OUT} =~ .*${WANT}.* ]]
+then
+  echo "PASS: auth setup"
+else
+  echo "FAIL: auth setup"
+  exit 1
+fi
 
 exit 0

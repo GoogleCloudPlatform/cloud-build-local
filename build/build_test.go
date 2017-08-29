@@ -154,11 +154,11 @@ func (r *mockRunner) Run(args []string, in io.Reader, out, err io.Writer, _ stri
 		if r.remoteImages[tag] {
 			// Successful pull.
 			io.WriteString(out, `Using default tag: latest
-latest: Pulling from test-argo/busybox
+latest: Pulling from test/busybox
 a5d4c53980c6: Pull complete
 b41c5284db84: Pull complete
 Digest: sha256:digestRemote
-Status: Downloaded newer image for gcr.io/test-argo/busybox:latest
+Status: Downloaded newer image for gcr.io/test/busybox:latest
 `)
 			r.localImages[tag] = true
 			return nil

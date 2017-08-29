@@ -19,16 +19,16 @@ steps:
   args:
   - 'build'
   - '-t'
-  - 'gcr.io/argo-local-builder/test_big:tag1'
+  - 'gcr.io/$PROJECT_ID/test_big:tag1'
   - '-t'
-  - 'gcr.io/argo-local-builder/test_big:tag2'
+  - 'gcr.io/$PROJECT_ID/test_big:tag2'
   - '-t'
-  - 'gcr.io/argo-local-builder/test_big:tag3'
+  - 'gcr.io/$PROJECT_ID/test_big:tag3'
   - '.'
   waitFor: ['-']
 
 images:
-- 'gcr.io/argo-local-builder/test_big:tag1'
-- 'gcr.io/argo-local-builder/test_big:tag2'
-- 'gcr.io/argo-local-builder/test_big:tag3'
+- 'gcr.io/$PROJECT_ID/test_big:tag1'
+- 'gcr.io/$PROJECT_ID/test_big:tag2'
+- 'gcr.io/$PROJECT_ID/test_big:tag3'
 

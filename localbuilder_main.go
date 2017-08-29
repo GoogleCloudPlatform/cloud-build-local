@@ -26,7 +26,6 @@ import (
 	"time"
 
 	computeMetadata "cloud.google.com/go/compute/metadata"
-	"golang.org/x/oauth2"
 	"github.com/google/uuid"
 
 	"github.com/GoogleCloudPlatform/container-builder-local/build"
@@ -43,14 +42,13 @@ import (
 
 const (
 	volumeNamePrefix  = "cloudbuild_vol_"
-	tokenRefreshDur   = 10 * time.Minute
 	gcbDockerVersion  = "17.05-ce"
 	metadataImageName = "gcr.io/cloud-builders/metadata"
 )
 
 var (
 	configFile    = flag.String("config", "cloudbuild.yaml", "cloud build config file path")
-	substitutions = flag.String("substitutions", "", `substitutions key=value pairs separated by comma; for example _FOO=bar,_BAZ=argo`)
+	substitutions = flag.String("substitutions", "", `substitutions key=value pairs separated by comma; for example _FOO=bar,_BAZ=baz`)
 	dryRun        = flag.Bool("dryrun", true, "If true, nothing will be run")
 	push          = flag.Bool("push", false, "If true, the images will be pushed")
 	help          = flag.Bool("help", false, "If true, print the help message")
@@ -204,31 +202,39 @@ func run(source string) error {
 		if err != nil {
 			return fmt.Errorf("Error getting access token to set docker credentials: %v", err)
 		}
-		if err := b.SetDockerAccessToken(tok); err != nil {
+		if err := b.SetDockerAccessToken(tok.AccessToken); err != nil {
 			return fmt.Errorf("Error setting docker credentials: %v", err)
 		}
 
-		// Write initial docker credentials for GCR. This writes the initial
-		// ~/.docker/config.json which is made available to build steps.
-		
-		go func(stopchan <-chan struct{}) {
+		// Write docker credentials for GCR. This writes the initial
+		// ~/.docker/config.json, which is made available to build steps, and keeps
+		// a fresh token available. Note that the user could `gcloud auth` to
+		// switch accounts mid-build, and we wouldn't notice that until token
+		// refresh; switching accounts mid-build is not supported.
+		go func(tok *metadata.Token, stopchan <-chan struct{}) {
 			for {
-				tok, err := gcloud.AccessToken(r)
-				if err != nil {
-					log.Printf("Error getting access token to update docker credentials: %v", err)
-					continue
+				refresh := time.Duration(0)
+				if tok != nil {
+					refresh = common.RefreshDuration(tok.Expiry)
 				}
-				if err := b.UpdateDockerAccessToken(tok); err != nil {
-					log.Printf("Error updating docker credentials: %v", err)
-				}
+
 				select {
-				case <-time.After(tokenRefreshDur):
-					continue
+				case <-time.After(refresh):
+					var err error
+					tok, err = gcloud.AccessToken(r)
+					if err != nil {
+						log.Printf("Error getting access token to update docker credentials: %v\n", err)
+						continue
+					}
+
+					if err := b.UpdateDockerAccessToken(tok.AccessToken); err != nil {
+						log.Printf("Error updating docker credentials: %v", err)
+					}
 				case <-stopchan:
 					return
 				}
 			}
-		}(stopchan)
+		}(tok, stopchan)
 	}
 
 	b.Start()
@@ -249,23 +255,18 @@ func run(source string) error {
 // supplyTokenToMetadata gets gcloud token and supply it to the metadata server.
 func supplyTokenToMetadata(metadataUpdater metadata.RealUpdater, r runner.Runner, stopchan <-chan struct{}) {
 	for {
-		accessToken, err := gcloud.AccessToken(r)
+		tok, err := gcloud.AccessToken(r)
 		if err != nil {
 			log.Printf("Error getting gcloud token: %v", err)
 			continue
 		}
-		token := oauth2.Token{
-			AccessToken: accessToken,
-			
-			// https://developers.google.com/identity/sign-in/web/backend-auth#calling-the-tokeninfo-endpoint
-			Expiry: time.Now().Add(2 * tokenRefreshDur),
-		}
-		if err := metadataUpdater.SetToken(token); err != nil {
+		if err := metadataUpdater.SetToken(tok); err != nil {
 			log.Printf("Error updating token in metadata server: %v", err)
 			continue
 		}
+		refresh := common.RefreshDuration(tok.Expiry)
 		select {
-		case <-time.After(tokenRefreshDur):
+		case <-time.After(refresh):
 			continue
 		case <-stopchan:
 			return

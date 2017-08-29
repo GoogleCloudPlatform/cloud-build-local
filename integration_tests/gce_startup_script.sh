@@ -88,7 +88,7 @@ gsutil cp /root/output.txt $gcs_logs_path/output.txt || exit
 (
   # If the test succeeds, copy the output to success.txt. Else, to failure.txt.
   cd /root/test-files
-  export PROJECT_ID=argo-local-builder
+  export PROJECT_ID=$(gcloud config list --format='value(core.project)')
   ./test_script.sh &> /root/output.txt && \
     gsutil cp /root/output.txt $gcs_logs_path/success.txt || \
     gsutil cp /root/output.txt $gcs_logs_path/failure.txt
