@@ -233,12 +233,6 @@ func run(source string) error {
 				case <-stopchan:
 					return
 				}
-				select {
-				case <-time.After(tokenRefreshDur):
-					continue
-				case <-stopchan:
-					return
-				}
 			}
 		}(tok, stopchan)
 	}
