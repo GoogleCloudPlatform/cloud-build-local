@@ -25,6 +25,13 @@ gcloud config set project my-project
 ```
 gcloud components install container-builder-local
 ```
+After successful installation, you will have ``container-builder-local`` setup on your PATH (as part of the google-cloud-sdk binaries), so you will be able to run it with:
+
+```
+$ container-builder-local 
+2017/08/23 10:16:03 Specify a source
+Usage: container-builder-local --config=cloudbuild.yaml [--substitutions=_FOO=bar] [--[no]dryrun] [--[no]push] source
+````
 
 ## Download the latest binaries
 
