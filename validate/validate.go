@@ -45,6 +45,7 @@ const (
 	maxNumSubstitutions = 100  // max number of user-defined substitutions.
 	maxSubstKeyLength   = 100  // max length of a substitution key.
 	maxSubstValueLength = 4000 // max length of a substitution value.
+	maxNumSecretEnvs    = 100  // max number of unique secret env values.
 
 	// Name of the permission required to use a key to decrypt data.
 	// Documented at https://cloud.google.com/kms/docs/reference/permissions-and-roles
@@ -396,8 +397,8 @@ func checkSecrets(b *cb.Build) error {
 			return fmt.Errorf("secretEnv %q is defined without being used", defined)
 		}
 	}
-	if len(definedSecretEnvs) > 10 {
-		return errors.New("build defines more than ten secret values")
+	if len(definedSecretEnvs) > maxNumSecretEnvs {
+		return fmt.Errorf("build defines more than %d secret values", maxNumSecretEnvs)
 	}
 
 	// Check secret_env max size.

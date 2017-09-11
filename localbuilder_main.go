@@ -42,7 +42,7 @@ import (
 
 const (
 	volumeNamePrefix  = "cloudbuild_vol_"
-	gcbDockerVersion  = "17.05-ce"
+	gcbDockerVersion  = "17.06.1-ce"
 	metadataImageName = "gcr.io/cloud-builders/metadata"
 )
 
@@ -51,6 +51,7 @@ var (
 	substitutions = flag.String("substitutions", "", `substitutions key=value pairs separated by comma; for example _FOO=bar,_BAZ=baz`)
 	dryRun        = flag.Bool("dryrun", true, "If true, nothing will be run")
 	push          = flag.Bool("push", false, "If true, the images will be pushed")
+	noSource      = flag.Bool("no-source", false, "Specify that no source should be used for this build.")
 	help          = flag.Bool("help", false, "If true, print the help message")
 	versionFlag   = flag.Bool("version", false, "If true, print the local builder version")
 )
@@ -72,12 +73,25 @@ func main() {
 		return
 	}
 
-	if len(args) == 0 {
-		exitUsage("Specify a source")
-	} else if len(args) > 1 {
-		exitUsage("There should be only one positional argument. Pass all the flags before the source.")
+	nbSource := 1
+	if *noSource {
+		nbSource = 0
 	}
-	source := args[0]
+
+	if len(args) < nbSource {
+		exitUsage("Specify a source")
+	} else if len(args) > nbSource {
+		if nbSource == 1 {
+			exitUsage("There should be only one positional argument. Pass all the flags before the source.")
+		} else {
+			exitUsage("no-source flag can't be used along with source.")
+		}
+	}
+	source := ""
+	if nbSource == 1 {
+		source = args[0]
+	}
+
 	if *configFile == "" {
 		exitUsage("Specify a config file")
 	}
@@ -160,14 +174,16 @@ func run(source string) error {
 		if err := vol.Setup(); err != nil {
 			return fmt.Errorf("Error creating docker volume: %v", err)
 		}
-		// If the source is a directory, only copy the inner content.
-		if isDir, err := isDirectory(source); err != nil {
-			return fmt.Errorf("Error getting directory: %v", err)
-		} else if isDir {
-			source = filepath.Clean(source) + "/."
-		}
-		if err := vol.Copy(source); err != nil {
-			return fmt.Errorf("Error copying source to docker volume: %v", err)
+		if source != "" {
+			// If the source is a directory, only copy the inner content.
+			if isDir, err := isDirectory(source); err != nil {
+				return fmt.Errorf("Error getting directory: %v", err)
+			} else if isDir {
+				source = filepath.Clean(source) + "/."
+			}
+			if err := vol.Copy(source); err != nil {
+				return fmt.Errorf("Error copying source to docker volume: %v", err)
+			}
 		}
 		defer vol.Close()
 	}
