@@ -16,6 +16,7 @@ package validate
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"strings"
 	"testing"
@@ -622,6 +623,21 @@ func makeTestBuild(buildID string) *cb.Build {
 }
 
 func TestCheckSecrets(t *testing.T) {
+	makeSecretEnvs := func(n int) []string {
+		var s []string
+		for i := 0; i < n; i++ {
+			s = append(s, fmt.Sprintf("MY_SECRET_%d", i))
+		}
+		return s
+	}
+	makeSecrets := func(n int) map[string][]byte {
+		m := map[string][]byte{}
+		for i := 0; i < n; i++ {
+			m[fmt.Sprintf("MY_SECRET_%d", i)] = []byte("hunter2")
+		}
+		return m
+	}
+
 	for _, c := range []struct {
 		desc    string
 		b       *cb.Build
@@ -730,29 +746,28 @@ func TestCheckSecrets(t *testing.T) {
 		},
 		wantErr: errors.New(`secretEnv value for "MY_SECRET" cannot exceed 1KB`),
 	}, {
-		desc: "Build with >10 secret values",
+		desc: "Happy case: Build with acceptable secret values",
 		b: &cb.Build{
 			Steps: []*cb.BuildStep{{
-				SecretEnv: []string{"MY_SECRET_1", "MY_SECRET_2", "MY_SECRET_3", "MY_SECRET_4", "MY_SECRET_5", "MY_SECRET_6", "MY_SECRET_7", "MY_SECRET_8", "MY_SECRET_9", "MY_SECRET_10", "MY_SECRET_11"},
+				SecretEnv: makeSecretEnvs(maxNumSecretEnvs),
 			}},
 			Secrets: []*cb.Secret{{
 				KmsKeyName: kmsKeyName,
-				SecretEnv: map[string][]byte{
-					"MY_SECRET_1":  []byte("hunter1"),
-					"MY_SECRET_2":  []byte("hunter1"),
-					"MY_SECRET_3":  []byte("hunter1"),
-					"MY_SECRET_4":  []byte("hunter1"),
-					"MY_SECRET_5":  []byte("hunter1"),
-					"MY_SECRET_6":  []byte("hunter1"),
-					"MY_SECRET_7":  []byte("hunter1"),
-					"MY_SECRET_8":  []byte("hunter1"),
-					"MY_SECRET_9":  []byte("hunter1"),
-					"MY_SECRET_10": []byte("hunter1"),
-					"MY_SECRET_11": []byte("hunter1"),
-				},
+				SecretEnv:  makeSecrets(maxNumSecretEnvs),
 			}},
 		},
-		wantErr: errors.New("build defines more than ten secret values"),
+	}, {
+		desc: "Build with too many secret values",
+		b: &cb.Build{
+			Steps: []*cb.BuildStep{{
+				SecretEnv: makeSecretEnvs(maxNumSecretEnvs + 1),
+			}},
+			Secrets: []*cb.Secret{{
+				KmsKeyName: kmsKeyName,
+				SecretEnv:  makeSecrets(maxNumSecretEnvs + 1),
+			}},
+		},
+		wantErr: errors.New("build defines more than 100 secret values"),
 	}, {
 		desc: "Step has env and secret_env collision",
 		b: &cb.Build{

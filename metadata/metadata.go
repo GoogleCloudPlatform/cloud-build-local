@@ -178,6 +178,11 @@ func (r RealUpdater) SetProjectInfo(b ProjectInfo) error {
 // The container listens on local port 8082, which is where RealUpdater POSTs
 // to.
 func StartLocalServer(r runner.Runner, metadataImage string) error {
+	// Unlike the hosted container builder service, the user's local machine is
+	// not guaranteed to have the latest version, so we explicitly pull it.
+	if err := r.Run([]string{"docker", "pull", metadataImage}, nil, os.Stdout, os.Stderr, ""); err != nil {
+		return err
+	}
 	return startServer(r, metadataImage, false, fixedMetadataIP, metadataLocalSubnet)
 }
 
