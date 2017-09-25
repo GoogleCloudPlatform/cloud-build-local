@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	cb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
-	"github.com/golang/protobuf/ptypes/timestamp"
+	"github.com/golang/protobuf/ptypes/duration"
 )
 
 const (
