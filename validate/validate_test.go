@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	cb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
+	"google3/google/protobuf/duration"
 )
 
 const (
@@ -257,6 +258,21 @@ func TestValidateBuild(t *testing.T) {
 			},
 		},
 		valid: true,
+	}, {
+		build: &cb.Build{
+			Id:      "name-only",
+			Steps:   []*cb.BuildStep{{Name: "foo"}},
+			Timeout: &duration.Duration{Seconds: 86400},
+		},
+		valid: true,
+	}, {
+		// fails because timeout is too big.
+		build: &cb.Build{
+			Id:      "name-only",
+			Steps:   []*cb.BuildStep{{Name: "foo"}},
+			Timeout: &duration.Duration{Seconds: 86401},
+		},
+		valid: false,
 	}}
 	for _, tc := range testCases {
 		b := tc.build
@@ -267,6 +283,49 @@ func TestValidateBuild(t *testing.T) {
 			}
 		} else if err == nil {
 			t.Errorf("CheckBuild(%+v) got nil error, want an error", b)
+		}
+	}
+}
+
+func TestCheckBuildAfterSubstitutions(t *testing.T) {
+	testCases := []struct {
+		build *cb.Build
+		valid bool
+	}{{
+		build: makeTestBuild("valid-build"),
+		valid: true,
+	}, {
+		build: &cb.Build{
+			Steps: []*cb.BuildStep{{Name: "foo"}},
+		},
+		valid: true,
+	}, {
+		build: &cb.Build{
+			Steps:  []*cb.BuildStep{{Name: "foo"}},
+			Images: []string{"foo"},
+		},
+		valid: true,
+	}, {
+		build: &cb.Build{
+			Steps: []*cb.BuildStep{{Name: "gcr.io/:broken"}},
+		},
+		valid: false,
+	}, {
+		build: &cb.Build{
+			Steps:  []*cb.BuildStep{{Name: "foo"}},
+			Images: []string{"gcr.io/:broken"},
+		},
+		valid: false,
+	}}
+	for _, tc := range testCases {
+		b := tc.build
+		err := CheckBuildAfterSubstitutions(b)
+		if tc.valid {
+			if err != nil {
+				t.Errorf("CheckBuildAfterSubstitutions(%+v) unexpectedly failed: %v", b, err)
+			}
+		} else if err == nil {
+			t.Errorf("CheckBuildAfterSubstitutions(%+v) got nil error, want an error", b)
 		}
 	}
 }
@@ -606,16 +665,17 @@ func manyStrings(n int) []string {
 	return out
 }
 
+// makeTestBuild should return a valid build after substitutions.
 func makeTestBuild(buildID string) *cb.Build {
 	return &cb.Build{
 		Id:        buildID,
 		ProjectId: projectID,
 		Status:    cb.Build_STATUS_UNKNOWN,
 		Steps: []*cb.BuildStep{{
-			Name: "gcr.io/$PROJECT_ID/my-builder",
+			Name: "gcr.io/my-project/my-builder",
 			Args: []string{"gcr.io/some/image/tag"},
 		}, {
-			Name: "gcr.io/$PROJECT_ID/my-builder",
+			Name: "gcr.io/my-project/my-builder",
 			Args: []string{"gcr.io/some/image/tag2"},
 		}},
 		Images: []string{"gcr.io/some/image/tag", "gcr.io/some/image/tag2"},
@@ -825,6 +885,9 @@ func TestCheckImageTags(t *testing.T) {
 	}
 	invalidTags := []string{
 		"",
+		" ",
+		"contains space",
+		"_ubuntu",
 		"gcr.io/z",
 		"gcr.io/broken/noth:",
 		"gcr.io/broken:image",
@@ -833,6 +896,9 @@ func TestCheckImageTags(t *testing.T) {
 		"gcr.io/:broken",
 		"gcr.io/projoect/Broken",
 		"gcr.o/broken/folder:tag",
+		"gcr.io/project/image:foo:bar",
+		"gcr.io/project/image@sha257:abcdefg",
+		"gcr.io/project/image@sha256:abcdefg:foo",
 		"baddomaingcr.io/doesntwork",
 		"sub.sub.gcr.io/baddomain/blah",
 	}
@@ -851,26 +917,26 @@ func TestCheckImageTags(t *testing.T) {
 	}
 }
 
-func TestCheckBuildStepName(t *testing.T) {
-	validNames := []string{
-		"gcr.o/works/folder:tag",
-		"gcr.io/z",
-		"subdomain.gcr.io/works/folder/folder",
-		"gcr.io/works:tag",
-		"gcr.io/works/folder:tag",
-		"ubuntu",
-		"ubuntu:latest",
-		"gcr.io/cloud-builders/docker@sha256:blah",
-	}
-	invalidNames := []string{
-		"",
-		"gcr.io/cloud-builders/docker@sha256:",
-		"gcr.io/cloud-builders/docker@sha56:blah",
-		"ubnutu::latest",
-		"gcr.io/:broken",
-		"gcr.io/project/Broken",
-	}
+var validNames = []string{
+	"gcr.o/works/folder:tag",
+	"gcr.io/z",
+	"subdomain.gcr.io/works/folder/folder",
+	"gcr.io/works:tag",
+	"gcr.io/works/folder:tag",
+	"ubuntu",
+	"ubuntu:latest",
+	"gcr.io/cloud-builders/docker@sha256:blah",
+}
+var invalidNames = []string{
+	"",
+	"gcr.io/cloud-builders/docker@sha256:",
+	"gcr.io/cloud-builders/docker@sha56:blah",
+	"ubnutu::latest",
+	"gcr.io/:broken",
+	"gcr.io/project/Broken",
+}
 
+func TestCheckBuildStepName(t *testing.T) {
 	for _, name := range validNames {
 		step := &cb.BuildStep{Name: name}
 		steps := []*cb.BuildStep{step}
@@ -883,6 +949,19 @@ func TestCheckBuildStepName(t *testing.T) {
 		steps := []*cb.BuildStep{step}
 		if err := checkBuildStepNames(steps); err == nil {
 			t.Errorf("checkBuildStepNames(%v) did not return error", steps)
+		}
+	}
+}
+
+func TestCheckImageNames(t *testing.T) {
+	for _, name := range validNames {
+		if err := checkImageNames([]string{name}); err != nil {
+			t.Errorf("checkImageNames(%v) got unexpected error: %v", name, err)
+		}
+	}
+	for _, name := range invalidNames {
+		if err := checkImageNames([]string{name}); err == nil {
+			t.Errorf("checkImageNames(%v) did not return error", name)
 		}
 	}
 }

@@ -26,6 +26,7 @@ import (
 	"time"
 
 	computeMetadata "cloud.google.com/go/compute/metadata"
+	"golang.org/x/oauth2"
 	"github.com/google/uuid"
 
 	"github.com/GoogleCloudPlatform/container-builder-local/build"
@@ -49,7 +50,7 @@ const (
 var (
 	configFile    = flag.String("config", "cloudbuild.yaml", "cloud build config file path")
 	substitutions = flag.String("substitutions", "", `substitutions key=value pairs separated by comma; for example _FOO=bar,_BAZ=baz`)
-	dryRun        = flag.Bool("dryrun", true, "If true, nothing will be run")
+	dryRun        = flag.Bool("dryrun", true, "If true, the config file is linted and the commands printed, but they are not run")
 	push          = flag.Bool("push", false, "If true, the images will be pushed")
 	noSource      = flag.Bool("no-source", false, "Specify that no source should be used for this build.")
 	help          = flag.Bool("help", false, "If true, print the help message")
@@ -167,6 +168,11 @@ func run(source string) error {
 		return fmt.Errorf("Error applying substitutions: %v", err)
 	}
 
+	// Validate the build after substitutions.
+	if err := validate.CheckBuildAfterSubstitutions(buildConfig); err != nil {
+		return fmt.Errorf("Error validating build after substitutions: %v", err)
+	}
+
 	// Create a volume, a helper container to copy the source, and defer cleaning.
 	volumeName := fmt.Sprintf("%s%s", volumeNamePrefix, uuid.New())
 	if !*dryRun {
@@ -188,10 +194,22 @@ func run(source string) error {
 		defer vol.Close()
 	}
 
-	b := build.New(r, *buildConfig, nil, &buildlog.BuildLog{}, volumeName, true, *push)
+	b := build.New(r, *buildConfig, nil /* TokenSource */, &buildlog.BuildLog{}, volumeName, true, *push, *dryRun)
 
 	// Do not run the spoofed metadata server on a dryrun.
 	if !*dryRun {
+		// Set initial Docker credentials.
+		tok, err := gcloud.AccessToken(r)
+		if err != nil {
+			return fmt.Errorf("Error getting access token to set docker credentials: %v", err)
+		}
+		if err := b.SetDockerAccessToken(tok.AccessToken); err != nil {
+			return fmt.Errorf("Error setting docker credentials: %v", err)
+		}
+		b.TokenSource = oauth2.StaticTokenSource(&oauth2.Token{
+			AccessToken: tok.AccessToken,
+		})
+
 		// On GCE, do not create a spoofed metadata server, use the existing one.
 		// The cloudbuild network is still needed, with a private subnet.
 		if computeMetadata.OnGCE() {
@@ -211,15 +229,6 @@ func run(source string) error {
 			metadataUpdater.SetProjectInfo(projectInfo)
 
 			go supplyTokenToMetadata(metadataUpdater, r, stopchan)
-		}
-
-		// Set initial Docker credentials.
-		tok, err := gcloud.AccessToken(r)
-		if err != nil {
-			return fmt.Errorf("Error getting access token to set docker credentials: %v", err)
-		}
-		if err := b.SetDockerAccessToken(tok.AccessToken); err != nil {
-			return fmt.Errorf("Error setting docker credentials: %v", err)
 		}
 
 		// Write docker credentials for GCR. This writes the initial
@@ -246,6 +255,10 @@ func run(source string) error {
 					if err := b.UpdateDockerAccessToken(tok.AccessToken); err != nil {
 						log.Printf("Error updating docker credentials: %v", err)
 					}
+
+					b.TokenSource = oauth2.StaticTokenSource(&oauth2.Token{
+						AccessToken: tok.AccessToken,
+					})
 				case <-stopchan:
 					return
 				}
