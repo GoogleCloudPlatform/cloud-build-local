@@ -23,12 +23,13 @@ import (
 )
 
 const (
-	projectID  = "my-project"
-	buildID    = "build-id"
-	repoName   = "my-repo"
-	branchName = "my-branch"
-	tagName    = "my-tag"
-	revisionID = "abc123"
+	projectID       = "my-project"
+	buildID         = "build-id"
+	repoName        = "my-repo"
+	branchName      = "my-branch"
+	tagName         = "my-tag"
+	longRevisionID  = "abcdefg1234567"
+	shortRevisionID = "abcd"
 )
 
 func addProjectSourceAndProvenance(b *cb.Build) {
@@ -42,7 +43,7 @@ func addProjectSourceAndProvenance(b *cb.Build) {
 		ResolvedRepoSource: &cb.RepoSource{
 			ProjectId: projectID,
 			RepoName:  repoName,
-			Revision:  &cb.RepoSource_CommitSha{CommitSha: revisionID},
+			Revision:  &cb.RepoSource_CommitSha{CommitSha: longRevisionID},
 		},
 	}
 }
@@ -55,7 +56,11 @@ func addTagName(b *cb.Build) {
 	b.GetSource().GetRepoSource().Revision = &cb.RepoSource_TagName{TagName: tagName}
 }
 func addRevision(b *cb.Build) {
-	b.GetSource().GetRepoSource().Revision = &cb.RepoSource_CommitSha{CommitSha: revisionID}
+	b.GetSource().GetRepoSource().Revision = &cb.RepoSource_CommitSha{CommitSha: longRevisionID}
+}
+
+func setRevisionID(b *cb.Build, revisionID string) {
+	b.GetSourceProvenance().GetResolvedRepoSource().Revision = &cb.RepoSource_CommitSha{CommitSha: revisionID}
 }
 
 func compareBuildStepsAndImages(got, want *cb.Build) error {
@@ -100,12 +105,12 @@ func TestBranch(t *testing.T) {
 	if err := compareBuildStepsAndImages(b, &cb.Build{
 		Steps: []*cb.BuildStep{{
 			Name:       "gcr.io/my-project/my-builder:my-branch",
-			Args:       []string{"gcr.io/my-project/my-branch:abc123"},
+			Args:       []string{"gcr.io/my-project/my-branch:abcdefg1234567"},
 			Env:        []string{"REPO_NAME=my-repo", "BUILD_ID=build-id"},
 			Dir:        "let's say... my-branch?",
 			Entrypoint: "thisMakesNoSenseBut...build_id",
 		}},
-		Images: []string{"gcr.io/foo/my-branch:abc123"},
+		Images: []string{"gcr.io/foo/my-branch:abcdefg1234567"},
 	}); err != nil {
 		t.Error(err)
 	}
@@ -130,11 +135,11 @@ func TestTag(t *testing.T) {
 	if err := compareBuildStepsAndImages(b, &cb.Build{
 		Steps: []*cb.BuildStep{{
 			Name: "gcr.io/my-project/my-builder:my-tag",
-			Args: []string{"gcr.io/my-project/my-tag:abc123"},
+			Args: []string{"gcr.io/my-project/my-tag:abcdefg1234567"},
 			Env:  []string{"REPO_NAME=my-repo", "BUILD_ID=build-id"},
 			Dir:  "let's say... my-tag?",
 		}},
-		Images: []string{"gcr.io/foo/my-tag:abc123"},
+		Images: []string{"gcr.io/foo/my-tag:abcdefg1234567"},
 	}); err != nil {
 		t.Error(err)
 	}
@@ -158,12 +163,62 @@ func TestRevision(t *testing.T) {
 	if err := compareBuildStepsAndImages(b, &cb.Build{
 		Steps: []*cb.BuildStep{{
 			Name: "gcr.io/my-project/my-builder",
-			Args: []string{"gcr.io/my-project/thing:abc123"},
+			Args: []string{"gcr.io/my-project/thing:abcdefg1234567"},
 			Env:  []string{"REPO_NAME=my-repo", "BUILD_ID=build-id"},
 		}},
 		Images: []string{"gcr.io/foo/thing"},
 	}); err != nil {
 		t.Error(err)
+	}
+}
+
+func TestShortSha(t *testing.T) {
+
+	tests := []struct {
+		b          *cb.Build
+		want       *cb.Build
+		revisionID string
+	}{
+		// Length of commit SHA exceeds maxShortShaLength characters.
+		{
+			b: &cb.Build{
+				Steps: []*cb.BuildStep{{
+					Name: "gcr.io/$PROJECT_ID/my-builder",
+					Args: []string{"gcr.io/$PROJECT_ID/thing:$SHORT_SHA"},
+				}}},
+			want: &cb.Build{
+				Steps: []*cb.BuildStep{{
+					Name: "gcr.io/my-project/my-builder",
+					Args: []string{"gcr.io/my-project/thing:abcdefg"},
+				}}},
+			revisionID: longRevisionID,
+		},
+		{
+			// Length of commit SHA does not exceed maxShortShaLength characters.
+			b: &cb.Build{
+				Steps: []*cb.BuildStep{{
+					Name: "gcr.io/$PROJECT_ID/my-builder",
+					Args: []string{"gcr.io/$PROJECT_ID/thing:$SHORT_SHA"},
+				}}},
+			want: &cb.Build{
+				Steps: []*cb.BuildStep{{
+					Name: "gcr.io/my-project/my-builder",
+					Args: []string{"gcr.io/my-project/thing:abcd"},
+				}}},
+			revisionID: shortRevisionID,
+		},
+	}
+
+	for _, test := range tests {
+		addProjectSourceAndProvenance(test.b)
+		setRevisionID(test.b, test.revisionID)
+		err := SubstituteBuildFields(test.b)
+		if err != nil {
+			t.Fatalf("Error while substituting build fields: %v", err)
+		}
+		if err := compareBuildStepsAndImages(test.b, test.want); err != nil {
+			t.Error(err)
+		}
 	}
 }
 
@@ -184,7 +239,7 @@ func TestUnknownFields(t *testing.T) {
 	if err := compareBuildStepsAndImages(b, &cb.Build{
 		Steps: []*cb.BuildStep{{
 			Name: "gcr.io/my-project/my-builder",
-			Args: []string{"gcr.io/my-project/thing:abc123"},
+			Args: []string{"gcr.io/my-project/thing:abcdefg1234567"},
 			Env:  []string{"REPO_NAME=my-repo", "BUILD_ID=build-id"},
 		}},
 		Images: []string{"gcr.io/foo/"},

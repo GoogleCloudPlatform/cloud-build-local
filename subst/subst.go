@@ -23,9 +23,10 @@ import (
 )
 
 var (
-	unbracedKeyRE   = `([A-Z_][A-Z0-9_]*)`
-	bracedKeyRE     = fmt.Sprintf(`{%s}`, unbracedKeyRE)
-	validSubstKeyRE = regexp.MustCompile(`^\$(?:` + bracedKeyRE + `|` + unbracedKeyRE + `)`)
+	unbracedKeyRE     = `([A-Z_][A-Z0-9_]*)`
+	bracedKeyRE       = fmt.Sprintf(`{%s}`, unbracedKeyRE)
+	validSubstKeyRE   = regexp.MustCompile(`^\$(?:` + bracedKeyRE + `|` + unbracedKeyRE + `)`)
+	maxShortShaLength = 7
 )
 
 // SubstituteBuildFields does an in-place string substitution of build parameters.
@@ -38,6 +39,7 @@ func SubstituteBuildFields(b *cb.Build) error {
 	branchName := ""
 	tagName := ""
 	commitSHA := ""
+	shortSHA := ""
 
 	if s := b.GetSource(); s != nil {
 		if rs := s.GetRepoSource(); rs != nil {
@@ -49,6 +51,11 @@ func SubstituteBuildFields(b *cb.Build) error {
 	if sp := b.GetSourceProvenance(); sp != nil {
 		if rrs := sp.GetResolvedRepoSource(); rrs != nil {
 			commitSHA = rrs.GetCommitSha()
+			shortSHA = commitSHA
+			// Length of commit SHA can be less than maxShortShaLength.
+			if len(shortSHA) > maxShortShaLength {
+				shortSHA = shortSHA[0:maxShortShaLength]
+			}
 		}
 	}
 
@@ -61,6 +68,7 @@ func SubstituteBuildFields(b *cb.Build) error {
 		"TAG_NAME":    tagName,
 		"REVISION_ID": commitSHA,
 		"COMMIT_SHA":  commitSHA,
+		"SHORT_SHA":   shortSHA,
 	}
 
 	// Add user-defined substitutions, overriding built-in substitutions.

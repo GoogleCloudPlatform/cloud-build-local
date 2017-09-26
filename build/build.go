@@ -75,7 +75,7 @@ type Build struct {
 	Mu               sync.Mutex
 	Request          cb.Build
 	HasMultipleSteps bool
-	Tokensource      oauth2.TokenSource
+	TokenSource      oauth2.TokenSource
 	Log              *buildlog.BuildLog
 	Status           BuildStatus
 	imageDigests     map[string]string // docker image tag to digest (for built images)
@@ -103,6 +103,7 @@ type Build struct {
 	hostWorkspaceDir string
 	local            bool
 	push             bool
+	dryrun           bool
 
 	// For UpdateDockerAccessToken, previous GCR auth value to replace.
 	prevGCRAuth string
@@ -114,11 +115,11 @@ type kms interface {
 
 // New constructs a new Build.
 func New(r runner.Runner, rq cb.Build, ts oauth2.TokenSource,
-	bl *buildlog.BuildLog, hostWorkspaceDir string, local, push bool) *Build {
+	bl *buildlog.BuildLog, hostWorkspaceDir string, local, push, dryrun bool) *Build {
 	return &Build{
 		Runner:           r,
 		Request:          rq,
-		Tokensource:      ts,
+		TokenSource:      ts,
 		imageDigests:     map[string]string{},
 		stepDigests:      make([]string, len(rq.Steps)),
 		Log:              bl,
@@ -129,6 +130,7 @@ func New(r runner.Runner, rq cb.Build, ts oauth2.TokenSource,
 		hostWorkspaceDir: hostWorkspaceDir,
 		local:            local,
 		push:             push,
+		dryrun:           dryrun,
 	}
 }
 
@@ -641,18 +643,31 @@ func (b *Build) getKMSClient() (kms, error) {
 		return b.kms, nil
 	}
 
+	if b.dryrun {
+		b.kms = dryRunKMS{}
+		return b.kms, nil
+	}
+
 	
 	// automatically gets (and refreshes) credentials from the metadata server
 	// when spoofing metadata works by IP. Until then, we'll just fetch the token
 	// and pass it to all HTTP requests.
 	svc, err := cloudkms.New(&http.Client{
-		Transport: &tokenTransport{b.Tokensource},
+		Transport: &tokenTransport{b.TokenSource},
 	})
 	if err != nil {
 		return nil, err
 	}
 	b.kms = realKMS{svc}
 	return b.kms, nil
+}
+
+// dryRunKMS always returns a base64-encoded placeholder string instead of real
+// decrypted value, for use in dryrun mode.
+type dryRunKMS struct{}
+
+func (dryRunKMS) Decrypt(string, string) (string, error) {
+	return base64.StdEncoding.EncodeToString([]byte("<REDACTED>")), nil
 }
 
 type realKMS struct {

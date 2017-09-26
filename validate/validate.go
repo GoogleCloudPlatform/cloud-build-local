@@ -21,6 +21,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"time"
 
 	cb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 	"github.com/GoogleCloudPlatform/container-builder-local/subst"
@@ -42,10 +43,11 @@ const (
 	maxNumImages = 100  // max number of images.
 	// MaxImageLength is the max length of image value. Used in other packages.
 	MaxImageLength      = 1000
-	maxNumSubstitutions = 100  // max number of user-defined substitutions.
-	maxSubstKeyLength   = 100  // max length of a substitution key.
-	maxSubstValueLength = 4000 // max length of a substitution value.
-	maxNumSecretEnvs    = 100  // max number of unique secret env values.
+	maxNumSubstitutions = 100   // max number of user-defined substitutions.
+	maxSubstKeyLength   = 100   // max length of a substitution key.
+	maxSubstValueLength = 4000  // max length of a substitution value.
+	maxNumSecretEnvs    = 100   // max number of unique secret env values.
+	maxTimeoutSeconds   = 86400 // max timeout in seconds
 
 	// Name of the permission required to use a key to decrypt data.
 	// Documented at https://cloud.google.com/kms/docs/reference/permissions-and-roles
@@ -63,6 +65,7 @@ var (
 		"TAG_NAME":    struct{}{},
 		"REVISION_ID": struct{}{},
 		"COMMIT_SHA":  struct{}{},
+		"SHORT_SHA":   struct{}{},
 	}
 	validVolumeNameRE   = regexp.MustCompile("^[a-zA-Z0-9][a-zA-Z0-9_.-]+$")
 	reservedVolumePaths = map[string]struct{}{
@@ -84,6 +87,10 @@ var (
 func CheckBuild(b *cb.Build) error {
 	if b == nil {
 		return errors.New("no build field was provided")
+	}
+
+	if b.Timeout != nil && b.Timeout.Seconds > maxTimeoutSeconds {
+		return fmt.Errorf("timeout exceeds the timeout limit of %v", maxTimeoutSeconds*time.Second)
 	}
 
 	if err := CheckSubstitutions(b.Substitutions); err != nil {
@@ -116,6 +123,15 @@ func CheckBuild(b *cb.Build) error {
 		return fmt.Errorf("invalid .secrets field: %v", err)
 	}
 	return nil
+}
+
+// CheckBuildAfterSubstitutions returns no error if build is valid,
+// otherwise a descriptive canonical error.
+func CheckBuildAfterSubstitutions(b *cb.Build) error {
+	if err := checkBuildStepNames(b.Steps); err != nil {
+		return err
+	}
+	return checkImageNames(b.Images)
 }
 
 // CheckSubstitutions validates the substitutions map.
@@ -446,6 +462,16 @@ func checkBuildStepNames(steps []*cb.BuildStep) error {
 		name := step.Name
 		if !validImageTagRE.MatchString(name) {
 			return fmt.Errorf("invalid build step name %q: must match format %q", name, validImageTagRE)
+		}
+	}
+	return nil
+}
+
+// checkImageNames validates the images.
+func checkImageNames(images []string) error {
+	for _, image := range images {
+		if !validImageTagRE.MatchString(image) {
+			return fmt.Errorf("invalid image %q: must match format %q", image, validImageTagRE)
 		}
 	}
 	return nil

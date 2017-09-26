@@ -399,7 +399,7 @@ func TestFetchBuilder(t *testing.T) {
 	}}
 	for _, tc := range testCases {
 		r := newMockRunner(t, tc.name)
-		b := New(r, tc.buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, false, false)
 		var gotErr error
 		var gotDigest string
 		wantDigest := ""
@@ -638,7 +638,7 @@ func TestRunBuildSteps(t *testing.T) {
 			}
 			return nil
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, false, false)
 		gotErr := b.runBuildSteps()
 		if !reflect.DeepEqual(gotErr, tc.wantErr) {
 			t.Errorf("%s: Wanted error %q, but got %q", tc.name, tc.wantErr, gotErr)
@@ -872,7 +872,7 @@ func TestBuildStepOrder(t *testing.T) {
 			}
 			return nil
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, false, false)
 		errorFromFunction := make(chan error)
 		go func() {
 			errorFromFunction <- b.runBuildSteps()
@@ -922,7 +922,7 @@ func TestPushImages(t *testing.T) {
 	}}
 	for _, tc := range testCases {
 		r := newMockRunner(t, tc.name)
-		b := New(r, tc.buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, true)
+		b := New(r, tc.buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, true, false)
 		r.remotePushesFail = tc.remotePushesFail
 		gotErr := b.pushImages()
 		if !reflect.DeepEqual(gotErr, tc.wantErr) {
@@ -1013,7 +1013,7 @@ func TestBuildStepConcurrency(t *testing.T) {
 	}
 
 	// Run the build.
-	b := New(r, req, mockTokenSource(), &buildlog.BuildLog{}, "", true, false)
+	b := New(r, req, mockTokenSource(), &buildlog.BuildLog{}, "", true, false, false)
 	ret := make(chan error)
 	go func() {
 		ret <- b.runBuildSteps()
@@ -1052,7 +1052,7 @@ type fakeRunner struct {
 func (f *fakeRunner) Run(args []string, _ io.Reader, _, _ io.Writer, _ string) error {
 	// The "+1" is for the name of the container which is appended to the
 	// dockerRunArgs base command.
-	b := New(nil, cb.Build{}, nil, &buildlog.BuildLog{}, "", true, false)
+	b := New(nil, cb.Build{}, nil, &buildlog.BuildLog{}, "", true, false, false)
 	argCount := len(b.dockerRunArgs("", 0)) + 1
 	switch {
 	case !startsWith(args, "docker", "run"):
@@ -1103,7 +1103,7 @@ func dockerRunString(idx int) string {
 }
 
 func dockerRunInStepDir(idx int, stepDir string) string {
-	b := New(nil, cb.Build{}, nil, &buildlog.BuildLog{}, "", true, false)
+	b := New(nil, cb.Build{}, nil, &buildlog.BuildLog{}, "", true, false, false)
 	dockerRunArg := b.dockerRunArgs(stepDir, idx)
 	return strings.Join(dockerRunArg, " ")
 }
@@ -1146,7 +1146,7 @@ func TestErrorCollection(t *testing.T) {
 		"got an http status: 300: it's a mystery to me",
 		"got another http status: 300: it's a double mystery",
 	}
-	b := New(nil, cb.Build{}, nil, &buildlog.BuildLog{}, "", true, false)
+	b := New(nil, cb.Build{}, nil, &buildlog.BuildLog{}, "", true, false, false)
 	for _, o := range outputs {
 		b.detectPushFailure(o)
 	}
@@ -1214,7 +1214,7 @@ func TestEntrypoint(t *testing.T) {
 			stepArgs <- strings.Join(args, " ")
 			return nil
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, false, false)
 		errorFromFunction := make(chan error)
 		go func() {
 			errorFromFunction <- b.runBuildSteps()
@@ -1305,7 +1305,7 @@ func TestSecrets(t *testing.T) {
 			gotCommand = strings.Join(args, " ")
 			return nil
 		}
-		b := New(r, buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, false)
+		b := New(r, buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, false, false)
 		b.kms = fakeKMS{
 			plaintext: c.plaintext,
 			err:       c.kmsErr,
@@ -1544,7 +1544,7 @@ func TestStart(t *testing.T) {
 			r.localImages["gcr.io/build"] = true
 			return nil
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, tc.push)
+		b := New(r, tc.buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, tc.push, false)
 		b.Start()
 		<-b.Done
 
@@ -1566,7 +1566,7 @@ func TestUpdateDockerAccessToken(t *testing.T) {
 	t.Parallel()
 	r := newMockRunner(t, "TestUpdateDockerAccessToken")
 	r.dockerRunHandler = func(args []string, _, _ io.Writer) error { return nil }
-	b := New(r, cb.Build{}, nil, nil, "", false, false)
+	b := New(r, cb.Build{}, nil, nil, "", false, false, false)
 
 	// If UpdateDockerAccessToken is called before SetDockerAccessToken, we
 	// should get an error.
