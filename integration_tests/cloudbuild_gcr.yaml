@@ -1,0 +1,15 @@
+# This test creates a docker image, using cache-from, then pushes to gcr.
+
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['pull', 'gcr.io/$PROJECT_ID/test']
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+  - 'build'
+  - '--cache-from'
+  - 'gcr.io/$PROJECT_ID/test'
+  - '-t'
+  - 'gcr.io/$PROJECT_ID/test'
+  - '.'
+
+images: ['gcr.io/$PROJECT_ID/test']

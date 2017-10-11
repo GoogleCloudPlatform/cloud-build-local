@@ -1,0 +1,25 @@
+# This build is triggered on push to the release branch in order to ensure that
+# code compiles prior to creating a Pull Request to the master branch.
+
+steps:
+# Run unit tests in all subdirectories (except those excluded by the grep).
+- name: 'gcr.io/cloud-builders/go:wheezy'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath|integration_tests" | xargs /builder/bin/go.bash test
+
+# Binary creation.
+- name: 'gcr.io/cloud-builders/go:wheezy'
+  args: ['build', '-o', 'container-builder-local', 'github.com/GoogleCloudPlatform/container-builder-local']
+
+# Copy the integration test files to GCS and
+# run integration tests in a VM.
+- name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: 'bash'
+  args: ['-c', './integration_tests/run_tests_on_vm.sh']
+
+timeout: '20m'
+
+
