@@ -1,37 +1,50 @@
-# Google Cloud Container Builder Local Builder
+# Google Container Builder Local Builder
 
-**Local Builder** runs [Google Cloud Container Builder] builds locally,
+**Local Builder** runs [Google Container Builder] locally,
 allowing easier debugging, execution of builds on your own hardware,
 and integration into local build and test workflows.
 
 ----
 
 ## Prerequisites
-- gcloud
-- docker
-- go (if you build the tool yourself)
 
-If the build needs to access a private GCR registry, install and configure the
-[Docker credential helper for GCR users](https://github.com/GoogleCloudPlatform/docker-credential-gcr).
+1.  Ensure you have installed:
+    * [gcloud](https://cloud.google.com/sdk/docs/quickstarts)
+    * [Docker](https://www.docker.com/)
+    * [Go](https://golang.org/doc/install) (if you want to compile Local
+      Builder from source)
 
-The local builder uses gcloud information to set up a spoofed metadata server,
-so you have to set the project:
-```
-gcloud config set project my-project
-```
+2.  If the build needs to access a private Google Container Registry, install
+    and configure the
+    [Docker credential helper](https://github.com/GoogleCloudPlatform/docker-credential-gcr)
+    for Google Container Registry.
+
+3.  Configure your project for the gcloud tool, where `[PROJECT_ID]` is
+    your Cloud Platform project ID:
+
+    ```
+    gcloud config set project [PROJECT-ID]
+    ```
 
 ## Install using gcloud
 
-```
-gcloud components install container-builder-local
-```
-After successful installation, you will have ``container-builder-local`` setup
-on your PATH (as part of the Google Cloud SDK binaries), so you will be able to
-run it with:
+1.  Install by running the following command:
 
-```
-$ container-builder-local
-```
+    ```
+    gcloud components install container-builder-local
+    ```
+
+    After successful installation, you will have `container-builder-local` in
+    your PATH as part of the Google Cloud SDK binaries.
+
+2.  To see all of the commands, run:
+
+    ```
+    $ container-builder-local --help
+    ```
+
+    The Local Builder's command is `$ container-builder-local`.
+
 
 ## Download the latest binaries
 
@@ -45,38 +58,22 @@ To run a build:
 ./container-builder-local_{linux,darwin}_{386,amd64}-v<latest_tag> --dryrun=false --config=path/to/cloudbuild.yaml path/to/code
 ```
 
-## Developing Local Builder
+## Developing and contributing to the Local Builder
 
-To build and develop Local Builder, you need a working [Go environment].
-
-Run the following commands to install the tool:
-
-```
-go get github.com/GoogleCloudPlatform/container-builder-local
-go install github.com/GoogleCloudPlatform/container-builder-local
-```
-
-To run a build:
-
-```
-./bin/container-builder-local --dryrun=false --config=path/to/cloudbuild.yaml path/to/code
-```
-
-To run the tests (without the vendored libraries):
-```
-go test $(go list github.com/GoogleCloudPlatform/container-builder-local/... | grep -v vendor)
-```
+See the [contributing instructions](https://github.com/GoogleCloudPlatform/container-builder-local/blob/master/CONTRIBUTING.md).
 
 ## Limitations
 
-- Only one build can be run at a time on a given host.
-- The tool doesn't work on Windows yet, PR welcome.
+*  Only one build can be run at a time on a given host.
+*  The tool works on the following platforms:
+   * Linux
+   * macOS
 
 ## Support
 
-File issues here, e-mail `gcr-contact@google.com`, or join our [Slack channel]
-if you have general questions about Local Builder or Container Builder.
+File issues here on gitHub, email `gcr-contact@google.com`, or join our
+[Slack channel] if you have general questions about Local Builder or
+Container Builder.
 
-[Google Cloud Container Builder]: http://cloud.google.com/container-builder/
-[Go environment]: https://golang.org/doc/install
+[Google Container Builder]: http://cloud.google.com/container-builder/
 [Slack channel]: https://googlecloud-community.slack.com/messages/C4KCRJL4D/details/

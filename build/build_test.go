@@ -29,7 +29,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/container-builder-local/buildlog"
 	"github.com/GoogleCloudPlatform/container-builder-local/runner"
 	"golang.org/x/oauth2"
 
@@ -141,7 +140,10 @@ func (r *mockRunner) Run(args []string, in io.Reader, out, err io.Writer, _ stri
 	}
 	if startsWith(args, "docker", "inspect") {
 		tag := args[2]
-		if r.localImages[tag] {
+		r.mu.Lock()
+		localImage := r.localImages[tag]
+		r.mu.Unlock()
+		if localImage {
 			// Image exists.
 			io.WriteString(out, `[
 {
@@ -189,9 +191,16 @@ a467a7c6794f: Image successfully pushed
 ea358092da77: Image successfully pushed
 2332d8973c93: Image successfully pushed
 `)
-		if tag != "gcr.io/build-output-tag-no-digest" {
+		if tag == "gcr.io/some-image-1" {
+			io.WriteString(out, "latest: digest: sha256:0h10b33f000deadb33f0000123456789abcdeffffffffffffff size: 9914\n")
+		} else if tag == "gcr.io/some-image-2" {
+			io.WriteString(out, "latest: digest: sha256:0h10n3rd000deadb33f0000123456789abcdeffffffffffffff size: 9914\n")
+		} else if tag == "gcr.io/some-image-3" {
+			io.WriteString(out, "latest: digest: sha256:0h10l33t000deadb33f0000123456789abcdeffffffffffffff size: 9914\n")
+		} else if tag != "gcr.io/build-output-tag-no-digest" {
 			io.WriteString(out, "latest: digest: sha256:deadb33f000deadb33f0000123456789abcdeffffffffffffff size: 9914\n")
 		}
+
 		// Successful push.
 		return nil
 	}
@@ -410,7 +419,7 @@ func TestFetchBuilder(t *testing.T) {
 	}}
 	for _, tc := range testCases {
 		r := newMockRunner(t, tc.name)
-		b := New(r, tc.buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, false, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", true, false, false)
 		var gotErr error
 		var gotDigest string
 		wantDigest := ""
@@ -494,7 +503,7 @@ func TestGetWaitChansForStep(t *testing.T) {
 			ch1,
 		},
 	}, {
-		name: "IDWithMultipleDepenedencies",
+		name: "IDWithMultipleDependencies",
 		build: Build{
 			Request: cb.Build{
 				Steps: []*cb.BuildStep{{
@@ -599,6 +608,7 @@ func TestGetWaitChansForStep(t *testing.T) {
 
 func TestRunBuildSteps(t *testing.T) {
 	t.Parallel()
+
 	testCases := []struct {
 		name                 string
 		buildRequest         cb.Build
@@ -618,6 +628,51 @@ func TestRunBuildSteps(t *testing.T) {
 			"docker inspect gcr.io/my-project/my-builder",
 			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 			dockerRunInStepDir(1, "foo/baz") +
+				" --env FOO=bar" +
+				" --env BAZ=buz" +
+				" --volume myvol:/foo" +
+				" gcr.io/my-project/my-builder a b c",
+			"docker images -q gcr.io/build-output-tag-1",
+			"docker images -q gcr.io/build-output-tag-2",
+			"docker images -q gcr.io/build-output-tag-no-digest",
+			"docker rm -f step_0 step_1",
+			"docker volume rm myvol",
+		},
+	}, {
+		name: "TestRunBuilderSubdir",
+		buildRequest: cb.Build{
+			Source: &cb.Source{
+				Source: &cb.Source_RepoSource{
+					RepoSource: &cb.RepoSource{
+						Dir: "subdir",
+					},
+				},
+			},
+			SourceProvenance: &cb.SourceProvenance{
+				ResolvedRepoSource: &cb.RepoSource{
+					Dir:      "subdir",
+					Revision: &cb.RepoSource_CommitSha{CommitSha: "commit-sha"},
+				},
+			},
+			Steps: []*cb.BuildStep{{
+				Name: "gcr.io/my-project/my-compiler",
+			}, {
+				Name:    "gcr.io/my-project/my-builder",
+				Env:     []string{"FOO=bar", "BAZ=buz"},
+				Args:    []string{"a", "b", "c"},
+				Dir:     "foo/bar/../baz",
+				Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+			}},
+			Images: []string{"gcr.io/build-output-tag-1", "gcr.io/build-output-tag-2", "gcr.io/build-output-tag-no-digest"},
+		},
+		wantCommands: []string{
+			"docker volume create --name myvol",
+			"docker inspect gcr.io/my-project/my-compiler",
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-compiler",
+			dockerRunInStepDir(0, "subdir") + " gcr.io/my-project/my-compiler",
+			"docker inspect gcr.io/my-project/my-builder",
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
+			dockerRunInStepDir(1, "subdir/foo/baz") +
 				" --env FOO=bar" +
 				" --env BAZ=buz" +
 				" --volume myvol:/foo" +
@@ -657,7 +712,7 @@ func TestRunBuildSteps(t *testing.T) {
 			}
 			return nil
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, false, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", true, false, false)
 		gotErr := b.runBuildSteps()
 		if !reflect.DeepEqual(gotErr, tc.wantErr) {
 			t.Errorf("%s: Wanted error %q, but got %q", tc.name, tc.wantErr, gotErr)
@@ -891,7 +946,7 @@ func TestBuildStepOrder(t *testing.T) {
 			}
 			return nil
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, false, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", true, false, false)
 		errorFromFunction := make(chan error)
 		go func() {
 			errorFromFunction <- b.runBuildSteps()
@@ -941,7 +996,7 @@ func TestPushImages(t *testing.T) {
 	}}
 	for _, tc := range testCases {
 		r := newMockRunner(t, tc.name)
-		b := New(r, tc.buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, true, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", true, true, false)
 		r.remotePushesFail = tc.remotePushesFail
 		gotErr := b.pushImages()
 		if !reflect.DeepEqual(gotErr, tc.wantErr) {
@@ -964,6 +1019,7 @@ func TestPushImages(t *testing.T) {
 			if got := b.imageDigests["gcr.io/build-output-tag-no-digest"]; got != "" {
 				t.Errorf("%s: Got digest %q for gcr.io/build-output-tag-no-digest. Wanted %q", tc.name, got, "")
 			}
+			b.Timing = TimingInfo{}
 			summary := b.Summary()
 			wantSummary := BuildSummary{
 				// We didn't use the Start method, so the build status never got updated.
@@ -984,13 +1040,252 @@ func TestPushImages(t *testing.T) {
 				// gcr.io/build-output-tag-no-digest doesn't show up at all b/c it has no digest!
 				},
 				BuildStepImages: []string{"", ""},
+				Timing:          TimingInfo{},
 			}
 			if !reflect.DeepEqual(summary, wantSummary) {
 				t.Errorf("unexpected build summary:\n got %+v\nwant %+v", summary, wantSummary)
 			}
 		}
 	}
+}
 
+var timeSecs int64
+var mu sync.Mutex
+
+var fakeTimeNow = func() time.Time {
+	mu.Lock()
+	defer mu.Unlock()
+	timeSecs++
+	return time.Unix(timeSecs, 0)
+}
+
+func isEndTimeAfterStartTime(ts *TimeSpan) bool {
+	return ts.End.Sub(ts.Start) > 0
+}
+
+func getStepIndex(id string, buildSteps []*cb.BuildStep) int {
+	for i, bs := range buildSteps {
+		if bs.Id == id {
+			return i
+		}
+	}
+	return -1
+}
+
+func TestBuildTiming(t *testing.T) {
+	timeNow = fakeTimeNow
+	defer func() { timeNow = time.Now }()
+
+	testCases := []struct {
+		name         string
+		buildRequest cb.Build
+	}{{
+		name:         "TestBuildTotalTiming",
+		buildRequest: commonBuildRequest,
+	}, {
+		name: "TestPushImagesTimingZeroSteps",
+	}, {
+		name: "TestPushImagesTimingFiveSteps",
+		buildRequest: cb.Build{
+			Steps: []*cb.BuildStep{{
+				Name: "gcr.io/step-one",
+			}, {
+				Name: "gcr.io/step-two",
+			}, {
+				Name: "gcr.io/step-three",
+			}, {
+				Name: "gcr.io/step-four",
+			}, {
+				Name: "gcr.io/step-five",
+			}},
+		},
+	}, {
+		name: "TestBuildImagesTimingParallelSteps",
+		buildRequest: cb.Build{
+			Steps: []*cb.BuildStep{{
+				Name:    "gcr.io/step-one",
+				Id:      "A",
+				WaitFor: []string{StartStep},
+			}, {
+				Name:    "gcr.io/step-two",
+				Id:      "B",
+				WaitFor: []string{"A"},
+			}, {
+				Name:    "gcr.io/step-three",
+				Id:      "C",
+				WaitFor: []string{"A"},
+			}, {
+				Name:    "gcr.io/step-four",
+				Id:      "D",
+				WaitFor: []string{"A"},
+			}, {
+				Name:    "gcr.io/step-five",
+				Id:      "E",
+				WaitFor: []string{"D"},
+			}},
+		},
+	}}
+	for _, tc := range testCases {
+		r := newMockRunner(t, tc.name)
+		r.dockerRunHandler = func(_ []string, _, _ io.Writer) error {
+			r.mu.Lock()
+			r.localImages["gcr.io/build-output-tag-1"] = true
+			r.localImages["gcr.io/build-output-tag-no-digest"] = true
+			r.localImages["gcr.io/build-output-tag-2"] = true
+			r.mu.Unlock()
+			return nil
+		}
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", true, false, false)
+		b.runBuildSteps()
+
+		buildTotal := b.Timing.BuildTotal
+		if !isEndTimeAfterStartTime(buildTotal) {
+			t.Errorf("%s: unexpected build total time:\n got %+v\nwant TimeSpan EndTime to occur after StartTime", tc.name, buildTotal)
+		}
+		buildStepTimes := b.Timing.BuildSteps
+		if len(buildStepTimes) != len(tc.buildRequest.Steps) {
+			t.Errorf("%s: unexpected number of build step times:\n got %d\nwant %d", tc.name, len(buildStepTimes), len(tc.buildRequest.Steps))
+		}
+		for _, bs := range buildStepTimes {
+			if !isEndTimeAfterStartTime(bs) {
+				t.Errorf("%s: unexpected build step time:\n got %+v\nwant TimeSpan EndTime to occur after StartTime", tc.name, bs)
+			}
+		}
+		buildSteps := tc.buildRequest.Steps
+		for i, bs := range buildSteps {
+			if bs.WaitFor != nil {
+				for _, wf := range bs.WaitFor {
+					if wf == "-" {
+						continue
+					}
+					wfIndex := getStepIndex(wf, buildSteps)
+					if wfIndex == -1 {
+						t.Errorf("%s: build step id %s not present in test case's build request", tc.name, wf)
+						continue
+					}
+					end := buildStepTimes[wfIndex].End // end time of the step with ID "wf"
+					if buildStepTimes[i].Start.Before(end) {
+						t.Errorf("%s: build step %d started before step %d ended", tc.name, i, wfIndex)
+					}
+				}
+			} else {
+				// If waitFor isn't defined, it's all previously defined build steps
+				for step := 0; step < i; step++ {
+					end := buildStepTimes[step].End // end time of the previous step
+					if buildStepTimes[i].Start.Before(end) {
+						t.Errorf("%s: build step %d started before step %d ended", tc.name, i, step)
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestPushTiming(t *testing.T) {
+	timeNow = fakeTimeNow
+	defer func() { timeNow = time.Now }()
+
+	testCases := []struct {
+		name               string
+		buildRequest       cb.Build
+		push               bool
+		wantImagePushTimes int
+	}{{
+		name:               "TestPushImagesTiming",
+		buildRequest:       commonBuildRequest,
+		push:               true,
+		wantImagePushTimes: 1,
+	}, {
+		name: "TestPushImagesTimingNoPush",
+		buildRequest: cb.Build{
+			Steps: []*cb.BuildStep{{
+				Name: "gcr.io/my-project/my-compiler",
+			}},
+		},
+		push:               false,
+		wantImagePushTimes: 0,
+	}, {
+		name: "TestPushImagesTimingFiveSteps",
+		buildRequest: cb.Build{
+			Steps: []*cb.BuildStep{{
+				Name: "gcr.io/step-one",
+			}, {
+				Name: "gcr.io/step-two",
+			}, {
+				Name: "gcr.io/step-three",
+			}, {
+				Name: "gcr.io/step-four",
+			}, {
+				Name: "gcr.io/step-five",
+			}},
+			Images: []string{"gcr.io/build-output-tag-1", "gcr.io/build-output-tag-2"},
+		},
+		push:               true,
+		wantImagePushTimes: 1,
+	}, {
+		name: "TestPushImagesTimingThreeStepsThreeImages",
+		buildRequest: cb.Build{
+			Steps: []*cb.BuildStep{{
+				Name: "gcr.io/step-one",
+			}, {
+				Name: "gcr.io/step-two",
+			}, {
+				Name: "gcr.io/step-three",
+			}},
+			Images: []string{"gcr.io/some-image-1", "gcr.io/some-image-2", "gcr.io/some-image-3"},
+		},
+		push:               true,
+		wantImagePushTimes: 3,
+	}, {
+		name: "TestPushImagesTimingParallelSteps",
+		buildRequest: cb.Build{
+			Steps: []*cb.BuildStep{{
+				Name:    "gcr.io/my-project/my-builder",
+				Id:      "A",
+				WaitFor: []string{StartStep},
+			}, {
+				Id:      "B",
+				WaitFor: []string{"A"},
+			}, {
+				Id:      "C",
+				WaitFor: []string{"A"},
+			}, {
+				Id:      "D",
+				WaitFor: []string{"A"},
+			}},
+			Images: []string{"gcr.io/build-output-tag-1", "gcr.io/build-output-tag-2", "gcr.io/build-output-tag-no-digest"},
+		},
+		push:               true,
+		wantImagePushTimes: 1,
+	}}
+	for _, tc := range testCases {
+		r := newMockRunner(t, tc.name)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", true, true, false)
+		b.pushImages()
+
+		pushTotal := b.Timing.PushTotal
+		imagePushes := b.Timing.ImagePushes
+		if !tc.push && pushTotal != nil {
+			t.Errorf("%v: unexpected push total time:\n got %+v\nwant pushTotal to be nil if no push occurs", tc.name, pushTotal)
+		}
+		if tc.push && !isEndTimeAfterStartTime(pushTotal) {
+			t.Errorf("%v: unexpected push total time:\n got %+v\nwant TimeSpan EndTime to occur after StartTime", tc.name, pushTotal)
+		}
+		for _, pushTime := range imagePushes {
+			if !isEndTimeAfterStartTime(pushTime) {
+				t.Errorf("%v: unexpected push total time:\n got %+v\nwant TimeSpan EndTime to occur after StartTime", tc.name, pushTime)
+			}
+		}
+		if len(imagePushes) == tc.wantImagePushTimes {
+			for _, d := range b.imageDigests {
+				if _, ok := imagePushes[d]; !ok {
+					t.Errorf("%v: timing for image push not present:\n wanted time for %v but no such key", tc.name, d)
+				}
+			}
+		} else {
+			t.Errorf("%v: unexpected number of image push times:\n got %v\nwant %v", tc.name, len(imagePushes), tc.wantImagePushTimes)
+		}
+	}
 }
 
 func TestBuildStepConcurrency(t *testing.T) {
@@ -1032,7 +1327,7 @@ func TestBuildStepConcurrency(t *testing.T) {
 	}
 
 	// Run the build.
-	b := New(r, req, mockTokenSource(), &buildlog.BuildLog{}, "", true, false, false)
+	b := New(r, req, mockTokenSource(), nopBuildLogger{}, "", true, false, false)
 	ret := make(chan error)
 	go func() {
 		ret <- b.runBuildSteps()
@@ -1071,7 +1366,7 @@ type fakeRunner struct {
 func (f *fakeRunner) Run(args []string, _ io.Reader, _, _ io.Writer, _ string) error {
 	// The "+1" is for the name of the container which is appended to the
 	// dockerRunArgs base command.
-	b := New(nil, cb.Build{}, nil, &buildlog.BuildLog{}, "", true, false, false)
+	b := New(nil, cb.Build{}, nil, nopBuildLogger{}, "", true, false, false)
 	argCount := len(b.dockerRunArgs("", 0)) + 1
 	switch {
 	case !startsWith(args, "docker", "run"):
@@ -1122,7 +1417,7 @@ func dockerRunString(idx int) string {
 }
 
 func dockerRunInStepDir(idx int, stepDir string) string {
-	b := New(nil, cb.Build{}, nil, &buildlog.BuildLog{}, "", true, false, false)
+	b := New(nil, cb.Build{}, nil, nopBuildLogger{}, "", true, false, false)
 	dockerRunArg := b.dockerRunArgs(stepDir, idx)
 	return strings.Join(dockerRunArg, " ")
 }
@@ -1165,7 +1460,7 @@ func TestErrorCollection(t *testing.T) {
 		"got an http status: 300: it's a mystery to me",
 		"got another http status: 300: it's a double mystery",
 	}
-	b := New(nil, cb.Build{}, nil, &buildlog.BuildLog{}, "", true, false, false)
+	b := New(nil, cb.Build{}, nil, nopBuildLogger{}, "", true, false, false)
 	for _, o := range outputs {
 		b.detectPushFailure(o)
 	}
@@ -1233,7 +1528,7 @@ func TestEntrypoint(t *testing.T) {
 			stepArgs <- strings.Join(args, " ")
 			return nil
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, false, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", true, false, false)
 		errorFromFunction := make(chan error)
 		go func() {
 			errorFromFunction <- b.runBuildSteps()
@@ -1324,7 +1619,7 @@ func TestSecrets(t *testing.T) {
 			gotCommand = strings.Join(args, " ")
 			return nil
 		}
-		b := New(r, buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, false, false)
+		b := New(r, buildRequest, mockTokenSource(), nopBuildLogger{}, "", true, false, false)
 		b.kms = fakeKMS{
 			plaintext: c.plaintext,
 			err:       c.kmsErr,
@@ -1563,7 +1858,7 @@ func TestStart(t *testing.T) {
 			r.localImages["gcr.io/build"] = true
 			return nil
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), &buildlog.BuildLog{}, "", true, tc.push, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", true, tc.push, false)
 		b.Start()
 		<-b.Done
 
@@ -1642,3 +1937,9 @@ EOF`,
 		t.Errorf("Commands didn't match!\n===Want:\n%s\n===Got:\n%s", want, got)
 	}
 }
+
+type nopBuildLogger struct{}
+
+func (nopBuildLogger) WriteMainEntry(string)              { return }
+func (nopBuildLogger) Close() error                       { return nil }
+func (nopBuildLogger) MakeWriter(prefix string) io.Writer { return ioutil.Discard }

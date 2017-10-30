@@ -16,9 +16,11 @@
 package main // import "github.com/GoogleCloudPlatform/container-builder-local"
 
 import (
+	"bufio"
 	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -30,7 +32,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/GoogleCloudPlatform/container-builder-local/build"
-	"github.com/GoogleCloudPlatform/container-builder-local/buildlog"
 	"github.com/GoogleCloudPlatform/container-builder-local/common"
 	"github.com/GoogleCloudPlatform/container-builder-local/config"
 	"github.com/GoogleCloudPlatform/container-builder-local/gcloud"
@@ -48,14 +49,14 @@ const (
 )
 
 var (
-	configFile     = flag.String("config", "cloudbuild.yaml", "cloud build config file path")
-	substitutions  = flag.String("substitutions", "", `substitutions key=value pairs separated by comma; for example _FOO=bar,_BAZ=baz`)
-	dryRun         = flag.Bool("dryrun", true, "If true, the config file is linted and the commands printed, but they are not run")
-	push           = flag.Bool("push", false, "If true, the images will be pushed")
-	noSource       = flag.Bool("no-source", false, "Specify that no source should be used for this build")
-	writeWorkspace = flag.String("write-workspace", "", "Host directory where to copy the workspace to")
-	help           = flag.Bool("help", false, "If true, print the help message")
-	versionFlag    = flag.Bool("version", false, "If true, print the local builder version")
+	configFile     = flag.String("config", "cloudbuild.yaml", "File path of the config file")
+	substitutions  = flag.String("substitutions", "", `key=value pairs where the key is already defined in the build request; separate multiple substitutions with a comma, for example: _FOO=bar,_BAZ=baz`)
+	dryRun         = flag.Bool("dryrun", true, "Lints the config file and prints but does not run the commands; Local Builder runs the commands only when dryrun is set to false")
+	push           = flag.Bool("push", false, "Pushes the images to the registry")
+	noSource       = flag.Bool("no-source", false, "Prevents Local Builder from using source for this build")
+	writeWorkspace = flag.String("write-workspace", "", "Copies the workspace directory to this host directory")
+	help           = flag.Bool("help", false, "Prints the help message")
+	versionFlag    = flag.Bool("version", false, "Prints the local builder version")
 )
 
 func exitUsage(msg string) {
@@ -198,7 +199,7 @@ func run(source string) error {
 		}
 	}
 
-	b := build.New(r, *buildConfig, nil /* TokenSource */, &buildlog.BuildLog{}, volumeName, true, *push, *dryRun)
+	b := build.New(r, *buildConfig, nil /* TokenSource */, stdoutLogger{}, volumeName, true, *push, *dryRun)
 
 	// Do not run the spoofed metadata server on a dryrun.
 	if !*dryRun {
@@ -275,7 +276,7 @@ func run(source string) error {
 
 	close(stopchan)
 
-	if b.Summary().Status == build.StatusError {
+	if b.GetStatus() == build.StatusError {
 		return fmt.Errorf("Build finished with ERROR status")
 	}
 
@@ -331,4 +332,35 @@ func isDirectory(path string) (bool, error) {
 	}
 	mode := fileInfo.Mode()
 	return mode.IsDir(), nil
+}
+
+type stdoutLogger struct{}
+
+func (stdoutLogger) MakeWriter(prefix string) io.Writer { return prefixWriter{os.Stdout, prefix} }
+func (stdoutLogger) Close() error                       { return nil }
+func (stdoutLogger) WriteMainEntry(msg string)          { fmt.Fprintln(os.Stdout, msg) }
+
+type prefixWriter struct {
+	w interface {
+		WriteString(string) (int, error)
+	}
+	prefix string
+}
+
+func (pw prefixWriter) Write(b []byte) (int, error) {
+	var buf bytes.Buffer
+	if n, err := buf.Write(b); err != nil {
+		return n, err
+	}
+
+	scanner := bufio.NewScanner(&buf)
+	for scanner.Scan() {
+		line := scanner.Text()
+		line = fmt.Sprintf("%s: %s\n", pw.prefix, line)
+		pw.w.WriteString(line)
+	}
+	if err := scanner.Err(); err != nil {
+		return -1, err
+	}
+	return len(b), nil
 }
