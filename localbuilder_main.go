@@ -18,6 +18,7 @@ package main // import "github.com/GoogleCloudPlatform/container-builder-local"
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -199,7 +200,7 @@ func run(source string) error {
 		}
 	}
 
-	b := build.New(r, *buildConfig, nil /* TokenSource */, stdoutLogger{}, volumeName, true, *push, *dryRun)
+	b := build.New(r, *buildConfig, nil /* TokenSource */, stdoutLogger{}, nopEventLogger{}, volumeName, true, *push, *dryRun)
 
 	// Do not run the spoofed metadata server on a dryrun.
 	if !*dryRun {
@@ -336,9 +337,14 @@ func isDirectory(path string) (bool, error) {
 
 type stdoutLogger struct{}
 
-func (stdoutLogger) MakeWriter(prefix string) io.Writer { return prefixWriter{os.Stdout, prefix} }
-func (stdoutLogger) Close() error                       { return nil }
-func (stdoutLogger) WriteMainEntry(msg string)          { fmt.Fprintln(os.Stdout, msg) }
+func (stdoutLogger) MakeWriter(prefix string, _ int, stdout bool) io.Writer {
+	if stdout {
+		return prefixWriter{os.Stdout, prefix}
+	}
+	return prefixWriter{os.Stderr, prefix}
+}
+func (stdoutLogger) Close() error              { return nil }
+func (stdoutLogger) WriteMainEntry(msg string) { fmt.Fprintln(os.Stdout, msg) }
 
 type prefixWriter struct {
 	w interface {
@@ -364,3 +370,8 @@ func (pw prefixWriter) Write(b []byte) (int, error) {
 	}
 	return len(b), nil
 }
+
+type nopEventLogger struct{}
+
+func (nopEventLogger) StartStep(context.Context, int) error        { return nil }
+func (nopEventLogger) FinishStep(context.Context, int, bool) error { return nil }
