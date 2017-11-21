@@ -54,12 +54,13 @@ type Hash struct {
 	Value []byte
 }
 
-// BuildSummary is the data returned by the blocking /build/status endpoint.
+// BuildSummary is the data returned by the blocking /build/summary endpoint.
 type BuildSummary struct {
 	Status          BuildStatus
 	BuiltImages     []BuiltImage
 	BuildStepImages []string // index of build step -> digest, else empty string
 	FileHashes      map[string][]Hash
+	Timing          TimingInfo
 }
 
 // BuiltImage is information about an image that resulted from this build and

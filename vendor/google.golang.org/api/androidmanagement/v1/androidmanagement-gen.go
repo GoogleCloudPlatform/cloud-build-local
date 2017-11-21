@@ -196,8 +196,8 @@ type ApiLevelCondition struct {
 }
 
 func (s *ApiLevelCondition) MarshalJSON() ([]byte, error) {
-	type noMethod ApiLevelCondition
-	raw := noMethod(*s)
+	type NoMethod ApiLevelCondition
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -240,8 +240,8 @@ type Application struct {
 }
 
 func (s *Application) MarshalJSON() ([]byte, error) {
-	type noMethod Application
-	raw := noMethod(*s)
+	type NoMethod Application
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -276,8 +276,8 @@ type ApplicationPermission struct {
 }
 
 func (s *ApplicationPermission) MarshalJSON() ([]byte, error) {
-	type noMethod ApplicationPermission
-	raw := noMethod(*s)
+	type NoMethod ApplicationPermission
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -355,8 +355,8 @@ type ApplicationPolicy struct {
 }
 
 func (s *ApplicationPolicy) MarshalJSON() ([]byte, error) {
-	type noMethod ApplicationPolicy
-	raw := noMethod(*s)
+	type NoMethod ApplicationPolicy
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -416,8 +416,8 @@ type Command struct {
 }
 
 func (s *Command) MarshalJSON() ([]byte, error) {
-	type noMethod Command
-	raw := noMethod(*s)
+	type NoMethod Command
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -464,8 +464,8 @@ type ComplianceRule struct {
 }
 
 func (s *ComplianceRule) MarshalJSON() ([]byte, error) {
-	type noMethod ComplianceRule
-	raw := noMethod(*s)
+	type NoMethod ComplianceRule
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -562,12 +562,13 @@ type Device struct {
 	PolicyCompliant bool `json:"policyCompliant,omitempty"`
 
 	// PolicyName: The name of the policy that is intended to be applied to
-	// the device. If empty, the policy with id default is applied. This
-	// field may be modified by an update request. The name of the policy is
-	// in the form enterprises/{enterpriseId}/policies/{policyId}. It is
-	// also permissible to only specify the policyId when updating this
-	// field as long as the policyId contains no slashes since the rest of
-	// the policy name can be inferred from context.
+	// the device. If empty, the policy_name for the user that owns this
+	// device is applied. This field may be modified by an update request.
+	// The name of the policy is in the form
+	// enterprises/{enterpriseId}/policies/{policyId}. It is also
+	// permissible to only specify the policyId when updating this field as
+	// long as the policyId contains no slashes since the rest of the policy
+	// name can be inferred from context.
 	PolicyName string `json:"policyName,omitempty"`
 
 	// PowerManagementEvents: Power management events on the device in
@@ -604,9 +605,8 @@ type Device struct {
 	// devices will be in this state until they have applied policy.
 	State string `json:"state,omitempty"`
 
-	// UserName: The resource name of the user of the device in the form
-	// enterprises/{enterpriseId}/users/{userId}. This is the name of the
-	// device account automatically created for this device.
+	// UserName: The resource name of the user that owns this device in the
+	// form enterprises/{enterpriseId}/users/{userId}.
 	UserName string `json:"userName,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -631,8 +631,8 @@ type Device struct {
 }
 
 func (s *Device) MarshalJSON() ([]byte, error) {
-	type noMethod Device
-	raw := noMethod(*s)
+	type NoMethod Device
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -684,8 +684,8 @@ type Display struct {
 }
 
 func (s *Display) MarshalJSON() ([]byte, error) {
-	type noMethod Display
-	raw := noMethod(*s)
+	type NoMethod Display
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -730,10 +730,12 @@ type EnrollmentToken struct {
 	// PolicyName: The name of the policy that will be initially applied to
 	// the enrolled device in the form
 	// enterprises/{enterpriseId}/policies/{policyId}. If not specified, the
-	// policy with id default is applied. It is permissible to only specify
-	// the policyId when updating this field as long as the policyId
-	// contains no slashes since the rest of the policy name can be inferred
-	// from context.
+	// policy_name for the user that owns the device is applied. If
+	// user_name also isn't specified, the policy defaults to
+	// enterprises/{enterpriseId}/policies/default. It is permissible to
+	// only specify the policyId when updating this field as long as the
+	// policyId contains no slashes since the rest of the policy name can be
+	// inferred from context.
 	PolicyName string `json:"policyName,omitempty"`
 
 	// QrCode: A JSON string whose UTF-8 representation can be used to
@@ -770,8 +772,8 @@ type EnrollmentToken struct {
 }
 
 func (s *EnrollmentToken) MarshalJSON() ([]byte, error) {
-	type noMethod EnrollmentToken
-	raw := noMethod(*s)
+	type NoMethod EnrollmentToken
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -849,8 +851,8 @@ type Enterprise struct {
 }
 
 func (s *Enterprise) MarshalJSON() ([]byte, error) {
-	type noMethod Enterprise
-	raw := noMethod(*s)
+	type NoMethod Enterprise
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -887,8 +889,8 @@ type ExternalData struct {
 }
 
 func (s *ExternalData) MarshalJSON() ([]byte, error) {
-	type noMethod ExternalData
-	raw := noMethod(*s)
+	type NoMethod ExternalData
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -967,8 +969,8 @@ type HardwareInfo struct {
 }
 
 func (s *HardwareInfo) MarshalJSON() ([]byte, error) {
-	type noMethod HardwareInfo
-	raw := noMethod(*s)
+	type NoMethod HardwareInfo
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1023,8 +1025,8 @@ type HardwareStatus struct {
 }
 
 func (s *HardwareStatus) MarshalJSON() ([]byte, error) {
-	type noMethod HardwareStatus
-	raw := noMethod(*s)
+	type NoMethod HardwareStatus
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1060,8 +1062,8 @@ type ListDevicesResponse struct {
 }
 
 func (s *ListDevicesResponse) MarshalJSON() ([]byte, error) {
-	type noMethod ListDevicesResponse
-	raw := noMethod(*s)
+	type NoMethod ListDevicesResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1097,8 +1099,8 @@ type ListOperationsResponse struct {
 }
 
 func (s *ListOperationsResponse) MarshalJSON() ([]byte, error) {
-	type noMethod ListOperationsResponse
-	raw := noMethod(*s)
+	type NoMethod ListOperationsResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1134,8 +1136,8 @@ type ListPoliciesResponse struct {
 }
 
 func (s *ListPoliciesResponse) MarshalJSON() ([]byte, error) {
-	type noMethod ListPoliciesResponse
-	raw := noMethod(*s)
+	type NoMethod ListPoliciesResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1197,8 +1199,8 @@ type ManagedProperty struct {
 }
 
 func (s *ManagedProperty) MarshalJSON() ([]byte, error) {
-	type noMethod ManagedProperty
-	raw := noMethod(*s)
+	type NoMethod ManagedProperty
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1229,8 +1231,8 @@ type ManagedPropertyEntry struct {
 }
 
 func (s *ManagedPropertyEntry) MarshalJSON() ([]byte, error) {
-	type noMethod ManagedPropertyEntry
-	raw := noMethod(*s)
+	type NoMethod ManagedPropertyEntry
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1279,8 +1281,8 @@ type MemoryEvent struct {
 }
 
 func (s *MemoryEvent) MarshalJSON() ([]byte, error) {
-	type noMethod MemoryEvent
-	raw := noMethod(*s)
+	type NoMethod MemoryEvent
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1312,8 +1314,8 @@ type MemoryInfo struct {
 }
 
 func (s *MemoryInfo) MarshalJSON() ([]byte, error) {
-	type noMethod MemoryInfo
-	raw := noMethod(*s)
+	type NoMethod MemoryInfo
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1347,8 +1349,8 @@ type NetworkInfo struct {
 }
 
 func (s *NetworkInfo) MarshalJSON() ([]byte, error) {
-	type noMethod NetworkInfo
-	raw := noMethod(*s)
+	type NoMethod NetworkInfo
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1451,8 +1453,8 @@ type NonComplianceDetail struct {
 }
 
 func (s *NonComplianceDetail) MarshalJSON() ([]byte, error) {
-	type noMethod NonComplianceDetail
-	raw := noMethod(*s)
+	type NoMethod NonComplianceDetail
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1517,8 +1519,8 @@ type NonComplianceDetailCondition struct {
 }
 
 func (s *NonComplianceDetailCondition) MarshalJSON() ([]byte, error) {
-	type noMethod NonComplianceDetailCondition
-	raw := noMethod(*s)
+	type NoMethod NonComplianceDetailCondition
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1578,8 +1580,8 @@ type Operation struct {
 }
 
 func (s *Operation) MarshalJSON() ([]byte, error) {
-	type noMethod Operation
-	raw := noMethod(*s)
+	type NoMethod Operation
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1638,6 +1640,10 @@ type PasswordRequirements struct {
 	// Possible values:
 	//   "PASSWORD_QUALITY_UNSPECIFIED" - There are no requirements for the
 	// password.
+	//   "BIOMETRIC_WEAK" - There must be at least low-security biometric
+	// recognition technology to secure the device. This includes
+	// technologies that can recognize the identity of an individual to
+	// about a 3 digit PIN (false detection is less than 1 in 1,000).
 	//   "SOMETHING" - There must be a password, but there are no
 	// restrictions on its characters.
 	//   "NUMERIC" - The password must contain numeric characters.
@@ -1672,8 +1678,8 @@ type PasswordRequirements struct {
 }
 
 func (s *PasswordRequirements) MarshalJSON() ([]byte, error) {
-	type noMethod PasswordRequirements
-	raw := noMethod(*s)
+	type NoMethod PasswordRequirements
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1713,8 +1719,8 @@ type PermissionGrant struct {
 }
 
 func (s *PermissionGrant) MarshalJSON() ([]byte, error) {
-	type noMethod PermissionGrant
-	raw := noMethod(*s)
+	type NoMethod PermissionGrant
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1759,8 +1765,8 @@ type PersistentPreferredActivity struct {
 }
 
 func (s *PersistentPreferredActivity) MarshalJSON() ([]byte, error) {
-	type noMethod PersistentPreferredActivity
-	raw := noMethod(*s)
+	type NoMethod PersistentPreferredActivity
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1899,9 +1905,8 @@ type Policy struct {
 	StayOnPluggedModes []string `json:"stayOnPluggedModes,omitempty"`
 
 	// SystemUpdate: The system update policy, which controls how OS updates
-	// are applied. If the update type is WINDOWED and the device has a
-	// device account, the update window will automatically apply to Play
-	// app updates as well.
+	// are applied. If the update type is WINDOWED, the update window will
+	// automatically apply to Play app updates as well.
 	SystemUpdate *SystemUpdate `json:"systemUpdate,omitempty"`
 
 	// UnmuteMicrophoneDisabled: Whether the microphone is muted and
@@ -1944,8 +1949,8 @@ type Policy struct {
 }
 
 func (s *Policy) MarshalJSON() ([]byte, error) {
-	type noMethod Policy
-	raw := noMethod(*s)
+	type NoMethod Policy
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1990,18 +1995,18 @@ type PowerManagementEvent struct {
 }
 
 func (s *PowerManagementEvent) MarshalJSON() ([]byte, error) {
-	type noMethod PowerManagementEvent
-	raw := noMethod(*s)
+	type NoMethod PowerManagementEvent
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 func (s *PowerManagementEvent) UnmarshalJSON(data []byte) error {
-	type noMethod PowerManagementEvent
+	type NoMethod PowerManagementEvent
 	var s1 struct {
 		BatteryLevel gensupport.JSONFloat64 `json:"batteryLevel"`
-		*noMethod
+		*NoMethod
 	}
-	s1.noMethod = (*noMethod)(s)
+	s1.NoMethod = (*NoMethod)(s)
 	if err := json.Unmarshal(data, &s1); err != nil {
 		return err
 	}
@@ -2041,8 +2046,8 @@ type SignupUrl struct {
 }
 
 func (s *SignupUrl) MarshalJSON() ([]byte, error) {
-	type noMethod SignupUrl
-	raw := noMethod(*s)
+	type NoMethod SignupUrl
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2086,8 +2091,8 @@ type SoftwareInfo struct {
 }
 
 func (s *SoftwareInfo) MarshalJSON() ([]byte, error) {
-	type noMethod SoftwareInfo
-	raw := noMethod(*s)
+	type NoMethod SoftwareInfo
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2162,8 +2167,8 @@ type Status struct {
 }
 
 func (s *Status) MarshalJSON() ([]byte, error) {
-	type noMethod Status
-	raw := noMethod(*s)
+	type NoMethod Status
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2208,8 +2213,8 @@ type StatusReportingSettings struct {
 }
 
 func (s *StatusReportingSettings) MarshalJSON() ([]byte, error) {
-	type noMethod StatusReportingSettings
-	raw := noMethod(*s)
+	type NoMethod StatusReportingSettings
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2238,10 +2243,10 @@ type SystemUpdate struct {
 	//   "AUTOMATIC" - Install automatically as soon as an update is
 	// available.
 	//   "WINDOWED" - Install automatically within a daily maintenance
-	// window. If the device has a device account, this also configures Play
-	// apps to be updated within the window. This is strongly recommended
-	// for kiosk devices because this is the only way apps persistently
-	// pinned to the foreground can be updated by Play.
+	// window. This also configures Play apps to be updated within the
+	// window. This is strongly recommended for kiosk devices because this
+	// is the only way apps persistently pinned to the foreground can be
+	// updated by Play.
 	//   "POSTPONE" - Postpone automatic install up to a maximum of 30 days.
 	Type string `json:"type,omitempty"`
 
@@ -2263,8 +2268,8 @@ type SystemUpdate struct {
 }
 
 func (s *SystemUpdate) MarshalJSON() ([]byte, error) {
-	type noMethod SystemUpdate
-	raw := noMethod(*s)
+	type NoMethod SystemUpdate
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2300,8 +2305,8 @@ type UserFacingMessage struct {
 }
 
 func (s *UserFacingMessage) MarshalJSON() ([]byte, error) {
-	type noMethod UserFacingMessage
-	raw := noMethod(*s)
+	type NoMethod UserFacingMessage
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2353,8 +2358,8 @@ type WebToken struct {
 }
 
 func (s *WebToken) MarshalJSON() ([]byte, error) {
-	type noMethod WebToken
-	raw := noMethod(*s)
+	type NoMethod WebToken
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2475,7 +2480,7 @@ func (c *EnterprisesCreateCall) Do(opts ...googleapi.CallOption) (*Enterprise, e
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2623,7 +2628,7 @@ func (c *EnterprisesGetCall) Do(opts ...googleapi.CallOption) (*Enterprise, erro
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2763,7 +2768,7 @@ func (c *EnterprisesPatchCall) Do(opts ...googleapi.CallOption) (*Enterprise, er
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2920,7 +2925,7 @@ func (c *EnterprisesApplicationsGetCall) Do(opts ...googleapi.CallOption) (*Appl
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3050,7 +3055,7 @@ func (c *EnterprisesDevicesDeleteCall) Do(opts ...googleapi.CallOption) (*Empty,
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3189,7 +3194,7 @@ func (c *EnterprisesDevicesGetCall) Do(opts ...googleapi.CallOption) (*Device, e
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3323,7 +3328,7 @@ func (c *EnterprisesDevicesIssueCommandCall) Do(opts ...googleapi.CallOption) (*
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3479,7 +3484,7 @@ func (c *EnterprisesDevicesListCall) Do(opts ...googleapi.CallOption) (*ListDevi
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3651,7 +3656,7 @@ func (c *EnterprisesDevicesPatchCall) Do(opts ...googleapi.CallOption) (*Device,
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3794,7 +3799,7 @@ func (c *EnterprisesDevicesOperationsCancelCall) Do(opts ...googleapi.CallOption
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3922,7 +3927,7 @@ func (c *EnterprisesDevicesOperationsDeleteCall) Do(opts ...googleapi.CallOption
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4063,7 +4068,7 @@ func (c *EnterprisesDevicesOperationsGetCall) Do(opts ...googleapi.CallOption) (
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4232,7 +4237,7 @@ func (c *EnterprisesDevicesOperationsListCall) Do(opts ...googleapi.CallOption) 
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4401,7 +4406,7 @@ func (c *EnterprisesEnrollmentTokensCreateCall) Do(opts ...googleapi.CallOption)
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4530,7 +4535,7 @@ func (c *EnterprisesEnrollmentTokensDeleteCall) Do(opts ...googleapi.CallOption)
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4656,7 +4661,7 @@ func (c *EnterprisesPoliciesDeleteCall) Do(opts ...googleapi.CallOption) (*Empty
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4795,7 +4800,7 @@ func (c *EnterprisesPoliciesGetCall) Do(opts ...googleapi.CallOption) (*Policy, 
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4948,7 +4953,7 @@ func (c *EnterprisesPoliciesListCall) Do(opts ...googleapi.CallOption) (*ListPol
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5120,7 +5125,7 @@ func (c *EnterprisesPoliciesPatchCall) Do(opts ...googleapi.CallOption) (*Policy
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5262,7 +5267,7 @@ func (c *EnterprisesWebTokensCreateCall) Do(opts ...googleapi.CallOption) (*WebT
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5404,7 +5409,7 @@ func (c *SignupUrlsCreateCall) Do(opts ...googleapi.CallOption) (*SignupUrl, err
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil

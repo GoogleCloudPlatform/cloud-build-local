@@ -1,12 +1,12 @@
 {
  "kind": "discovery#restDescription",
- "etag": "\"YWOzh2SDasdU84ArJnpYek-OMdg/QmLvLWNsI9BfMK5wWeN2hMPf260\"",
+ "etag": "\"YWOzh2SDasdU84ArJnpYek-OMdg/fAVKyPugJAqWsjzIFuZg5ZMlajU\"",
  "discoveryVersion": "v1",
  "id": "content:v2sandbox",
  "name": "content",
  "canonicalName": "Shopping Content",
  "version": "v2sandbox",
- "revision": "20170928",
+ "revision": "20171102",
  "title": "Content API for Shopping",
  "description": "Manages product items, inventory, and Merchant Center accounts for Google Shopping.",
  "ownerDomain": "google.com",
@@ -331,10 +331,6 @@
      "items": {
       "$ref": "OrderCancellation"
      }
-    },
-    "channelType": {
-     "type": "string",
-     "description": "The channel type of the order: \"purchaseOnGoogle\" or \"googleExpress\"."
     },
     "id": {
      "type": "string",
@@ -781,7 +777,7 @@
    "properties": {
     "lineItemId": {
      "type": "string",
-     "description": "The id of the line item that is shipped."
+     "description": "The id of the line item that is shipped. Either lineItemId or productId is required."
     },
     "quantity": {
      "type": "integer",
@@ -836,7 +832,7 @@
     },
     "lineItemId": {
      "type": "string",
-     "description": "The ID of the line item to cancel."
+     "description": "The ID of the line item to cancel. Either lineItemId or productId is required."
     },
     "operationId": {
      "type": "string",
@@ -1027,7 +1023,7 @@
     },
     "lineItemId": {
      "type": "string",
-     "description": "The ID of the line item to cancel."
+     "description": "The ID of the line item to cancel. Either lineItemId or productId is required."
     },
     "quantity": {
      "type": "integer",
@@ -1068,7 +1064,7 @@
    "properties": {
     "lineItemId": {
      "type": "string",
-     "description": "The ID of the line item to return."
+     "description": "The ID of the line item to return. Either lineItemId or productId is required."
     },
     "quantity": {
      "type": "integer",
@@ -1302,7 +1298,7 @@
    "properties": {
     "lineItemId": {
      "type": "string",
-     "description": "The ID of the line item to return."
+     "description": "The ID of the line item to return. Either lineItemId or productId is required."
     },
     "operationId": {
      "type": "string",
@@ -1764,11 +1760,11 @@
      "id": "content.orders.acknowledge",
      "path": "{merchantId}/orders/{orderId}/acknowledge",
      "httpMethod": "POST",
-     "description": "Marks an order as acknowledged. This method can only be called for non-multi-client accounts.",
+     "description": "Marks an order as acknowledged.",
      "parameters": {
       "merchantId": {
        "type": "string",
-       "description": "The ID of the managing account.",
+       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
        "required": true,
        "format": "uint64",
        "location": "path"
@@ -1798,11 +1794,11 @@
      "id": "content.orders.advancetestorder",
      "path": "{merchantId}/testorders/{orderId}/advance",
      "httpMethod": "POST",
-     "description": "Sandbox only. Moves a test order from state \"inProgress\" to state \"pendingShipment\". This method can only be called for non-multi-client accounts.",
+     "description": "Sandbox only. Moves a test order from state \"inProgress\" to state \"pendingShipment\".",
      "parameters": {
       "merchantId": {
        "type": "string",
-       "description": "The ID of the managing account.",
+       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
        "required": true,
        "format": "uint64",
        "location": "path"
@@ -1829,11 +1825,11 @@
      "id": "content.orders.cancel",
      "path": "{merchantId}/orders/{orderId}/cancel",
      "httpMethod": "POST",
-     "description": "Cancels all line items in an order, making a full refund. This method can only be called for non-multi-client accounts.",
+     "description": "Cancels all line items in an order, making a full refund.",
      "parameters": {
       "merchantId": {
        "type": "string",
-       "description": "The ID of the managing account.",
+       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
        "required": true,
        "format": "uint64",
        "location": "path"
@@ -1863,11 +1859,11 @@
      "id": "content.orders.cancellineitem",
      "path": "{merchantId}/orders/{orderId}/cancelLineItem",
      "httpMethod": "POST",
-     "description": "Cancels a line item, making a full refund. This method can only be called for non-multi-client accounts.",
+     "description": "Cancels a line item, making a full refund.",
      "parameters": {
       "merchantId": {
        "type": "string",
-       "description": "The ID of the managing account.",
+       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
        "required": true,
        "format": "uint64",
        "location": "path"
@@ -1897,11 +1893,11 @@
      "id": "content.orders.createtestorder",
      "path": "{merchantId}/testorders",
      "httpMethod": "POST",
-     "description": "Sandbox only. Creates a test order. This method can only be called for non-multi-client accounts.",
+     "description": "Sandbox only. Creates a test order.",
      "parameters": {
       "merchantId": {
        "type": "string",
-       "description": "The ID of the managing account.",
+       "description": "The ID of the account that should manage the order. This cannot be a multi-client account.",
        "required": true,
        "format": "uint64",
        "location": "path"
@@ -1924,7 +1920,7 @@
      "id": "content.orders.custombatch",
      "path": "orders/batch",
      "httpMethod": "POST",
-     "description": "Retrieves or modifies multiple orders in a single request. This method can only be called for non-multi-client accounts.",
+     "description": "Retrieves or modifies multiple orders in a single request.",
      "request": {
       "$ref": "OrdersCustomBatchRequest"
      },
@@ -1939,11 +1935,11 @@
      "id": "content.orders.get",
      "path": "{merchantId}/orders/{orderId}",
      "httpMethod": "GET",
-     "description": "Retrieves an order from your Merchant Center account. This method can only be called for non-multi-client accounts.",
+     "description": "Retrieves an order from your Merchant Center account.",
      "parameters": {
       "merchantId": {
        "type": "string",
-       "description": "The ID of the managing account.",
+       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
        "required": true,
        "format": "uint64",
        "location": "path"
@@ -1970,11 +1966,11 @@
      "id": "content.orders.getbymerchantorderid",
      "path": "{merchantId}/ordersbymerchantid/{merchantOrderId}",
      "httpMethod": "GET",
-     "description": "Retrieves an order using merchant order id. This method can only be called for non-multi-client accounts.",
+     "description": "Retrieves an order using merchant order id.",
      "parameters": {
       "merchantId": {
        "type": "string",
-       "description": "The ID of the managing account.",
+       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
        "required": true,
        "format": "uint64",
        "location": "path"
@@ -2001,11 +1997,11 @@
      "id": "content.orders.gettestordertemplate",
      "path": "{merchantId}/testordertemplates/{templateName}",
      "httpMethod": "GET",
-     "description": "Sandbox only. Retrieves an order template that can be used to quickly create a new order in sandbox. This method can only be called for non-multi-client accounts.",
+     "description": "Sandbox only. Retrieves an order template that can be used to quickly create a new order in sandbox.",
      "parameters": {
       "merchantId": {
        "type": "string",
-       "description": "The ID of the managing account.",
+       "description": "The ID of the account that should manage the order. This cannot be a multi-client account.",
        "required": true,
        "format": "uint64",
        "location": "path"
@@ -2044,7 +2040,7 @@
      "id": "content.orders.list",
      "path": "{merchantId}/orders",
      "httpMethod": "GET",
-     "description": "Lists the orders in your Merchant Center account. This method can only be called for non-multi-client accounts.",
+     "description": "Lists the orders in your Merchant Center account.",
      "parameters": {
       "acknowledged": {
        "type": "boolean",
@@ -2059,7 +2055,7 @@
       },
       "merchantId": {
        "type": "string",
-       "description": "The ID of the managing account.",
+       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
        "required": true,
        "format": "uint64",
        "location": "path"
@@ -2139,11 +2135,11 @@
      "id": "content.orders.refund",
      "path": "{merchantId}/orders/{orderId}/refund",
      "httpMethod": "POST",
-     "description": "Refund a portion of the order, up to the full amount paid. This method can only be called for non-multi-client accounts.",
+     "description": "Refund a portion of the order, up to the full amount paid.",
      "parameters": {
       "merchantId": {
        "type": "string",
-       "description": "The ID of the managing account.",
+       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
        "required": true,
        "format": "uint64",
        "location": "path"
@@ -2173,11 +2169,11 @@
      "id": "content.orders.returnlineitem",
      "path": "{merchantId}/orders/{orderId}/returnLineItem",
      "httpMethod": "POST",
-     "description": "Returns a line item. This method can only be called for non-multi-client accounts.",
+     "description": "Returns a line item.",
      "parameters": {
       "merchantId": {
        "type": "string",
-       "description": "The ID of the managing account.",
+       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
        "required": true,
        "format": "uint64",
        "location": "path"
@@ -2207,11 +2203,11 @@
      "id": "content.orders.shiplineitems",
      "path": "{merchantId}/orders/{orderId}/shipLineItems",
      "httpMethod": "POST",
-     "description": "Marks line item(s) as shipped. This method can only be called for non-multi-client accounts.",
+     "description": "Marks line item(s) as shipped.",
      "parameters": {
       "merchantId": {
        "type": "string",
-       "description": "The ID of the managing account.",
+       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
        "required": true,
        "format": "uint64",
        "location": "path"
@@ -2241,11 +2237,11 @@
      "id": "content.orders.updatemerchantorderid",
      "path": "{merchantId}/orders/{orderId}/updateMerchantOrderId",
      "httpMethod": "POST",
-     "description": "Updates the merchant order ID for a given order. This method can only be called for non-multi-client accounts.",
+     "description": "Updates the merchant order ID for a given order.",
      "parameters": {
       "merchantId": {
        "type": "string",
-       "description": "The ID of the managing account.",
+       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
        "required": true,
        "format": "uint64",
        "location": "path"
@@ -2275,11 +2271,11 @@
      "id": "content.orders.updateshipment",
      "path": "{merchantId}/orders/{orderId}/updateShipment",
      "httpMethod": "POST",
-     "description": "Updates a shipment's status, carrier, and/or tracking ID. This method can only be called for non-multi-client accounts.",
+     "description": "Updates a shipment's status, carrier, and/or tracking ID.",
      "parameters": {
       "merchantId": {
        "type": "string",
-       "description": "The ID of the managing account.",
+       "description": "The ID of the account that manages the order. This cannot be a multi-client account.",
        "required": true,
        "format": "uint64",
        "location": "path"
