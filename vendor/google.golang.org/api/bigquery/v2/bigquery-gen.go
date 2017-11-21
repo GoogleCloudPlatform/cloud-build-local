@@ -210,8 +210,8 @@ type BigtableColumn struct {
 }
 
 func (s *BigtableColumn) MarshalJSON() ([]byte, error) {
-	type noMethod BigtableColumn
-	raw := noMethod(*s)
+	type NoMethod BigtableColumn
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -267,8 +267,8 @@ type BigtableColumnFamily struct {
 }
 
 func (s *BigtableColumnFamily) MarshalJSON() ([]byte, error) {
-	type noMethod BigtableColumnFamily
-	raw := noMethod(*s)
+	type NoMethod BigtableColumnFamily
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -314,8 +314,8 @@ type BigtableOptions struct {
 }
 
 func (s *BigtableOptions) MarshalJSON() ([]byte, error) {
-	type noMethod BigtableOptions
-	raw := noMethod(*s)
+	type NoMethod BigtableOptions
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -382,8 +382,8 @@ type CsvOptions struct {
 }
 
 func (s *CsvOptions) MarshalJSON() ([]byte, error) {
-	type noMethod CsvOptions
-	raw := noMethod(*s)
+	type NoMethod CsvOptions
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -478,8 +478,8 @@ type Dataset struct {
 }
 
 func (s *Dataset) MarshalJSON() ([]byte, error) {
-	type noMethod Dataset
-	raw := noMethod(*s)
+	type NoMethod Dataset
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -534,8 +534,8 @@ type DatasetAccess struct {
 }
 
 func (s *DatasetAccess) MarshalJSON() ([]byte, error) {
-	type noMethod DatasetAccess
-	raw := noMethod(*s)
+	type NoMethod DatasetAccess
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -580,8 +580,8 @@ type DatasetList struct {
 }
 
 func (s *DatasetList) MarshalJSON() ([]byte, error) {
-	type noMethod DatasetList
-	raw := noMethod(*s)
+	type NoMethod DatasetList
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -623,8 +623,8 @@ type DatasetListDatasets struct {
 }
 
 func (s *DatasetListDatasets) MarshalJSON() ([]byte, error) {
-	type noMethod DatasetListDatasets
-	raw := noMethod(*s)
+	type NoMethod DatasetListDatasets
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -655,8 +655,8 @@ type DatasetReference struct {
 }
 
 func (s *DatasetReference) MarshalJSON() ([]byte, error) {
-	type noMethod DatasetReference
-	raw := noMethod(*s)
+	type NoMethod DatasetReference
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -685,8 +685,8 @@ type EncryptionConfiguration struct {
 }
 
 func (s *EncryptionConfiguration) MarshalJSON() ([]byte, error) {
-	type noMethod EncryptionConfiguration
-	raw := noMethod(*s)
+	type NoMethod EncryptionConfiguration
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -722,8 +722,8 @@ type ErrorProto struct {
 }
 
 func (s *ErrorProto) MarshalJSON() ([]byte, error) {
-	type noMethod ErrorProto
-	raw := noMethod(*s)
+	type NoMethod ErrorProto
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -832,13 +832,13 @@ type ExplainQueryStage struct {
 }
 
 func (s *ExplainQueryStage) MarshalJSON() ([]byte, error) {
-	type noMethod ExplainQueryStage
-	raw := noMethod(*s)
+	type NoMethod ExplainQueryStage
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 func (s *ExplainQueryStage) UnmarshalJSON(data []byte) error {
-	type noMethod ExplainQueryStage
+	type NoMethod ExplainQueryStage
 	var s1 struct {
 		ComputeRatioAvg gensupport.JSONFloat64 `json:"computeRatioAvg"`
 		ComputeRatioMax gensupport.JSONFloat64 `json:"computeRatioMax"`
@@ -848,9 +848,9 @@ func (s *ExplainQueryStage) UnmarshalJSON(data []byte) error {
 		WaitRatioMax    gensupport.JSONFloat64 `json:"waitRatioMax"`
 		WriteRatioAvg   gensupport.JSONFloat64 `json:"writeRatioAvg"`
 		WriteRatioMax   gensupport.JSONFloat64 `json:"writeRatioMax"`
-		*noMethod
+		*NoMethod
 	}
-	s1.noMethod = (*noMethod)(s)
+	s1.NoMethod = (*NoMethod)(s)
 	if err := json.Unmarshal(data, &s1); err != nil {
 		return err
 	}
@@ -890,8 +890,8 @@ type ExplainQueryStep struct {
 }
 
 func (s *ExplainQueryStep) MarshalJSON() ([]byte, error) {
-	type noMethod ExplainQueryStep
-	raw := noMethod(*s)
+	type NoMethod ExplainQueryStep
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -980,8 +980,8 @@ type ExternalDataConfiguration struct {
 }
 
 func (s *ExternalDataConfiguration) MarshalJSON() ([]byte, error) {
-	type noMethod ExternalDataConfiguration
-	raw := noMethod(*s)
+	type NoMethod ExternalDataConfiguration
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1063,8 +1063,8 @@ type GetQueryResultsResponse struct {
 }
 
 func (s *GetQueryResultsResponse) MarshalJSON() ([]byte, error) {
-	type noMethod GetQueryResultsResponse
-	raw := noMethod(*s)
+	type NoMethod GetQueryResultsResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1097,8 +1097,8 @@ type GetServiceAccountResponse struct {
 }
 
 func (s *GetServiceAccountResponse) MarshalJSON() ([]byte, error) {
-	type noMethod GetServiceAccountResponse
-	raw := noMethod(*s)
+	type NoMethod GetServiceAccountResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1137,8 +1137,8 @@ type GoogleSheetsOptions struct {
 }
 
 func (s *GoogleSheetsOptions) MarshalJSON() ([]byte, error) {
-	type noMethod GoogleSheetsOptions
-	raw := noMethod(*s)
+	type NoMethod GoogleSheetsOptions
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1196,8 +1196,8 @@ type Job struct {
 }
 
 func (s *Job) MarshalJSON() ([]byte, error) {
-	type noMethod Job
-	raw := noMethod(*s)
+	type NoMethod Job
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1230,8 +1230,8 @@ type JobCancelResponse struct {
 }
 
 func (s *JobCancelResponse) MarshalJSON() ([]byte, error) {
-	type noMethod JobCancelResponse
-	raw := noMethod(*s)
+	type NoMethod JobCancelResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1280,8 +1280,8 @@ type JobConfiguration struct {
 }
 
 func (s *JobConfiguration) MarshalJSON() ([]byte, error) {
-	type noMethod JobConfiguration
-	raw := noMethod(*s)
+	type NoMethod JobConfiguration
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1337,8 +1337,8 @@ type JobConfigurationExtract struct {
 }
 
 func (s *JobConfigurationExtract) MarshalJSON() ([]byte, error) {
-	type noMethod JobConfigurationExtract
-	raw := noMethod(*s)
+	type NoMethod JobConfigurationExtract
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1451,17 +1451,16 @@ type JobConfigurationLoad struct {
 	// property.
 	SchemaInlineFormat string `json:"schemaInlineFormat,omitempty"`
 
-	// SchemaUpdateOptions: [Experimental] Allows the schema of the
-	// desitination table to be updated as a side effect of the load job if
-	// a schema is autodetected or supplied in the job configuration. Schema
-	// update options are supported in two cases: when writeDisposition is
-	// WRITE_APPEND; when writeDisposition is WRITE_TRUNCATE and the
-	// destination table is a partition of a table, specified by partition
-	// decorators. For normal tables, WRITE_TRUNCATE will always overwrite
-	// the schema. One or more of the following values are specified:
-	// ALLOW_FIELD_ADDITION: allow adding a nullable field to the schema.
-	// ALLOW_FIELD_RELAXATION: allow relaxing a required field in the
-	// original schema to nullable.
+	// SchemaUpdateOptions: Allows the schema of the destination table to be
+	// updated as a side effect of the load job if a schema is autodetected
+	// or supplied in the job configuration. Schema update options are
+	// supported in two cases: when writeDisposition is WRITE_APPEND; when
+	// writeDisposition is WRITE_TRUNCATE and the destination table is a
+	// partition of a table, specified by partition decorators. For normal
+	// tables, WRITE_TRUNCATE will always overwrite the schema. One or more
+	// of the following values are specified: ALLOW_FIELD_ADDITION: allow
+	// adding a nullable field to the schema. ALLOW_FIELD_RELAXATION: allow
+	// relaxing a required field in the original schema to nullable.
 	SchemaUpdateOptions []string `json:"schemaUpdateOptions,omitempty"`
 
 	// SkipLeadingRows: [Optional] The number of rows at the top of a CSV
@@ -1487,8 +1486,8 @@ type JobConfigurationLoad struct {
 	// not allowed.
 	SourceUris []string `json:"sourceUris,omitempty"`
 
-	// TimePartitioning: [Experimental] If specified, configures time-based
-	// partitioning for the destination table.
+	// TimePartitioning: If specified, configures time-based partitioning
+	// for the destination table.
 	TimePartitioning *TimePartitioning `json:"timePartitioning,omitempty"`
 
 	// WriteDisposition: [Optional] Specifies the action that occurs if the
@@ -1522,8 +1521,8 @@ type JobConfigurationLoad struct {
 }
 
 func (s *JobConfigurationLoad) MarshalJSON() ([]byte, error) {
-	type noMethod JobConfigurationLoad
-	raw := noMethod(*s)
+	type NoMethod JobConfigurationLoad
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1602,16 +1601,15 @@ type JobConfigurationQuery struct {
 	// QueryParameters: Query parameters for standard SQL queries.
 	QueryParameters []*QueryParameter `json:"queryParameters,omitempty"`
 
-	// SchemaUpdateOptions: [Experimental] Allows the schema of the
-	// destination table to be updated as a side effect of the query job.
-	// Schema update options are supported in two cases: when
-	// writeDisposition is WRITE_APPEND; when writeDisposition is
-	// WRITE_TRUNCATE and the destination table is a partition of a table,
-	// specified by partition decorators. For normal tables, WRITE_TRUNCATE
-	// will always overwrite the schema. One or more of the following values
-	// are specified: ALLOW_FIELD_ADDITION: allow adding a nullable field to
-	// the schema. ALLOW_FIELD_RELAXATION: allow relaxing a required field
-	// in the original schema to nullable.
+	// SchemaUpdateOptions: Allows the schema of the destination table to be
+	// updated as a side effect of the query job. Schema update options are
+	// supported in two cases: when writeDisposition is WRITE_APPEND; when
+	// writeDisposition is WRITE_TRUNCATE and the destination table is a
+	// partition of a table, specified by partition decorators. For normal
+	// tables, WRITE_TRUNCATE will always overwrite the schema. One or more
+	// of the following values are specified: ALLOW_FIELD_ADDITION: allow
+	// adding a nullable field to the schema. ALLOW_FIELD_RELAXATION: allow
+	// relaxing a required field in the original schema to nullable.
 	SchemaUpdateOptions []string `json:"schemaUpdateOptions,omitempty"`
 
 	// TableDefinitions: [Optional] If querying an external data source
@@ -1620,8 +1618,8 @@ type JobConfigurationQuery struct {
 	// source can then be queried as if it were a standard BigQuery table.
 	TableDefinitions map[string]ExternalDataConfiguration `json:"tableDefinitions,omitempty"`
 
-	// TimePartitioning: [Experimental] If specified, configures time-based
-	// partitioning for the destination table.
+	// TimePartitioning: If specified, configures time-based partitioning
+	// for the destination table.
 	TimePartitioning *TimePartitioning `json:"timePartitioning,omitempty"`
 
 	// UseLegacySql: Specifies whether to use BigQuery's legacy SQL dialect
@@ -1676,8 +1674,8 @@ type JobConfigurationQuery struct {
 }
 
 func (s *JobConfigurationQuery) MarshalJSON() ([]byte, error) {
-	type noMethod JobConfigurationQuery
-	raw := noMethod(*s)
+	type NoMethod JobConfigurationQuery
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1735,8 +1733,8 @@ type JobConfigurationTableCopy struct {
 }
 
 func (s *JobConfigurationTableCopy) MarshalJSON() ([]byte, error) {
-	type noMethod JobConfigurationTableCopy
-	raw := noMethod(*s)
+	type NoMethod JobConfigurationTableCopy
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1775,8 +1773,8 @@ type JobList struct {
 }
 
 func (s *JobList) MarshalJSON() ([]byte, error) {
-	type noMethod JobList
-	raw := noMethod(*s)
+	type NoMethod JobList
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1831,8 +1829,8 @@ type JobListJobs struct {
 }
 
 func (s *JobListJobs) MarshalJSON() ([]byte, error) {
-	type noMethod JobListJobs
-	raw := noMethod(*s)
+	type NoMethod JobListJobs
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1863,8 +1861,8 @@ type JobReference struct {
 }
 
 func (s *JobReference) MarshalJSON() ([]byte, error) {
-	type noMethod JobReference
-	raw := noMethod(*s)
+	type NoMethod JobReference
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1914,8 +1912,8 @@ type JobStatistics struct {
 }
 
 func (s *JobStatistics) MarshalJSON() ([]byte, error) {
-	type noMethod JobStatistics
-	raw := noMethod(*s)
+	type NoMethod JobStatistics
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1926,6 +1924,21 @@ type JobStatistics2 struct {
 	// CacheHit: [Output-only] Whether the query result was fetched from the
 	// query cache.
 	CacheHit bool `json:"cacheHit,omitempty"`
+
+	// DdlOperationPerformed: [Output-only, Experimental] The DDL operation
+	// performed, possibly dependent on the pre-existence of the DDL target.
+	// Possible values (new values might be added in the future): "CREATE":
+	// The query created the DDL target. "SKIP": No-op. Example cases: the
+	// query is CREATE TABLE IF NOT EXISTS while the table already exists,
+	// or the query is DROP TABLE IF EXISTS while the table does not exist.
+	// "REPLACE": The query replaced the DDL target. Example case: the query
+	// is CREATE OR REPLACE TABLE, and the table already exists. "DROP": The
+	// query deleted the DDL target.
+	DdlOperationPerformed string `json:"ddlOperationPerformed,omitempty"`
+
+	// DdlTargetTable: [Output-only, Experimental] The DDL target table.
+	// Present only for CREATE/DROP TABLE/VIEW queries.
+	DdlTargetTable *TableReference `json:"ddlTargetTable,omitempty"`
 
 	// NumDmlAffectedRows: [Output-only] The number of rows affected by a
 	// DML statement. Present only for DML statements INSERT, UPDATE or
@@ -1980,8 +1993,8 @@ type JobStatistics2 struct {
 }
 
 func (s *JobStatistics2) MarshalJSON() ([]byte, error) {
-	type noMethod JobStatistics2
-	raw := noMethod(*s)
+	type NoMethod JobStatistics2
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2027,8 +2040,8 @@ type JobStatistics3 struct {
 }
 
 func (s *JobStatistics3) MarshalJSON() ([]byte, error) {
-	type noMethod JobStatistics3
-	raw := noMethod(*s)
+	type NoMethod JobStatistics3
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2059,8 +2072,8 @@ type JobStatistics4 struct {
 }
 
 func (s *JobStatistics4) MarshalJSON() ([]byte, error) {
-	type noMethod JobStatistics4
-	raw := noMethod(*s)
+	type NoMethod JobStatistics4
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2096,8 +2109,8 @@ type JobStatus struct {
 }
 
 func (s *JobStatus) MarshalJSON() ([]byte, error) {
-	type noMethod JobStatus
-	raw := noMethod(*s)
+	type NoMethod JobStatus
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2141,8 +2154,8 @@ type ProjectList struct {
 }
 
 func (s *ProjectList) MarshalJSON() ([]byte, error) {
-	type noMethod ProjectList
-	raw := noMethod(*s)
+	type NoMethod ProjectList
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2180,8 +2193,8 @@ type ProjectListProjects struct {
 }
 
 func (s *ProjectListProjects) MarshalJSON() ([]byte, error) {
-	type noMethod ProjectListProjects
-	raw := noMethod(*s)
+	type NoMethod ProjectListProjects
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2208,8 +2221,8 @@ type ProjectReference struct {
 }
 
 func (s *ProjectReference) MarshalJSON() ([]byte, error) {
-	type noMethod ProjectReference
-	raw := noMethod(*s)
+	type NoMethod ProjectReference
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2242,8 +2255,8 @@ type QueryParameter struct {
 }
 
 func (s *QueryParameter) MarshalJSON() ([]byte, error) {
-	type noMethod QueryParameter
-	raw := noMethod(*s)
+	type NoMethod QueryParameter
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2277,8 +2290,8 @@ type QueryParameterType struct {
 }
 
 func (s *QueryParameterType) MarshalJSON() ([]byte, error) {
-	type noMethod QueryParameterType
-	raw := noMethod(*s)
+	type NoMethod QueryParameterType
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2310,8 +2323,8 @@ type QueryParameterTypeStructTypes struct {
 }
 
 func (s *QueryParameterTypeStructTypes) MarshalJSON() ([]byte, error) {
-	type noMethod QueryParameterTypeStructTypes
-	raw := noMethod(*s)
+	type NoMethod QueryParameterTypeStructTypes
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2344,8 +2357,8 @@ type QueryParameterValue struct {
 }
 
 func (s *QueryParameterValue) MarshalJSON() ([]byte, error) {
-	type noMethod QueryParameterValue
-	raw := noMethod(*s)
+	type NoMethod QueryParameterValue
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2434,8 +2447,8 @@ type QueryRequest struct {
 }
 
 func (s *QueryRequest) MarshalJSON() ([]byte, error) {
-	type noMethod QueryRequest
-	raw := noMethod(*s)
+	type NoMethod QueryRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2514,8 +2527,8 @@ type QueryResponse struct {
 }
 
 func (s *QueryResponse) MarshalJSON() ([]byte, error) {
-	type noMethod QueryResponse
-	raw := noMethod(*s)
+	type NoMethod QueryResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2552,8 +2565,8 @@ type Streamingbuffer struct {
 }
 
 func (s *Streamingbuffer) MarshalJSON() ([]byte, error) {
-	type noMethod Streamingbuffer
-	raw := noMethod(*s)
+	type NoMethod Streamingbuffer
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2638,8 +2651,8 @@ type Table struct {
 	// TableReference: [Required] Reference describing the ID of this table.
 	TableReference *TableReference `json:"tableReference,omitempty"`
 
-	// TimePartitioning: [Experimental] If specified, configures time-based
-	// partitioning for this table.
+	// TimePartitioning: If specified, configures time-based partitioning
+	// for this table.
 	TimePartitioning *TimePartitioning `json:"timePartitioning,omitempty"`
 
 	// Type: [Output-only] Describes the table type. The following values
@@ -2674,8 +2687,8 @@ type Table struct {
 }
 
 func (s *Table) MarshalJSON() ([]byte, error) {
-	type noMethod Table
-	raw := noMethod(*s)
+	type NoMethod Table
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2700,8 +2713,8 @@ type TableCell struct {
 }
 
 func (s *TableCell) MarshalJSON() ([]byte, error) {
-	type noMethod TableCell
-	raw := noMethod(*s)
+	type NoMethod TableCell
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2750,8 +2763,8 @@ type TableDataInsertAllRequest struct {
 }
 
 func (s *TableDataInsertAllRequest) MarshalJSON() ([]byte, error) {
-	type noMethod TableDataInsertAllRequest
-	raw := noMethod(*s)
+	type NoMethod TableDataInsertAllRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2784,8 +2797,8 @@ type TableDataInsertAllRequestRows struct {
 }
 
 func (s *TableDataInsertAllRequestRows) MarshalJSON() ([]byte, error) {
-	type noMethod TableDataInsertAllRequestRows
-	raw := noMethod(*s)
+	type NoMethod TableDataInsertAllRequestRows
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2818,8 +2831,8 @@ type TableDataInsertAllResponse struct {
 }
 
 func (s *TableDataInsertAllResponse) MarshalJSON() ([]byte, error) {
-	type noMethod TableDataInsertAllResponse
-	raw := noMethod(*s)
+	type NoMethod TableDataInsertAllResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2849,8 +2862,8 @@ type TableDataInsertAllResponseInsertErrors struct {
 }
 
 func (s *TableDataInsertAllResponseInsertErrors) MarshalJSON() ([]byte, error) {
-	type noMethod TableDataInsertAllResponseInsertErrors
-	raw := noMethod(*s)
+	type NoMethod TableDataInsertAllResponseInsertErrors
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2894,8 +2907,8 @@ type TableDataList struct {
 }
 
 func (s *TableDataList) MarshalJSON() ([]byte, error) {
-	type noMethod TableDataList
-	raw := noMethod(*s)
+	type NoMethod TableDataList
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2942,8 +2955,8 @@ type TableFieldSchema struct {
 }
 
 func (s *TableFieldSchema) MarshalJSON() ([]byte, error) {
-	type noMethod TableFieldSchema
-	raw := noMethod(*s)
+	type NoMethod TableFieldSchema
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2985,12 +2998,22 @@ type TableList struct {
 }
 
 func (s *TableList) MarshalJSON() ([]byte, error) {
-	type noMethod TableList
-	raw := noMethod(*s)
+	type NoMethod TableList
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 type TableListTables struct {
+	// CreationTime: The time when this table was created, in milliseconds
+	// since the epoch.
+	CreationTime int64 `json:"creationTime,omitempty,string"`
+
+	// ExpirationTime: [Optional] The time when this table expires, in
+	// milliseconds since the epoch. If not present, the table will persist
+	// indefinitely. Expired tables will be deleted and their storage
+	// reclaimed.
+	ExpirationTime int64 `json:"expirationTime,omitempty,string"`
+
 	// FriendlyName: The user-friendly name for this table.
 	FriendlyName string `json:"friendlyName,omitempty"`
 
@@ -3007,8 +3030,7 @@ type TableListTables struct {
 	// TableReference: A reference uniquely identifying the table.
 	TableReference *TableReference `json:"tableReference,omitempty"`
 
-	// TimePartitioning: [Experimental] The time-based partitioning for this
-	// table.
+	// TimePartitioning: The time-based partitioning for this table.
 	TimePartitioning *TimePartitioning `json:"timePartitioning,omitempty"`
 
 	// Type: The type of table. Possible values are: TABLE, VIEW.
@@ -3017,7 +3039,7 @@ type TableListTables struct {
 	// View: Additional details for a view.
 	View *TableListTablesView `json:"view,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "FriendlyName") to
+	// ForceSendFields is a list of field names (e.g. "CreationTime") to
 	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
 	// non-interface field appearing in ForceSendFields will be sent to the
@@ -3025,7 +3047,7 @@ type TableListTables struct {
 	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "FriendlyName") to include
+	// NullFields is a list of field names (e.g. "CreationTime") to include
 	// in API requests with the JSON null value. By default, fields with
 	// empty values are omitted from API requests. However, any field with
 	// an empty value appearing in NullFields will be sent to the server as
@@ -3035,8 +3057,8 @@ type TableListTables struct {
 }
 
 func (s *TableListTables) MarshalJSON() ([]byte, error) {
-	type noMethod TableListTables
-	raw := noMethod(*s)
+	type NoMethod TableListTables
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -3064,8 +3086,8 @@ type TableListTablesView struct {
 }
 
 func (s *TableListTablesView) MarshalJSON() ([]byte, error) {
-	type noMethod TableListTablesView
-	raw := noMethod(*s)
+	type NoMethod TableListTablesView
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -3099,8 +3121,8 @@ type TableReference struct {
 }
 
 func (s *TableReference) MarshalJSON() ([]byte, error) {
-	type noMethod TableReference
-	raw := noMethod(*s)
+	type NoMethod TableReference
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -3127,8 +3149,8 @@ type TableRow struct {
 }
 
 func (s *TableRow) MarshalJSON() ([]byte, error) {
-	type noMethod TableRow
-	raw := noMethod(*s)
+	type NoMethod TableRow
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -3154,8 +3176,8 @@ type TableSchema struct {
 }
 
 func (s *TableSchema) MarshalJSON() ([]byte, error) {
-	type noMethod TableSchema
-	raw := noMethod(*s)
+	type NoMethod TableSchema
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -3192,8 +3214,8 @@ type TimePartitioning struct {
 }
 
 func (s *TimePartitioning) MarshalJSON() ([]byte, error) {
-	type noMethod TimePartitioning
-	raw := noMethod(*s)
+	type NoMethod TimePartitioning
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -3225,8 +3247,8 @@ type UserDefinedFunctionResource struct {
 }
 
 func (s *UserDefinedFunctionResource) MarshalJSON() ([]byte, error) {
-	type noMethod UserDefinedFunctionResource
-	raw := noMethod(*s)
+	type NoMethod UserDefinedFunctionResource
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -3264,8 +3286,8 @@ type ViewDefinition struct {
 }
 
 func (s *ViewDefinition) MarshalJSON() ([]byte, error) {
-	type noMethod ViewDefinition
-	raw := noMethod(*s)
+	type NoMethod ViewDefinition
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -3501,7 +3523,7 @@ func (c *DatasetsGetCall) Do(opts ...googleapi.CallOption) (*Dataset, error) {
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3640,7 +3662,7 @@ func (c *DatasetsInsertCall) Do(opts ...googleapi.CallOption) (*Dataset, error) 
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3813,7 +3835,7 @@ func (c *DatasetsListCall) Do(opts ...googleapi.CallOption) (*DatasetList, error
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3993,7 +4015,7 @@ func (c *DatasetsPatchCall) Do(opts ...googleapi.CallOption) (*Dataset, error) {
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4139,7 +4161,7 @@ func (c *DatasetsUpdateCall) Do(opts ...googleapi.CallOption) (*Dataset, error) 
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4279,7 +4301,7 @@ func (c *JobsCancelCall) Do(opts ...googleapi.CallOption) (*JobCancelResponse, e
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4429,7 +4451,7 @@ func (c *JobsGetCall) Do(opts ...googleapi.CallOption) (*Job, error) {
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4608,7 +4630,7 @@ func (c *JobsGetQueryResultsCall) Do(opts ...googleapi.CallOption) (*GetQueryRes
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4859,7 +4881,7 @@ func (c *JobsInsertCall) Do(opts ...googleapi.CallOption) (*Job, error) {
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5067,7 +5089,7 @@ func (c *JobsListCall) Do(opts ...googleapi.CallOption) (*JobList, error) {
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5266,7 +5288,7 @@ func (c *JobsQueryCall) Do(opts ...googleapi.CallOption) (*QueryResponse, error)
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5409,7 +5431,7 @@ func (c *ProjectsGetServiceAccountCall) Do(opts ...googleapi.CallOption) (*GetSe
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5558,7 +5580,7 @@ func (c *ProjectsListCall) Do(opts ...googleapi.CallOption) (*ProjectList, error
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5720,7 +5742,7 @@ func (c *TabledataInsertAllCall) Do(opts ...googleapi.CallOption) (*TableDataIns
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5912,7 +5934,7 @@ func (c *TabledataListCall) Do(opts ...googleapi.CallOption) (*TableDataList, er
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -6241,7 +6263,7 @@ func (c *TablesGetCall) Do(opts ...googleapi.CallOption) (*Table, error) {
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -6395,7 +6417,7 @@ func (c *TablesInsertCall) Do(opts ...googleapi.CallOption) (*Table, error) {
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -6561,7 +6583,7 @@ func (c *TablesListCall) Do(opts ...googleapi.CallOption) (*TableList, error) {
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -6741,7 +6763,7 @@ func (c *TablesPatchCall) Do(opts ...googleapi.CallOption) (*Table, error) {
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -6897,7 +6919,7 @@ func (c *TablesUpdateCall) Do(opts ...googleapi.CallOption) (*Table, error) {
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
