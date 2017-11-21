@@ -140,8 +140,8 @@ type Arg struct {
 }
 
 func (s *Arg) MarshalJSON() ([]byte, error) {
-	type noMethod Arg
-	raw := noMethod(*s)
+	type NoMethod Arg
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -193,8 +193,8 @@ type File struct {
 }
 
 func (s *File) MarshalJSON() ([]byte, error) {
-	type noMethod File
-	raw := noMethod(*s)
+	type NoMethod File
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -226,8 +226,8 @@ type FunctionCall struct {
 }
 
 func (s *FunctionCall) MarshalJSON() ([]byte, error) {
-	type noMethod FunctionCall
-	raw := noMethod(*s)
+	type NoMethod FunctionCall
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -280,8 +280,8 @@ type FunctionMock struct {
 }
 
 func (s *FunctionMock) MarshalJSON() ([]byte, error) {
-	type noMethod FunctionMock
-	raw := noMethod(*s)
+	type NoMethod FunctionMock
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -342,8 +342,8 @@ type GetReleaseExecutableResponse struct {
 }
 
 func (s *GetReleaseExecutableResponse) MarshalJSON() ([]byte, error) {
-	type noMethod GetReleaseExecutableResponse
-	raw := noMethod(*s)
+	type NoMethod GetReleaseExecutableResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -385,8 +385,8 @@ type Issue struct {
 }
 
 func (s *Issue) MarshalJSON() ([]byte, error) {
-	type noMethod Issue
-	raw := noMethod(*s)
+	type NoMethod Issue
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -423,8 +423,8 @@ type ListReleasesResponse struct {
 }
 
 func (s *ListReleasesResponse) MarshalJSON() ([]byte, error) {
-	type noMethod ListReleasesResponse
-	raw := noMethod(*s)
+	type NoMethod ListReleasesResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -461,8 +461,8 @@ type ListRulesetsResponse struct {
 }
 
 func (s *ListRulesetsResponse) MarshalJSON() ([]byte, error) {
-	type noMethod ListRulesetsResponse
-	raw := noMethod(*s)
+	type NoMethod ListRulesetsResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -543,8 +543,8 @@ type Release struct {
 }
 
 func (s *Release) MarshalJSON() ([]byte, error) {
-	type noMethod Release
-	raw := noMethod(*s)
+	type NoMethod Release
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -577,8 +577,8 @@ type Result struct {
 }
 
 func (s *Result) MarshalJSON() ([]byte, error) {
-	type noMethod Result
-	raw := noMethod(*s)
+	type NoMethod Result
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -621,8 +621,8 @@ type Ruleset struct {
 }
 
 func (s *Ruleset) MarshalJSON() ([]byte, error) {
-	type noMethod Ruleset
-	raw := noMethod(*s)
+	type NoMethod Ruleset
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -650,8 +650,8 @@ type Source struct {
 }
 
 func (s *Source) MarshalJSON() ([]byte, error) {
-	type noMethod Source
-	raw := noMethod(*s)
+	type NoMethod Source
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -687,8 +687,8 @@ type SourcePosition struct {
 }
 
 func (s *SourcePosition) MarshalJSON() ([]byte, error) {
-	type noMethod SourcePosition
-	raw := noMethod(*s)
+	type NoMethod SourcePosition
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -771,8 +771,8 @@ type TestCase struct {
 }
 
 func (s *TestCase) MarshalJSON() ([]byte, error) {
-	type noMethod TestCase
-	raw := noMethod(*s)
+	type NoMethod TestCase
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -842,8 +842,8 @@ type TestResult struct {
 }
 
 func (s *TestResult) MarshalJSON() ([]byte, error) {
-	type noMethod TestResult
-	raw := noMethod(*s)
+	type NoMethod TestResult
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -876,8 +876,8 @@ type TestRulesetRequest struct {
 }
 
 func (s *TestRulesetRequest) MarshalJSON() ([]byte, error) {
-	type noMethod TestRulesetRequest
-	raw := noMethod(*s)
+	type NoMethod TestRulesetRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -918,8 +918,8 @@ type TestRulesetResponse struct {
 }
 
 func (s *TestRulesetResponse) MarshalJSON() ([]byte, error) {
-	type noMethod TestRulesetResponse
-	raw := noMethod(*s)
+	type NoMethod TestRulesetResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -952,8 +952,40 @@ type TestSuite struct {
 }
 
 func (s *TestSuite) MarshalJSON() ([]byte, error) {
-	type noMethod TestSuite
-	raw := noMethod(*s)
+	type NoMethod TestSuite
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// UpdateReleaseRequest: The request for
+// FirebaseRulesService.UpdateReleasePatch.
+type UpdateReleaseRequest struct {
+	// Release: `Release` to update.
+	Release *Release `json:"release,omitempty"`
+
+	// UpdateMask: Specifies which fields to update.
+	UpdateMask string `json:"updateMask,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Release") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Release") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *UpdateReleaseRequest) MarshalJSON() ([]byte, error) {
+	type NoMethod UpdateReleaseRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1084,7 +1116,7 @@ func (c *ProjectsTestCall) Do(opts ...googleapi.CallOption) (*TestRulesetRespons
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -1255,7 +1287,7 @@ func (c *ProjectsReleasesCreateCall) Do(opts ...googleapi.CallOption) (*Release,
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -1384,7 +1416,7 @@ func (c *ProjectsReleasesDeleteCall) Do(opts ...googleapi.CallOption) (*Empty, e
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -1524,7 +1556,7 @@ func (c *ProjectsReleasesGetCall) Do(opts ...googleapi.CallOption) (*Release, er
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -1679,7 +1711,7 @@ func (c *ProjectsReleasesGetExecutableCall) Do(opts ...googleapi.CallOption) (*G
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -1898,7 +1930,7 @@ func (c *ProjectsReleasesListCall) Do(opts ...googleapi.CallOption) (*ListReleas
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -1967,6 +1999,148 @@ func (c *ProjectsReleasesListCall) Pages(ctx context.Context, f func(*ListReleas
 		}
 		c.PageToken(x.NextPageToken)
 	}
+}
+
+// method id "firebaserules.projects.releases.patch":
+
+type ProjectsReleasesPatchCall struct {
+	s                    *Service
+	name                 string
+	updatereleaserequest *UpdateReleaseRequest
+	urlParams_           gensupport.URLParams
+	ctx_                 context.Context
+	header_              http.Header
+}
+
+// Patch: Update a `Release` via PATCH.
+//
+// Only updates to the `ruleset_name` and `test_suite_name` fields will
+// be
+// honored. `Release` rename is not supported. To create a `Release` use
+// the
+// CreateRelease method.
+func (r *ProjectsReleasesService) Patch(name string, updatereleaserequest *UpdateReleaseRequest) *ProjectsReleasesPatchCall {
+	c := &ProjectsReleasesPatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	c.updatereleaserequest = updatereleaserequest
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsReleasesPatchCall) Fields(s ...googleapi.Field) *ProjectsReleasesPatchCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsReleasesPatchCall) Context(ctx context.Context) *ProjectsReleasesPatchCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsReleasesPatchCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsReleasesPatchCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.updatereleaserequest)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("PATCH", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "firebaserules.projects.releases.patch" call.
+// Exactly one of *Release or error will be non-nil. Any non-2xx status
+// code is an error. Response headers are in either
+// *Release.ServerResponse.Header or (if a response was returned at all)
+// in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
+// check whether the returned error was because http.StatusNotModified
+// was returned.
+func (c *ProjectsReleasesPatchCall) Do(opts ...googleapi.CallOption) (*Release, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Release{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Update a `Release` via PATCH.\n\nOnly updates to the `ruleset_name` and `test_suite_name` fields will be\nhonored. `Release` rename is not supported. To create a `Release` use the\nCreateRelease method.",
+	//   "flatPath": "v1/projects/{projectsId}/releases/{releasesId}",
+	//   "httpMethod": "PATCH",
+	//   "id": "firebaserules.projects.releases.patch",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "Resource name for the project which owns this `Release`.\n\nFormat: `projects/{project_id}`",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/releases/.+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v1/{+name}",
+	//   "request": {
+	//     "$ref": "UpdateReleaseRequest"
+	//   },
+	//   "response": {
+	//     "$ref": "Release"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/firebase"
+	//   ]
+	// }
+
 }
 
 // method id "firebaserules.projects.releases.update":
@@ -2075,7 +2249,7 @@ func (c *ProjectsReleasesUpdateCall) Do(opts ...googleapi.CallOption) (*Release,
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2219,7 +2393,7 @@ func (c *ProjectsRulesetsCreateCall) Do(opts ...googleapi.CallOption) (*Ruleset,
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2351,7 +2525,7 @@ func (c *ProjectsRulesetsDeleteCall) Do(opts ...googleapi.CallOption) (*Empty, e
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2491,7 +2665,7 @@ func (c *ProjectsRulesetsGetCall) Do(opts ...googleapi.CallOption) (*Ruleset, er
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2673,7 +2847,7 @@ func (c *ProjectsRulesetsListCall) Do(opts ...googleapi.CallOption) (*ListRulese
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil

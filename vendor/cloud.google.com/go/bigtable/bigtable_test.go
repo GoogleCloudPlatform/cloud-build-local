@@ -319,6 +319,12 @@ func TestClientIntegration(t *testing.T) {
 			filter: ConditionFilter(ChainFilters(ColumnFilter(".*j.*"), ColumnFilter(".*mckinley.*")), StripValueFilter(), nil),
 			want:   "",
 		},
+		{
+			desc:   "chain that ends with an interleave that has no match. covers #804",
+			rr:     RowRange{},
+			filter: ConditionFilter(ChainFilters(ColumnFilter(".*j.*"), InterleaveFilters(ColumnFilter(".*x.*"), ColumnFilter(".*z.*"))), StripValueFilter(), nil),
+			want:   "",
+		},
 	}
 	for _, tc := range readTests {
 		var opts []ReadOption
@@ -441,6 +447,10 @@ func TestClientIntegration(t *testing.T) {
 		row, err := tbl.ApplyReadModifyWrite(ctx, "gwashington", step.rmw)
 		if err != nil {
 			t.Fatalf("ApplyReadModifyWrite %+v: %v", step.rmw, err)
+		}
+		// Make sure the modified cell returned by the RMW operation has a timestamp.
+		if row["counter"][0].Timestamp == 0 {
+			t.Errorf("RMW returned cell timestamp: got %v, want > 0", row["counter"][0].Timestamp)
 		}
 		clearTimestamps(row)
 		wantRow := Row{"counter": []ReadItem{{Row: "gwashington", Column: "counter:likes", Value: step.want}}}

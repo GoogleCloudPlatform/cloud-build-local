@@ -17,6 +17,7 @@ package build
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -33,7 +34,6 @@ import (
 
 	cb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 
-	"github.com/GoogleCloudPlatform/container-builder-local/buildlog"
 	"github.com/GoogleCloudPlatform/container-builder-local/common"
 	"github.com/GoogleCloudPlatform/container-builder-local/runner"
 	"github.com/GoogleCloudPlatform/container-builder-local/volume"
@@ -67,7 +67,23 @@ var (
 	digestPullRE = regexp.MustCompile(`^Digest:\s*(sha256:[^\s]+)$`)
 	// RunRm : if true, all `docker run` commands will be passed a `--rm` flag.
 	RunRm = false
+	// timeNow is a function that returns the current time.
+	timeNow = time.Now
 )
+
+// Logger encapsulates logging build output.
+type Logger interface {
+	WriteMainEntry(msg string)
+	Close() error
+	MakeWriter(prefix string, stepIdx int, stdout bool) io.Writer
+}
+
+// EventLogger encapsulates logging events about build steps
+// starting/finishing.
+type EventLogger interface {
+	StartStep(ctx context.Context, stepIdx int) error
+	FinishStep(ctx context.Context, stepIdx int, success bool) error
+}
 
 // Build manages a single build.
 type Build struct {
@@ -76,7 +92,8 @@ type Build struct {
 	Request          cb.Build
 	HasMultipleSteps bool
 	TokenSource      oauth2.TokenSource
-	Log              *buildlog.BuildLog
+	Log              Logger
+	EventLogger      EventLogger
 	Status           BuildStatus
 	imageDigests     map[string]string // docker image tag to digest (for built images)
 	stepDigests      []string          // build step index to digest (for build steps)
@@ -107,6 +124,29 @@ type Build struct {
 
 	// For UpdateDockerAccessToken, previous GCR auth value to replace.
 	prevGCRAuth string
+
+	// timing holds timing information for build execution phases.
+	Timing TimingInfo
+}
+
+// TimingInfo holds timing information for build execution phases.
+type TimingInfo struct {
+	BuildSteps  []*TimeSpan
+	BuildTotal  *TimeSpan
+	ImagePushes map[string]*TimeSpan
+	PushTotal   *TimeSpan
+	SourceTotal *TimeSpan
+}
+
+// TimeSpan holds the start and end time for a build execution phase.
+type TimeSpan struct {
+	Start time.Time
+	End   time.Time
+}
+
+type buildStepTime struct {
+	stepIdx  int
+	timeSpan *TimeSpan
 }
 
 type kms interface {
@@ -115,7 +155,7 @@ type kms interface {
 
 // New constructs a new Build.
 func New(r runner.Runner, rq cb.Build, ts oauth2.TokenSource,
-	bl *buildlog.BuildLog, hostWorkspaceDir string, local, push, dryrun bool) *Build {
+	bl Logger, eventLogger EventLogger, hostWorkspaceDir string, local, push, dryrun bool) *Build {
 	return &Build{
 		Runner:           r,
 		Request:          rq,
@@ -123,6 +163,7 @@ func New(r runner.Runner, rq cb.Build, ts oauth2.TokenSource,
 		imageDigests:     map[string]string{},
 		stepDigests:      make([]string, len(rq.Steps)),
 		Log:              bl,
+		EventLogger:      eventLogger,
 		Done:             make(chan struct{}),
 		Times:            map[BuildStatus]time.Duration{},
 		LastStateStart:   time.Now(),
@@ -137,24 +178,13 @@ func New(r runner.Runner, rq cb.Build, ts oauth2.TokenSource,
 // Start executes a single build.
 func (b *Build) Start() {
 	if b.local {
-		defer func() {
-			// The worker will close it after it finishes all its work, which includes
-			// more steps (source fetching, etc...).
-			// Wait for all logging to finish.
-			if err := b.Log.Close(); err != nil {
-				b.Status = StatusError
-			}
-			close(b.Done)
-		}()
-		if err := b.Log.SetupPrint(); err != nil {
-			b.Failbuild(err)
-		}
+		defer close(b.Done)
 	}
 
 	// Create the home volume.
 	homeVol := volume.New(homeVolume, b.Runner)
 	if err := homeVol.Setup(); err != nil {
-		b.Failbuild(err)
+		b.FailBuild(err)
 		return
 	}
 	defer func() {
@@ -166,7 +196,7 @@ func (b *Build) Start() {
 	// Fetch and run the build steps.
 	b.UpdateStatus(StatusBuild)
 	if err := b.runBuildSteps(); err != nil {
-		b.Failbuild(err)
+		b.FailBuild(err)
 		return
 	}
 
@@ -174,7 +204,7 @@ func (b *Build) Start() {
 	if b.push {
 		b.UpdateStatus(StatusPush)
 		if err := b.pushImages(); err != nil {
-			b.Failbuild(err)
+			b.FailBuild(err)
 			return
 		}
 	}
@@ -214,6 +244,8 @@ func (b *Build) Summary() BuildSummary {
 		s.BuildStepImages = append(s.BuildStepImages, digest)
 	}
 
+	s.Timing = b.Timing
+
 	return s
 }
 
@@ -231,8 +263,8 @@ func (b *Build) UpdateStatus(status BuildStatus) {
 
 }
 
-// Failbuild updates the build's status to failure.
-func (b *Build) Failbuild(err error) {
+// FailBuild updates the build's status to failure.
+func (b *Build) FailBuild(err error) {
 	b.UpdateStatus(StatusError)
 	b.Log.WriteMainEntry("ERROR: " + err.Error())
 	b.Mu.Lock()
@@ -339,8 +371,7 @@ func (b *Build) UpdateDockerAccessToken(tok string) error {
 }
 
 func (b *Build) dockerCmdOutput(cmd string, args ...string) (string, error) {
-	dockerArgs := append([]string{"docker", cmd}, args...)
-	return b.runAndScrape(dockerArgs, "")
+	return b.runAndScrape(append([]string{"docker", cmd}, args...))
 }
 
 func (b *Build) dockerInspect(tag string) (string, error) {
@@ -464,7 +495,7 @@ func (b *Build) dockerPushWithRetries(tag string, attempt int) (string, error) {
 		"gcr.io/cloud-builders/docker",
 		"push", tag}
 
-	output, err := b.runWithScrapedLogging("PUSH", args, "")
+	output, err := b.runWithScrapedLogging("PUSH", args)
 	if err != nil {
 		b.PushErrors++
 		if derr := b.detectPushFailure(output); derr != nil {
@@ -555,29 +586,29 @@ func (b *Build) dockerPush(tag string) (map[string]string, error) {
 }
 
 // runWithScrapedLogging executes the command and returns the output (stdin, stderr), with logging.
-func (b *Build) runWithScrapedLogging(logPrefix string, cmd []string, dir string) (string, error) {
+func (b *Build) runWithScrapedLogging(logPrefix string, cmd []string) (string, error) {
 	var buf bytes.Buffer
-	outWriter := io.MultiWriter(b.Log.MakeWriter(logPrefix+":STDOUT"), &buf)
-	errWriter := io.MultiWriter(b.Log.MakeWriter(logPrefix+":STDERR"), &buf)
-	err := b.Runner.Run(cmd, nil, outWriter, errWriter, dir)
+	outWriter := io.MultiWriter(b.Log.MakeWriter(logPrefix+":STDOUT", -1, true), &buf)
+	errWriter := io.MultiWriter(b.Log.MakeWriter(logPrefix+":STDERR", -1, false), &buf)
+	err := b.Runner.Run(cmd, nil, outWriter, errWriter, "")
 	return buf.String(), err
 }
 
 // runAndScrape executes the command and returns the output (stdin, stderr), without logging.
-func (b *Build) runAndScrape(cmd []string, dir string) (string, error) {
+func (b *Build) runAndScrape(cmd []string) (string, error) {
 	var buf bytes.Buffer
 	outWriter := io.Writer(&buf)
 	errWriter := io.Writer(&buf)
-	err := b.Runner.Run(cmd, nil, outWriter, errWriter, dir)
+	err := b.Runner.Run(cmd, nil, outWriter, errWriter, "")
 	return buf.String(), err
 }
 
 // fetchBuilder takes a step name and pulls the image if it isn't already present.
 // It returns the digest of the image or empty string.
-func (b *Build) fetchBuilder(name string, stepIdentifier string) (string, error) {
+func (b *Build) fetchBuilder(name string, stepIdentifier string, stepIdx int) (string, error) {
 	digest, err := b.dockerInspect(name)
-	outWriter := b.Log.MakeWriter(fmt.Sprintf("%s", stepIdentifier))
-	errWriter := b.Log.MakeWriter(fmt.Sprintf("%s", stepIdentifier))
+	outWriter := b.Log.MakeWriter(fmt.Sprintf("%s", stepIdentifier), stepIdx, true)
+	errWriter := b.Log.MakeWriter(fmt.Sprintf("%s", stepIdentifier), stepIdx, false)
 	if err == errorScrapingDigest {
 		fmt.Fprintf(outWriter, "Already have image: %s\n", name)
 		return "", nil
@@ -687,10 +718,43 @@ func (r realKMS) Decrypt(key, enc string) (string, error) {
 	return resp.Plaintext, nil
 }
 
-func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan struct{}, done chan<- struct{}, errors chan error) {
+func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan struct{}, done chan<- struct{}, timingChan chan *buildStepTime, errors chan error) {
 	for _, ch := range waitChans {
 		<-ch
 	}
+	start := timeNow()
+	// timeStepFunc times the step and should be called whether or not the step has an error.
+	// The function should be called before any errors are passed into the errors channel.
+	// It must also be called before the done channel is closed, otherwise consecutive
+	// build steps may start before this function has been timed.
+	timeStepFunc := func() {
+		ts := &TimeSpan{start, timeNow()}
+		timingChan <- &buildStepTime{
+			stepIdx:  idx,
+			timeSpan: ts,
+		}
+		close(timingChan)
+	}
+
+	// handleStepError times the step and sends an error to the errors channel.
+	handleStepError := func(err error) {
+		timeStepFunc()
+		errors <- err
+	}
+	success := false
+
+	ctx := context.Background()
+	if err := b.EventLogger.StartStep(ctx, idx); err != nil {
+		log.Printf("Error publishing start-step event: %v", err)
+		
+	}
+	defer func(idx int) {
+		if err := b.EventLogger.FinishStep(ctx, idx, success); err != nil {
+			log.Printf("Error publishing finish-step event: %v", err)
+			
+		}
+	}(idx)
+
 	var stepIdentifier string
 	if b.HasMultipleSteps {
 		if step.Id != "" {
@@ -699,12 +763,12 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 			stepIdentifier = fmt.Sprintf("Step #%d", idx)
 		}
 	}
-	outWriter := b.Log.MakeWriter(fmt.Sprintf("%s", stepIdentifier))
-	errWriter := b.Log.MakeWriter(fmt.Sprintf("%s", stepIdentifier))
+	outWriter := b.Log.MakeWriter(fmt.Sprintf("%s", stepIdentifier), idx, true)
+	errWriter := b.Log.MakeWriter(fmt.Sprintf("%s", stepIdentifier), idx, false)
 
-	digest, err := b.fetchBuilder(step.Name, stepIdentifier)
+	digest, err := b.fetchBuilder(step.Name, stepIdentifier, idx)
 	if err != nil {
-		errors <- err
+		handleStepError(err)
 		return
 	}
 	b.recordStepDigest(idx, digest)
@@ -734,7 +798,7 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 	if len(step.SecretEnv) > 0 {
 		kms, err := b.getKMSClient()
 		if err != nil {
-			errors <- err
+			handleStepError(err)
 			return
 		}
 		for _, se := range step.SecretEnv {
@@ -745,12 +809,12 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 					kmsKeyName := sec.KmsKeyName
 					plaintext, err := kms.Decrypt(kmsKeyName, base64.StdEncoding.EncodeToString(val))
 					if err != nil {
-						errors <- fmt.Errorf("Failed to decrypt %q using key %q: %v", se, kmsKeyName, err)
+						handleStepError(fmt.Errorf("Failed to decrypt %q using key %q: %v", se, kmsKeyName, err))
 						return
 					}
 					dec, err := base64.StdEncoding.DecodeString(plaintext)
 					if err != nil {
-						errors <- fmt.Errorf("Plaintext was not base64-decodeable: %v", err)
+						handleStepError(fmt.Errorf("Plaintext was not base64-decodeable: %v", err))
 						return
 					}
 					args = append(args, "--env", fmt.Sprintf("%s=%s", se, string(dec)))
@@ -763,9 +827,10 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 	args = append(args, runTarget)
 	args = append(args, step.Args...)
 	if err := b.Runner.Run(args, nil, outWriter, errWriter, ""); err != nil {
-		errors <- fmt.Errorf("build step %q failed: %v", runTarget, err)
+		handleStepError(fmt.Errorf("build step %q failed: %v", runTarget, err))
 	} else {
 		defer close(done)
+		defer timeStepFunc() // step was successful
 	}
 	if b.HasMultipleSteps {
 		b.Log.WriteMainEntry(fmt.Sprintf("Finished %s", stepIdentifier))
@@ -773,6 +838,15 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 }
 
 func (b *Build) runBuildSteps() error {
+	// Create BuildTotal TimeSpan with Start time. End time has zero value.
+	b.Timing.BuildTotal = &TimeSpan{Start: timeNow()}
+	defer func() {
+		// Populate End time in BuildTotal TimeSpan.
+		// If the build is killed before the function has finished, this deferred function
+		// will not execute, but we will the Start time.
+		b.Timing.BuildTotal.End = timeNow()
+	}()
+
 	// Create all the volumes referenced by all steps and defer cleanup.
 	
 	allVolumes := map[string]bool{}
@@ -800,6 +874,7 @@ func (b *Build) runBuildSteps() error {
 	b.HasMultipleSteps = len(b.Request.Steps) > 1
 	errors := make(chan error)
 	var finishedChannels []chan struct{}
+	var timingChannels []chan *buildStepTime
 	b.idxChan = map[int]chan struct{}{}
 	b.idxTranslate = map[string]int{}
 	for idx, step := range b.Request.Steps {
@@ -814,14 +889,23 @@ func (b *Build) runBuildSteps() error {
 		if err != nil {
 			return err
 		}
-		go b.fetchAndRunStep(step, idx, waitChans, finishedStep, errors)
+		timing := make(chan *buildStepTime, 1)
+		go b.fetchAndRunStep(step, idx, waitChans, finishedStep, timing, errors)
 		finishedChannels = append(finishedChannels, finishedStep)
+		timingChannels = append(timingChannels, timing)
 	}
-	for _, ch := range finishedChannels {
+	// When a step has an error and doesn't finish, we still want the step timing.
+	
+	// We could possibly pass errors in that channel too. Reducing the number of channels can make the code clearer.
+	for i, ch := range finishedChannels {
 		select {
 		case <-ch:
+			t := <-timingChannels[i]
+			b.Timing.BuildSteps = append(b.Timing.BuildSteps, t.timeSpan)
 			continue
 		case err := <-errors:
+			t := <-timingChannels[i] // time an unfinished step
+			b.Timing.BuildSteps = append(b.Timing.BuildSteps, t.timeSpan)
 			return err
 		}
 	}
@@ -846,6 +930,14 @@ func (b *Build) dockerRunArgs(stepDir string, idx int) []string {
 		args = append(args, "--rm")
 	}
 
+	workdir := containerWorkspaceDir
+	if dir := b.Request.GetSource().GetRepoSource().GetDir(); dir != "" {
+		// At some point we may elect to do a "shallow clone" instead.
+		// See: https://git-scm.com/docs/git-archive
+		workdir = path.Join(workdir, dir)
+	}
+	workdir = path.Join(workdir, stepDir)
+
 	args = append(args,
 		// Gives a unique name to each build step.
 		// Makes the build step easier to kill when it fails.
@@ -858,7 +950,7 @@ func (b *Build) dockerRunArgs(stepDir string, idx int) []string {
 		// Note: path.Join is more correct than filepath.Join. Docker volume aths
 		// are always Linux forward slash paths. As this tool can run on any OS,
 		// filepath.Join would produce an incorrect result.
-		"--workdir", path.Join(containerWorkspaceDir, stepDir),
+		"--workdir", workdir,
 		// Mount in the home volume.
 		"--volume", homeVolume+":"+homeDir,
 		// Make /builder/home $HOME.
@@ -895,22 +987,24 @@ func (b *Build) resolveDigestsForImage(image string, digests map[string]string) 
 	fields := strings.Split(image, ":")
 	untaggedImage := fields[0]
 
-	// We report all pushed tag digests, even though the customer may have only asked for one.
-	// The reason for collecting all digests is that if the customer specified an untagged
-	// image, but never tagged a ":latest" (but tagged a few others), then there is no single
-	// "correct" tag/digest to record. Instead, we should record all of them.
+	// We report all pushed tag digests, even though the customer may have only
+	// asked for one.  The reason for collecting all digests is that if the
+	// customer specified an untagged image, but never tagged a ":latest" (but
+	// tagged a few others), then there is no single "correct" tag/digest to
+	// record. Instead, we should record all of them.
 
 	resolvedDigests := map[string]string{}
 	for tag, digest := range digests {
-		// Pulling without a tag is the same as pulling :latest, so we'll record it both ways.
-		// No matter what the user specified, the tag in this list will never be empty.
+		// Pulling without a tag is the same as pulling :latest, so we'll record it
+		// both ways.  No matter what the user specified, the tag in this list will
+		// never be empty.
 		if tag == "latest" {
 			resolvedDigests[untaggedImage] = digest
 		}
-		// If another push step already sent this image, we'll overwrite. Usually the digests
-		// will be the same in this situation, but it's possible a background docker task
-		// changed the tag. Either way, the digest here is soemthing that was actually pushed
-		// so we'll record it.
+		// If another push step already sent this image, we'll overwrite. Usually
+		// the digests will be the same in this situation, but it's possible a
+		// background docker task changed the tag. Either way, the digest here is
+		// something that was actually pushed so we'll record it.
 		resolvedDigests[fmt.Sprintf("%s:%s", untaggedImage, tag)] = digest
 	}
 	return resolvedDigests
@@ -920,8 +1014,17 @@ func (b *Build) pushImages() error {
 	if b.Request.Images == nil {
 		return nil
 	}
+	b.Timing.PushTotal = &TimeSpan{Start: timeNow()}
+	defer func() {
+		b.Timing.PushTotal.End = timeNow()
+	}()
+
+	b.Timing.ImagePushes = make(map[string]*TimeSpan)
 	for _, image := range b.Request.Images {
+		start := timeNow()
 		digests, err := b.dockerPush(image)
+		timing := &TimeSpan{Start: start, End: timeNow()}
+
 		if err == errorScrapingDigest {
 			log.Println("Unable to find a digest")
 			continue
@@ -936,6 +1039,7 @@ func (b *Build) pushImages() error {
 		b.Mu.Lock()
 		for i, d := range resolvedDigests {
 			b.imageDigests[i] = d
+			b.Timing.ImagePushes[d] = timing
 		}
 		b.Mu.Unlock()
 	}

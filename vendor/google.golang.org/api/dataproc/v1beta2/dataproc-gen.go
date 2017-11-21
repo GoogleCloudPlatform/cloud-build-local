@@ -203,8 +203,8 @@ type AcceleratorConfig struct {
 }
 
 func (s *AcceleratorConfig) MarshalJSON() ([]byte, error) {
-	type noMethod AcceleratorConfig
-	raw := noMethod(*s)
+	type NoMethod AcceleratorConfig
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -251,8 +251,8 @@ type Binding struct {
 }
 
 func (s *Binding) MarshalJSON() ([]byte, error) {
-	type noMethod Binding
-	raw := noMethod(*s)
+	type NoMethod Binding
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -321,8 +321,8 @@ type Cluster struct {
 }
 
 func (s *Cluster) MarshalJSON() ([]byte, error) {
-	type noMethod Cluster
-	raw := noMethod(*s)
+	type NoMethod Cluster
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -394,8 +394,8 @@ type ClusterConfig struct {
 }
 
 func (s *ClusterConfig) MarshalJSON() ([]byte, error) {
-	type noMethod ClusterConfig
-	raw := noMethod(*s)
+	type NoMethod ClusterConfig
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -427,19 +427,19 @@ type ClusterMetrics struct {
 }
 
 func (s *ClusterMetrics) MarshalJSON() ([]byte, error) {
-	type noMethod ClusterMetrics
-	raw := noMethod(*s)
+	type NoMethod ClusterMetrics
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 type ClusterOperation struct {
-	// Done: Output-only Indicates the operation is done.
+	// Done: Output only. Indicates the operation is done.
 	Done bool `json:"done,omitempty"`
 
-	// Error: Output-only Error, if operation failed.
+	// Error: Output only. Error, if operation failed.
 	Error string `json:"error,omitempty"`
 
-	// OperationId: Output-only The id of the cluster operation.
+	// OperationId: Output only. The id of the cluster operation.
 	OperationId string `json:"operationId,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Done") to
@@ -460,8 +460,8 @@ type ClusterOperation struct {
 }
 
 func (s *ClusterOperation) MarshalJSON() ([]byte, error) {
-	type noMethod ClusterOperation
-	raw := noMethod(*s)
+	type NoMethod ClusterOperation
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -509,8 +509,8 @@ type ClusterOperationMetadata struct {
 }
 
 func (s *ClusterOperationMetadata) MarshalJSON() ([]byte, error) {
-	type noMethod ClusterOperationMetadata
-	raw := noMethod(*s)
+	type NoMethod ClusterOperationMetadata
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -554,19 +554,22 @@ type ClusterOperationStatus struct {
 }
 
 func (s *ClusterOperationStatus) MarshalJSON() ([]byte, error) {
-	type noMethod ClusterOperationStatus
-	raw := noMethod(*s)
+	type NoMethod ClusterOperationStatus
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 // ClusterSelector: A selector that chooses target cluster for jobs
 // based on metadata.
 type ClusterSelector struct {
-	// ClusterLabels: Required The cluster labels. Cluster must have all
+	// ClusterLabels: Required. The cluster labels. Cluster must have all
 	// labels to match.
 	ClusterLabels map[string]string `json:"clusterLabels,omitempty"`
 
-	// Zone: Required The cluster target zone.
+	// Zone: Optional. The zone where workflow process executes. This
+	// parameter does not affect the selection of the cluster.If
+	// unspecified, the zone of the first cluster matching the selector is
+	// used.
 	Zone string `json:"zone,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "ClusterLabels") to
@@ -587,8 +590,8 @@ type ClusterSelector struct {
 }
 
 func (s *ClusterSelector) MarshalJSON() ([]byte, error) {
-	type noMethod ClusterSelector
-	raw := noMethod(*s)
+	type NoMethod ClusterSelector
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -646,8 +649,8 @@ type ClusterStatus struct {
 }
 
 func (s *ClusterStatus) MarshalJSON() ([]byte, error) {
-	type noMethod ClusterStatus
-	raw := noMethod(*s)
+	type NoMethod ClusterStatus
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -681,8 +684,8 @@ type DiagnoseClusterResults struct {
 }
 
 func (s *DiagnoseClusterResults) MarshalJSON() ([]byte, error) {
-	type noMethod DiagnoseClusterResults
-	raw := noMethod(*s)
+	type NoMethod DiagnoseClusterResults
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -721,8 +724,8 @@ type DiskConfig struct {
 }
 
 func (s *DiskConfig) MarshalJSON() ([]byte, error) {
-	type noMethod DiskConfig
-	raw := noMethod(*s)
+	type NoMethod DiskConfig
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -849,8 +852,8 @@ type GceClusterConfig struct {
 }
 
 func (s *GceClusterConfig) MarshalJSON() ([]byte, error) {
-	type noMethod GceClusterConfig
-	raw := noMethod(*s)
+	type NoMethod GceClusterConfig
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -920,8 +923,8 @@ type HadoopJob struct {
 }
 
 func (s *HadoopJob) MarshalJSON() ([]byte, error) {
-	type noMethod HadoopJob
-	raw := noMethod(*s)
+	type NoMethod HadoopJob
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -974,8 +977,8 @@ type HiveJob struct {
 }
 
 func (s *HiveJob) MarshalJSON() ([]byte, error) {
-	type noMethod HiveJob
-	raw := noMethod(*s)
+	type NoMethod HiveJob
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1043,25 +1046,25 @@ type InstanceGroupConfig struct {
 }
 
 func (s *InstanceGroupConfig) MarshalJSON() ([]byte, error) {
-	type noMethod InstanceGroupConfig
-	raw := noMethod(*s)
+	type NoMethod InstanceGroupConfig
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 // InstantiateWorkflowTemplateRequest: A request to instantiate a
 // workflow template.
 type InstantiateWorkflowTemplateRequest struct {
-	// InstanceId: Optional A tag that prevents multiple concurrent workflow
-	// instances with the same tag from running. This mitigates risk of
-	// concurrent instances started due to retries.It is recommended to
-	// always set this value to a UUID
+	// InstanceId: Optional. A tag that prevents multiple concurrent
+	// workflow instances with the same tag from running. This mitigates
+	// risk of concurrent instances started due to retries.It is recommended
+	// to always set this value to a UUID
 	// (https://en.wikipedia.org/wiki/Universally_unique_identifier).The tag
 	// must contain only letters (a-z, A-Z), numbers (0-9), underscores (_),
 	// and hyphens (-). The maximum length is 40 characters.
 	InstanceId string `json:"instanceId,omitempty"`
 
-	// Version: Optional The version of workflow template to instantiate. If
-	// specified, the workflow will be instantiated only if the current
+	// Version: Optional. The version of workflow template to instantiate.
+	// If specified, the workflow will be instantiated only if the current
 	// version of the workflow template has the supplied version.This option
 	// cannot be used to instantiate a previous version of workflow
 	// template.
@@ -1085,8 +1088,8 @@ type InstantiateWorkflowTemplateRequest struct {
 }
 
 func (s *InstantiateWorkflowTemplateRequest) MarshalJSON() ([]byte, error) {
-	type noMethod InstantiateWorkflowTemplateRequest
-	raw := noMethod(*s)
+	type NoMethod InstantiateWorkflowTemplateRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1178,8 +1181,8 @@ type Job struct {
 }
 
 func (s *Job) MarshalJSON() ([]byte, error) {
-	type noMethod Job
-	raw := noMethod(*s)
+	type NoMethod Job
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1211,8 +1214,8 @@ type JobPlacement struct {
 }
 
 func (s *JobPlacement) MarshalJSON() ([]byte, error) {
-	type noMethod JobPlacement
-	raw := noMethod(*s)
+	type NoMethod JobPlacement
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1248,8 +1251,8 @@ type JobReference struct {
 }
 
 func (s *JobReference) MarshalJSON() ([]byte, error) {
-	type noMethod JobReference
-	raw := noMethod(*s)
+	type NoMethod JobReference
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1283,8 +1286,8 @@ type JobScheduling struct {
 }
 
 func (s *JobScheduling) MarshalJSON() ([]byte, error) {
-	type noMethod JobScheduling
-	raw := noMethod(*s)
+	type NoMethod JobScheduling
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1353,8 +1356,8 @@ type JobStatus struct {
 }
 
 func (s *JobStatus) MarshalJSON() ([]byte, error) {
-	type noMethod JobStatus
-	raw := noMethod(*s)
+	type NoMethod JobStatus
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1392,8 +1395,8 @@ type LifecycleConfig struct {
 }
 
 func (s *LifecycleConfig) MarshalJSON() ([]byte, error) {
-	type noMethod LifecycleConfig
-	raw := noMethod(*s)
+	type NoMethod LifecycleConfig
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1430,8 +1433,8 @@ type ListClustersResponse struct {
 }
 
 func (s *ListClustersResponse) MarshalJSON() ([]byte, error) {
-	type noMethod ListClustersResponse
-	raw := noMethod(*s)
+	type NoMethod ListClustersResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1468,8 +1471,8 @@ type ListJobsResponse struct {
 }
 
 func (s *ListJobsResponse) MarshalJSON() ([]byte, error) {
-	type noMethod ListJobsResponse
-	raw := noMethod(*s)
+	type NoMethod ListJobsResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1505,21 +1508,21 @@ type ListOperationsResponse struct {
 }
 
 func (s *ListOperationsResponse) MarshalJSON() ([]byte, error) {
-	type noMethod ListOperationsResponse
-	raw := noMethod(*s)
+	type NoMethod ListOperationsResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 // ListWorkflowTemplatesResponse: A response to a request to list
 // workflow templates in a project.
 type ListWorkflowTemplatesResponse struct {
-	// NextPageToken: Output-only This token is included in the response if
+	// NextPageToken: Output only. This token is included in the response if
 	// there are more results to fetch. To fetch additional results, provide
 	// this value as the page_token in a subsequent
 	// <code>ListWorkflowTemplatesRequest</code>.
 	NextPageToken string `json:"nextPageToken,omitempty"`
 
-	// Templates: Output-only WorkflowTemplates list.
+	// Templates: Output only. WorkflowTemplates list.
 	Templates []*WorkflowTemplate `json:"templates,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -1544,8 +1547,8 @@ type ListWorkflowTemplatesResponse struct {
 }
 
 func (s *ListWorkflowTemplatesResponse) MarshalJSON() ([]byte, error) {
-	type noMethod ListWorkflowTemplatesResponse
-	raw := noMethod(*s)
+	type NoMethod ListWorkflowTemplatesResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1575,23 +1578,23 @@ type LoggingConfig struct {
 }
 
 func (s *LoggingConfig) MarshalJSON() ([]byte, error) {
-	type noMethod LoggingConfig
-	raw := noMethod(*s)
+	type NoMethod LoggingConfig
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 // ManagedCluster: Cluster that is managed by the workflow.
 type ManagedCluster struct {
-	// ClusterName: Required The cluster name. Cluster names within a
+	// ClusterName: Required. The cluster name. Cluster names within a
 	// project must be unique. Names from deleted clusters can be reused.
 	ClusterName string `json:"clusterName,omitempty"`
 
-	// Config: Required The cluster configuration.
+	// Config: Required. The cluster configuration.
 	Config *ClusterConfig `json:"config,omitempty"`
 
-	// Labels: Optional The labels to associate with this cluster.Label keys
-	// must be between 1 and 63 characters long, and must conform to the
-	// following PCRE regular expression: \p{Ll}\p{Lo}{0,62}Label values
+	// Labels: Optional. The labels to associate with this cluster.Label
+	// keys must be between 1 and 63 characters long, and must conform to
+	// the following PCRE regular expression: \p{Ll}\p{Lo}{0,62}Label values
 	// must be between 1 and 63 characters long, and must conform to the
 	// following PCRE regular expression: \p{Ll}\p{Lo}\p{N}_-{0,63}No more
 	// than 64 labels can be associated with a given cluster.
@@ -1615,8 +1618,8 @@ type ManagedCluster struct {
 }
 
 func (s *ManagedCluster) MarshalJSON() ([]byte, error) {
-	type noMethod ManagedCluster
-	raw := noMethod(*s)
+	type NoMethod ManagedCluster
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1651,8 +1654,8 @@ type ManagedGroupConfig struct {
 }
 
 func (s *ManagedGroupConfig) MarshalJSON() ([]byte, error) {
-	type noMethod ManagedGroupConfig
-	raw := noMethod(*s)
+	type NoMethod ManagedGroupConfig
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1689,8 +1692,8 @@ type NodeInitializationAction struct {
 }
 
 func (s *NodeInitializationAction) MarshalJSON() ([]byte, error) {
-	type noMethod NodeInitializationAction
-	raw := noMethod(*s)
+	type NoMethod NodeInitializationAction
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1750,8 +1753,8 @@ type Operation struct {
 }
 
 func (s *Operation) MarshalJSON() ([]byte, error) {
-	type noMethod Operation
-	raw := noMethod(*s)
+	type NoMethod Operation
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1762,7 +1765,7 @@ type OrderedJob struct {
 	// HiveJob: Job is a Hive job.
 	HiveJob *HiveJob `json:"hiveJob,omitempty"`
 
-	// Labels: Optional The labels to associate with this job.Label keys
+	// Labels: Optional. The labels to associate with this job.Label keys
 	// must be between 1 and 63 characters long, and must conform to the
 	// following regular expression: \p{Ll}\p{Lo}{0,62}Label values must be
 	// between 1 and 63 characters long, and must conform to the following
@@ -1773,7 +1776,7 @@ type OrderedJob struct {
 	// PigJob: Job is a Pig job.
 	PigJob *PigJob `json:"pigJob,omitempty"`
 
-	// PrerequisiteStepIds: Optional The optional list of prerequisite job
+	// PrerequisiteStepIds: Optional. The optional list of prerequisite job
 	// step_ids. If not specified, the job will start at the beginning of
 	// workflow.
 	PrerequisiteStepIds []string `json:"prerequisiteStepIds,omitempty"`
@@ -1781,7 +1784,7 @@ type OrderedJob struct {
 	// PysparkJob: Job is a Pyspark job.
 	PysparkJob *PySparkJob `json:"pysparkJob,omitempty"`
 
-	// Scheduling: Optional Job scheduling configuration.
+	// Scheduling: Optional. Job scheduling configuration.
 	Scheduling *JobScheduling `json:"scheduling,omitempty"`
 
 	// SparkJob: Job is a Spark job.
@@ -1790,7 +1793,7 @@ type OrderedJob struct {
 	// SparkSqlJob: Job is a SparkSql job.
 	SparkSqlJob *SparkSqlJob `json:"sparkSqlJob,omitempty"`
 
-	// StepId: Required The step id. The id must be unique among all jobs
+	// StepId: Required. The step id. The id must be unique among all jobs
 	// within the template.The step id is used as prefix for job id, as job
 	// workflow-step-id label, and in prerequisite_step_ids field from other
 	// steps.
@@ -1814,8 +1817,8 @@ type OrderedJob struct {
 }
 
 func (s *OrderedJob) MarshalJSON() ([]byte, error) {
-	type noMethod OrderedJob
-	raw := noMethod(*s)
+	type NoMethod OrderedJob
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1872,8 +1875,8 @@ type PigJob struct {
 }
 
 func (s *PigJob) MarshalJSON() ([]byte, error) {
-	type noMethod PigJob
-	raw := noMethod(*s)
+	type NoMethod PigJob
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1943,8 +1946,8 @@ type Policy struct {
 }
 
 func (s *Policy) MarshalJSON() ([]byte, error) {
-	type noMethod Policy
-	raw := noMethod(*s)
+	type NoMethod Policy
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2005,8 +2008,8 @@ type PySparkJob struct {
 }
 
 func (s *PySparkJob) MarshalJSON() ([]byte, error) {
-	type noMethod PySparkJob
-	raw := noMethod(*s)
+	type NoMethod PySparkJob
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2047,8 +2050,8 @@ type QueryList struct {
 }
 
 func (s *QueryList) MarshalJSON() ([]byte, error) {
-	type noMethod QueryList
-	raw := noMethod(*s)
+	type NoMethod QueryList
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2078,8 +2081,8 @@ type SetIamPolicyRequest struct {
 }
 
 func (s *SetIamPolicyRequest) MarshalJSON() ([]byte, error) {
-	type noMethod SetIamPolicyRequest
-	raw := noMethod(*s)
+	type NoMethod SetIamPolicyRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2124,8 +2127,8 @@ type SoftwareConfig struct {
 }
 
 func (s *SoftwareConfig) MarshalJSON() ([]byte, error) {
-	type noMethod SoftwareConfig
-	raw := noMethod(*s)
+	type NoMethod SoftwareConfig
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2187,8 +2190,8 @@ type SparkJob struct {
 }
 
 func (s *SparkJob) MarshalJSON() ([]byte, error) {
-	type noMethod SparkJob
-	raw := noMethod(*s)
+	type NoMethod SparkJob
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2235,8 +2238,8 @@ type SparkSqlJob struct {
 }
 
 func (s *SparkSqlJob) MarshalJSON() ([]byte, error) {
-	type noMethod SparkSqlJob
-	raw := noMethod(*s)
+	type NoMethod SparkSqlJob
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2311,8 +2314,8 @@ type Status struct {
 }
 
 func (s *Status) MarshalJSON() ([]byte, error) {
-	type noMethod Status
-	raw := noMethod(*s)
+	type NoMethod Status
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2339,8 +2342,8 @@ type SubmitJobRequest struct {
 }
 
 func (s *SubmitJobRequest) MarshalJSON() ([]byte, error) {
-	type noMethod SubmitJobRequest
-	raw := noMethod(*s)
+	type NoMethod SubmitJobRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2371,8 +2374,8 @@ type TestIamPermissionsRequest struct {
 }
 
 func (s *TestIamPermissionsRequest) MarshalJSON() ([]byte, error) {
-	type noMethod TestIamPermissionsRequest
-	raw := noMethod(*s)
+	type NoMethod TestIamPermissionsRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2405,14 +2408,14 @@ type TestIamPermissionsResponse struct {
 }
 
 func (s *TestIamPermissionsResponse) MarshalJSON() ([]byte, error) {
-	type noMethod TestIamPermissionsResponse
-	raw := noMethod(*s)
+	type NoMethod TestIamPermissionsResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 // WorkflowGraph: The workflow graph.
 type WorkflowGraph struct {
-	// Nodes: Output-only The workflow nodes.
+	// Nodes: Output only. The workflow nodes.
 	Nodes []*WorkflowNode `json:"nodes,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Nodes") to
@@ -2433,26 +2436,26 @@ type WorkflowGraph struct {
 }
 
 func (s *WorkflowGraph) MarshalJSON() ([]byte, error) {
-	type noMethod WorkflowGraph
-	raw := noMethod(*s)
+	type NoMethod WorkflowGraph
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 // WorkflowMetadata: A Cloud Dataproc workflow template resource.
 type WorkflowMetadata struct {
-	// ClusterName: Output-only The name of the managed cluster.
+	// ClusterName: Output only. The name of the managed cluster.
 	ClusterName string `json:"clusterName,omitempty"`
 
-	// CreateCluster: Output-only The create cluster operation metadata.
+	// CreateCluster: Output only. The create cluster operation metadata.
 	CreateCluster *ClusterOperation `json:"createCluster,omitempty"`
 
-	// DeleteCluster: Output-only The delete cluster operation metadata.
+	// DeleteCluster: Output only. The delete cluster operation metadata.
 	DeleteCluster *ClusterOperation `json:"deleteCluster,omitempty"`
 
-	// Graph: Output-only The workflow graph.
+	// Graph: Output only. The workflow graph.
 	Graph *WorkflowGraph `json:"graph,omitempty"`
 
-	// State: Output-only The workflow state.
+	// State: Output only. The workflow state.
 	//
 	// Possible values:
 	//   "UNKNOWN" - Unused.
@@ -2461,10 +2464,10 @@ type WorkflowMetadata struct {
 	//   "DONE" - The operation is done; either cancelled or completed.
 	State string `json:"state,omitempty"`
 
-	// Template: Output-only The "resource name" of the template.
+	// Template: Output only. The "resource name" of the template.
 	Template string `json:"template,omitempty"`
 
-	// Version: Output-only The version of template at the time of workflow
+	// Version: Output only. The version of template at the time of workflow
 	// instantiation.
 	Version int64 `json:"version,omitempty"`
 
@@ -2486,24 +2489,24 @@ type WorkflowMetadata struct {
 }
 
 func (s *WorkflowMetadata) MarshalJSON() ([]byte, error) {
-	type noMethod WorkflowMetadata
-	raw := noMethod(*s)
+	type NoMethod WorkflowMetadata
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 // WorkflowNode: The workflow node.
 type WorkflowNode struct {
-	// Error: Output-only The error detail.
+	// Error: Output only. The error detail.
 	Error string `json:"error,omitempty"`
 
-	// JobId: Output-only The job id; populated after the node enters
+	// JobId: Output only. The job id; populated after the node enters
 	// RUNNING state.
 	JobId string `json:"jobId,omitempty"`
 
-	// PrerequisiteStepIds: Output-only Node's prerequisite nodes.
+	// PrerequisiteStepIds: Output only. Node's prerequisite nodes.
 	PrerequisiteStepIds []string `json:"prerequisiteStepIds,omitempty"`
 
-	// State: Output-only The node state.
+	// State: Output only. The node state.
 	//
 	// Possible values:
 	//   "NODE_STATUS_UNSPECIFIED"
@@ -2515,7 +2518,7 @@ type WorkflowNode struct {
 	// ancestor or peer failed.
 	State string `json:"state,omitempty"`
 
-	// StepId: Output-only The name of the node.
+	// StepId: Output only. The name of the node.
 	StepId string `json:"stepId,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Error") to
@@ -2536,23 +2539,23 @@ type WorkflowNode struct {
 }
 
 func (s *WorkflowNode) MarshalJSON() ([]byte, error) {
-	type noMethod WorkflowNode
-	raw := noMethod(*s)
+	type NoMethod WorkflowNode
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 // WorkflowTemplate: A Cloud Dataproc workflow template resource.
 type WorkflowTemplate struct {
-	// CreateTime: Output-only The time template was created.
+	// CreateTime: Output only. The time template was created.
 	CreateTime string `json:"createTime,omitempty"`
 
-	// Id: Required The template id.
+	// Id: Required. The template id.
 	Id string `json:"id,omitempty"`
 
-	// Jobs: Required The Directed Acyclic Graph of Jobs to submit.
+	// Jobs: Required. The Directed Acyclic Graph of Jobs to submit.
 	Jobs []*OrderedJob `json:"jobs,omitempty"`
 
-	// Labels: Optional The labels to associate with this template. These
+	// Labels: Optional. The labels to associate with this template. These
 	// labels will be propagated to all jobs and clusters created by the
 	// workflow instance.Label keys must contain 1 to 63 characters, and
 	// must conform to RFC 1035 (https://www.ietf.org/rfc/rfc1035.txt).Label
@@ -2562,26 +2565,26 @@ type WorkflowTemplate struct {
 	// associated with a template.
 	Labels map[string]string `json:"labels,omitempty"`
 
-	// Name: Output-only The "resource name" of the template, as described
+	// Name: Output only. The "resource name" of the template, as described
 	// in https://cloud.google.com/apis/design/resource_names of the form
 	// projects/{project_id}/regions/{region}/workflowTemplates/{template_id}
 	Name string `json:"name,omitempty"`
 
-	// Placement: Required WorkflowTemplate scheduling information.
+	// Placement: Required. WorkflowTemplate scheduling information.
 	Placement *WorkflowTemplatePlacement `json:"placement,omitempty"`
 
-	// UpdateTime: Output-only The time template was last updated.
+	// UpdateTime: Output only. The time template was last updated.
 	UpdateTime string `json:"updateTime,omitempty"`
 
-	// Version: Optional Used to perform a consistent read-modify-write.This
-	// field should be left blank for a CreateWorkflowTemplate request. It
-	// is required for an UpdateWorkflowTemplate request, and must match the
-	// current server version. A typical update template flow would fetch
-	// the current template with a GetWorkflowTemplate request, which will
-	// return the current template with the version field filled in with the
-	// current server version. The user updates other fields in the
-	// template, then returns it as part of the UpdateWorkflowTemplate
-	// request.
+	// Version: Optional. Used to perform a consistent
+	// read-modify-write.This field should be left blank for a
+	// CreateWorkflowTemplate request. It is required for an
+	// UpdateWorkflowTemplate request, and must match the current server
+	// version. A typical update template flow would fetch the current
+	// template with a GetWorkflowTemplate request, which will return the
+	// current template with the version field filled in with the current
+	// server version. The user updates other fields in the template, then
+	// returns it as part of the UpdateWorkflowTemplate request.
 	Version int64 `json:"version,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -2606,20 +2609,20 @@ type WorkflowTemplate struct {
 }
 
 func (s *WorkflowTemplate) MarshalJSON() ([]byte, error) {
-	type noMethod WorkflowTemplate
-	raw := noMethod(*s)
+	type NoMethod WorkflowTemplate
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 // WorkflowTemplatePlacement: Specifies workflow execution target.Either
 // managed_cluster or cluster_selector is required.
 type WorkflowTemplatePlacement struct {
-	// ClusterSelector: Optional A selector that chooses target cluster for
+	// ClusterSelector: Optional. A selector that chooses target cluster for
 	// jobs based on metadata.The selector is evaluated at the time each job
 	// is submitted.
 	ClusterSelector *ClusterSelector `json:"clusterSelector,omitempty"`
 
-	// ManagedCluster: Optional A cluster that is managed by the workflow.
+	// ManagedCluster: Optional. A cluster that is managed by the workflow.
 	ManagedCluster *ManagedCluster `json:"managedCluster,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "ClusterSelector") to
@@ -2641,8 +2644,8 @@ type WorkflowTemplatePlacement struct {
 }
 
 func (s *WorkflowTemplatePlacement) MarshalJSON() ([]byte, error) {
-	type noMethod WorkflowTemplatePlacement
-	raw := noMethod(*s)
+	type NoMethod WorkflowTemplatePlacement
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2697,18 +2700,18 @@ type YarnApplication struct {
 }
 
 func (s *YarnApplication) MarshalJSON() ([]byte, error) {
-	type noMethod YarnApplication
-	raw := noMethod(*s)
+	type NoMethod YarnApplication
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 func (s *YarnApplication) UnmarshalJSON(data []byte) error {
-	type noMethod YarnApplication
+	type NoMethod YarnApplication
 	var s1 struct {
 		Progress gensupport.JSONFloat64 `json:"progress"`
-		*noMethod
+		*NoMethod
 	}
-	s1.noMethod = (*noMethod)(s)
+	s1.NoMethod = (*NoMethod)(s)
 	if err := json.Unmarshal(data, &s1); err != nil {
 		return err
 	}
@@ -2816,7 +2819,7 @@ func (c *ProjectsLocationsWorkflowTemplatesCreateCall) Do(opts ...googleapi.Call
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2830,7 +2833,7 @@ func (c *ProjectsLocationsWorkflowTemplatesCreateCall) Do(opts ...googleapi.Call
 	//   ],
 	//   "parameters": {
 	//     "parent": {
-	//       "description": "Required The \"resource name\" of the region, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}",
+	//       "description": "Required. The \"resource name\" of the region, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/locations/[^/]+$",
 	//       "required": true,
@@ -2869,8 +2872,8 @@ func (r *ProjectsLocationsWorkflowTemplatesService) Delete(name string) *Project
 	return c
 }
 
-// Version sets the optional parameter "version": Optional The version
-// of workflow template to delete. If specified, will only delete the
+// Version sets the optional parameter "version": The version of
+// workflow template to delete. If specified, will only delete the
 // template if the current server version matches specified version.
 func (c *ProjectsLocationsWorkflowTemplatesDeleteCall) Version(version int64) *ProjectsLocationsWorkflowTemplatesDeleteCall {
 	c.urlParams_.Set("version", fmt.Sprint(version))
@@ -2953,7 +2956,7 @@ func (c *ProjectsLocationsWorkflowTemplatesDeleteCall) Do(opts ...googleapi.Call
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2967,14 +2970,14 @@ func (c *ProjectsLocationsWorkflowTemplatesDeleteCall) Do(opts ...googleapi.Call
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "Required The \"resource name\" of the workflow template, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}/workflowTemplates/{template_id}",
+	//       "description": "Required. The \"resource name\" of the workflow template, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}/workflowTemplates/{template_id}",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/locations/[^/]+/workflowTemplates/[^/]+$",
 	//       "required": true,
 	//       "type": "string"
 	//     },
 	//     "version": {
-	//       "description": "Optional The version of workflow template to delete. If specified, will only delete the template if the current server version matches specified version.",
+	//       "description": "Optional. The version of workflow template to delete. If specified, will only delete the template if the current server version matches specified version.",
 	//       "format": "int32",
 	//       "location": "query",
 	//       "type": "integer"
@@ -3010,10 +3013,9 @@ func (r *ProjectsLocationsWorkflowTemplatesService) Get(name string) *ProjectsLo
 	return c
 }
 
-// Version sets the optional parameter "version": Optional The version
-// of workflow template to retrieve. Only previously instatiated
-// versions can be retrieved.If unspecified, retrieves the current
-// version.
+// Version sets the optional parameter "version": The version of
+// workflow template to retrieve. Only previously instatiated versions
+// can be retrieved.If unspecified, retrieves the current version.
 func (c *ProjectsLocationsWorkflowTemplatesGetCall) Version(version int64) *ProjectsLocationsWorkflowTemplatesGetCall {
 	c.urlParams_.Set("version", fmt.Sprint(version))
 	return c
@@ -3108,7 +3110,7 @@ func (c *ProjectsLocationsWorkflowTemplatesGetCall) Do(opts ...googleapi.CallOpt
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3122,14 +3124,14 @@ func (c *ProjectsLocationsWorkflowTemplatesGetCall) Do(opts ...googleapi.CallOpt
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "Required The \"resource name\" of the workflow template, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}/workflowTemplates/{template_id}",
+	//       "description": "Required. The \"resource name\" of the workflow template, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}/workflowTemplates/{template_id}",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/locations/[^/]+/workflowTemplates/[^/]+$",
 	//       "required": true,
 	//       "type": "string"
 	//     },
 	//     "version": {
-	//       "description": "Optional The version of workflow template to retrieve. Only previously instatiated versions can be retrieved.If unspecified, retrieves the current version.",
+	//       "description": "Optional. The version of workflow template to retrieve. Only previously instatiated versions can be retrieved.If unspecified, retrieves the current version.",
 	//       "format": "int32",
 	//       "location": "query",
 	//       "type": "integer"
@@ -3255,7 +3257,7 @@ func (c *ProjectsLocationsWorkflowTemplatesInstantiateCall) Do(opts ...googleapi
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3269,7 +3271,7 @@ func (c *ProjectsLocationsWorkflowTemplatesInstantiateCall) Do(opts ...googleapi
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "Required The \"resource name\" of the workflow template, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}/workflowTemplates/{template_id}",
+	//       "description": "Required. The \"resource name\" of the workflow template, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}/workflowTemplates/{template_id}",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/locations/[^/]+/workflowTemplates/[^/]+$",
 	//       "required": true,
@@ -3308,16 +3310,15 @@ func (r *ProjectsLocationsWorkflowTemplatesService) List(parent string) *Project
 	return c
 }
 
-// PageSize sets the optional parameter "pageSize": Optional The maximum
-// number of results to return in each response.
+// PageSize sets the optional parameter "pageSize": The maximum number
+// of results to return in each response.
 func (c *ProjectsLocationsWorkflowTemplatesListCall) PageSize(pageSize int64) *ProjectsLocationsWorkflowTemplatesListCall {
 	c.urlParams_.Set("pageSize", fmt.Sprint(pageSize))
 	return c
 }
 
-// PageToken sets the optional parameter "pageToken": Optional The page
-// token, returned by a previous call, to request the next page of
-// results.
+// PageToken sets the optional parameter "pageToken": The page token,
+// returned by a previous call, to request the next page of results.
 func (c *ProjectsLocationsWorkflowTemplatesListCall) PageToken(pageToken string) *ProjectsLocationsWorkflowTemplatesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
 	return c
@@ -3412,7 +3413,7 @@ func (c *ProjectsLocationsWorkflowTemplatesListCall) Do(opts ...googleapi.CallOp
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3426,18 +3427,18 @@ func (c *ProjectsLocationsWorkflowTemplatesListCall) Do(opts ...googleapi.CallOp
 	//   ],
 	//   "parameters": {
 	//     "pageSize": {
-	//       "description": "Optional The maximum number of results to return in each response.",
+	//       "description": "Optional. The maximum number of results to return in each response.",
 	//       "format": "int32",
 	//       "location": "query",
 	//       "type": "integer"
 	//     },
 	//     "pageToken": {
-	//       "description": "Optional The page token, returned by a previous call, to request the next page of results.",
+	//       "description": "Optional. The page token, returned by a previous call, to request the next page of results.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "parent": {
-	//       "description": "Required The \"resource name\" of the region, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}",
+	//       "description": "Required. The \"resource name\" of the region, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/locations/[^/]+$",
 	//       "required": true,
@@ -3577,7 +3578,7 @@ func (c *ProjectsLocationsWorkflowTemplatesUpdateCall) Do(opts ...googleapi.Call
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3591,7 +3592,7 @@ func (c *ProjectsLocationsWorkflowTemplatesUpdateCall) Do(opts ...googleapi.Call
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "Output-only The \"resource name\" of the template, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}/workflowTemplates/{template_id}",
+	//       "description": "Output only. The \"resource name\" of the template, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}/workflowTemplates/{template_id}",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/locations/[^/]+/workflowTemplates/[^/]+$",
 	//       "required": true,
@@ -3715,7 +3716,7 @@ func (c *ProjectsRegionsClustersCreateCall) Do(opts ...googleapi.CallOption) (*O
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3863,7 +3864,7 @@ func (c *ProjectsRegionsClustersDeleteCall) Do(opts ...googleapi.CallOption) (*O
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4021,7 +4022,7 @@ func (c *ProjectsRegionsClustersDiagnoseCall) Do(opts ...googleapi.CallOption) (
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4182,7 +4183,7 @@ func (c *ProjectsRegionsClustersGetCall) Do(opts ...googleapi.CallOption) (*Clus
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4336,7 +4337,7 @@ func (c *ProjectsRegionsClustersGetIamPolicyCall) Do(opts ...googleapi.CallOptio
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4510,7 +4511,7 @@ func (c *ProjectsRegionsClustersListCall) Do(opts ...googleapi.CallOption) (*Lis
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4738,7 +4739,7 @@ func (c *ProjectsRegionsClustersPatchCall) Do(opts ...googleapi.CallOption) (*Op
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4899,7 +4900,7 @@ func (c *ProjectsRegionsClustersSetIamPolicyCall) Do(opts ...googleapi.CallOptio
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5039,7 +5040,7 @@ func (c *ProjectsRegionsClustersTestIamPermissionsCall) Do(opts ...googleapi.Cal
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5182,7 +5183,7 @@ func (c *ProjectsRegionsJobsCancelCall) Do(opts ...googleapi.CallOption) (*Job, 
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5330,7 +5331,7 @@ func (c *ProjectsRegionsJobsDeleteCall) Do(opts ...googleapi.CallOption) (*Empty
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5488,7 +5489,7 @@ func (c *ProjectsRegionsJobsGetCall) Do(opts ...googleapi.CallOption) (*Job, err
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5565,7 +5566,7 @@ func (c *ProjectsRegionsJobsListCall) ClusterName(clusterName string) *ProjectsR
 // the jobs to list. Filters are case-sensitive and have the following
 // syntax:field = value AND field = value ...where field is status.state
 // or labels.[KEY], and [KEY] is a label key. value can be * to match
-// all values. status.state can be either ACTIVE or INACTIVE. Only the
+// all values. status.state can be either ACTIVE or NON_ACTIVE. Only the
 // logical AND operator is supported; space-separated items are treated
 // as having an implicit AND operator.Example filter:status.state =
 // ACTIVE AND labels.env = staging AND labels.starred = *
@@ -5575,8 +5576,8 @@ func (c *ProjectsRegionsJobsListCall) Filter(filter string) *ProjectsRegionsJobs
 }
 
 // JobStateMatcher sets the optional parameter "jobStateMatcher":
-// Specifies enumerated categories of jobs to list (default = match ALL
-// jobs).
+// Specifies enumerated categories of jobs to list. (default = match ALL
+// jobs).If filter is provided, jobStateMatcher will be ignored.
 //
 // Possible values:
 //   "ALL"
@@ -5691,7 +5692,7 @@ func (c *ProjectsRegionsJobsListCall) Do(opts ...googleapi.CallOption) (*ListJob
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5711,12 +5712,12 @@ func (c *ProjectsRegionsJobsListCall) Do(opts ...googleapi.CallOption) (*ListJob
 	//       "type": "string"
 	//     },
 	//     "filter": {
-	//       "description": "Optional. A filter constraining the jobs to list. Filters are case-sensitive and have the following syntax:field = value AND field = value ...where field is status.state or labels.[KEY], and [KEY] is a label key. value can be * to match all values. status.state can be either ACTIVE or INACTIVE. Only the logical AND operator is supported; space-separated items are treated as having an implicit AND operator.Example filter:status.state = ACTIVE AND labels.env = staging AND labels.starred = *",
+	//       "description": "Optional. A filter constraining the jobs to list. Filters are case-sensitive and have the following syntax:field = value AND field = value ...where field is status.state or labels.[KEY], and [KEY] is a label key. value can be * to match all values. status.state can be either ACTIVE or NON_ACTIVE. Only the logical AND operator is supported; space-separated items are treated as having an implicit AND operator.Example filter:status.state = ACTIVE AND labels.env = staging AND labels.starred = *",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "jobStateMatcher": {
-	//       "description": "Optional. Specifies enumerated categories of jobs to list (default = match ALL jobs).",
+	//       "description": "Optional. Specifies enumerated categories of jobs to list. (default = match ALL jobs).If filter is provided, jobStateMatcher will be ignored.",
 	//       "enum": [
 	//         "ALL",
 	//         "ACTIVE",
@@ -5899,7 +5900,7 @@ func (c *ProjectsRegionsJobsPatchCall) Do(opts ...googleapi.CallOption) (*Job, e
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -6056,7 +6057,7 @@ func (c *ProjectsRegionsJobsSubmitCall) Do(opts ...googleapi.CallOption) (*Job, 
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -6199,7 +6200,7 @@ func (c *ProjectsRegionsOperationsCancelCall) Do(opts ...googleapi.CallOption) (
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -6327,7 +6328,7 @@ func (c *ProjectsRegionsOperationsDeleteCall) Do(opts ...googleapi.CallOption) (
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -6468,7 +6469,7 @@ func (c *ProjectsRegionsOperationsGetCall) Do(opts ...googleapi.CallOption) (*Op
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -6637,7 +6638,7 @@ func (c *ProjectsRegionsOperationsListCall) Do(opts ...googleapi.CallOption) (*L
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -6806,7 +6807,7 @@ func (c *ProjectsRegionsWorkflowTemplatesCreateCall) Do(opts ...googleapi.CallOp
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -6820,7 +6821,7 @@ func (c *ProjectsRegionsWorkflowTemplatesCreateCall) Do(opts ...googleapi.CallOp
 	//   ],
 	//   "parameters": {
 	//     "parent": {
-	//       "description": "Required The \"resource name\" of the region, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}",
+	//       "description": "Required. The \"resource name\" of the region, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/regions/[^/]+$",
 	//       "required": true,
@@ -6859,8 +6860,8 @@ func (r *ProjectsRegionsWorkflowTemplatesService) Delete(name string) *ProjectsR
 	return c
 }
 
-// Version sets the optional parameter "version": Optional The version
-// of workflow template to delete. If specified, will only delete the
+// Version sets the optional parameter "version": The version of
+// workflow template to delete. If specified, will only delete the
 // template if the current server version matches specified version.
 func (c *ProjectsRegionsWorkflowTemplatesDeleteCall) Version(version int64) *ProjectsRegionsWorkflowTemplatesDeleteCall {
 	c.urlParams_.Set("version", fmt.Sprint(version))
@@ -6943,7 +6944,7 @@ func (c *ProjectsRegionsWorkflowTemplatesDeleteCall) Do(opts ...googleapi.CallOp
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -6957,14 +6958,14 @@ func (c *ProjectsRegionsWorkflowTemplatesDeleteCall) Do(opts ...googleapi.CallOp
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "Required The \"resource name\" of the workflow template, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}/workflowTemplates/{template_id}",
+	//       "description": "Required. The \"resource name\" of the workflow template, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}/workflowTemplates/{template_id}",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/regions/[^/]+/workflowTemplates/[^/]+$",
 	//       "required": true,
 	//       "type": "string"
 	//     },
 	//     "version": {
-	//       "description": "Optional The version of workflow template to delete. If specified, will only delete the template if the current server version matches specified version.",
+	//       "description": "Optional. The version of workflow template to delete. If specified, will only delete the template if the current server version matches specified version.",
 	//       "format": "int32",
 	//       "location": "query",
 	//       "type": "integer"
@@ -7000,10 +7001,9 @@ func (r *ProjectsRegionsWorkflowTemplatesService) Get(name string) *ProjectsRegi
 	return c
 }
 
-// Version sets the optional parameter "version": Optional The version
-// of workflow template to retrieve. Only previously instatiated
-// versions can be retrieved.If unspecified, retrieves the current
-// version.
+// Version sets the optional parameter "version": The version of
+// workflow template to retrieve. Only previously instatiated versions
+// can be retrieved.If unspecified, retrieves the current version.
 func (c *ProjectsRegionsWorkflowTemplatesGetCall) Version(version int64) *ProjectsRegionsWorkflowTemplatesGetCall {
 	c.urlParams_.Set("version", fmt.Sprint(version))
 	return c
@@ -7098,7 +7098,7 @@ func (c *ProjectsRegionsWorkflowTemplatesGetCall) Do(opts ...googleapi.CallOptio
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -7112,14 +7112,14 @@ func (c *ProjectsRegionsWorkflowTemplatesGetCall) Do(opts ...googleapi.CallOptio
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "Required The \"resource name\" of the workflow template, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}/workflowTemplates/{template_id}",
+	//       "description": "Required. The \"resource name\" of the workflow template, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}/workflowTemplates/{template_id}",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/regions/[^/]+/workflowTemplates/[^/]+$",
 	//       "required": true,
 	//       "type": "string"
 	//     },
 	//     "version": {
-	//       "description": "Optional The version of workflow template to retrieve. Only previously instatiated versions can be retrieved.If unspecified, retrieves the current version.",
+	//       "description": "Optional. The version of workflow template to retrieve. Only previously instatiated versions can be retrieved.If unspecified, retrieves the current version.",
 	//       "format": "int32",
 	//       "location": "query",
 	//       "type": "integer"
@@ -7245,7 +7245,7 @@ func (c *ProjectsRegionsWorkflowTemplatesInstantiateCall) Do(opts ...googleapi.C
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -7259,7 +7259,7 @@ func (c *ProjectsRegionsWorkflowTemplatesInstantiateCall) Do(opts ...googleapi.C
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "Required The \"resource name\" of the workflow template, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}/workflowTemplates/{template_id}",
+	//       "description": "Required. The \"resource name\" of the workflow template, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}/workflowTemplates/{template_id}",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/regions/[^/]+/workflowTemplates/[^/]+$",
 	//       "required": true,
@@ -7298,16 +7298,15 @@ func (r *ProjectsRegionsWorkflowTemplatesService) List(parent string) *ProjectsR
 	return c
 }
 
-// PageSize sets the optional parameter "pageSize": Optional The maximum
-// number of results to return in each response.
+// PageSize sets the optional parameter "pageSize": The maximum number
+// of results to return in each response.
 func (c *ProjectsRegionsWorkflowTemplatesListCall) PageSize(pageSize int64) *ProjectsRegionsWorkflowTemplatesListCall {
 	c.urlParams_.Set("pageSize", fmt.Sprint(pageSize))
 	return c
 }
 
-// PageToken sets the optional parameter "pageToken": Optional The page
-// token, returned by a previous call, to request the next page of
-// results.
+// PageToken sets the optional parameter "pageToken": The page token,
+// returned by a previous call, to request the next page of results.
 func (c *ProjectsRegionsWorkflowTemplatesListCall) PageToken(pageToken string) *ProjectsRegionsWorkflowTemplatesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
 	return c
@@ -7402,7 +7401,7 @@ func (c *ProjectsRegionsWorkflowTemplatesListCall) Do(opts ...googleapi.CallOpti
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -7416,18 +7415,18 @@ func (c *ProjectsRegionsWorkflowTemplatesListCall) Do(opts ...googleapi.CallOpti
 	//   ],
 	//   "parameters": {
 	//     "pageSize": {
-	//       "description": "Optional The maximum number of results to return in each response.",
+	//       "description": "Optional. The maximum number of results to return in each response.",
 	//       "format": "int32",
 	//       "location": "query",
 	//       "type": "integer"
 	//     },
 	//     "pageToken": {
-	//       "description": "Optional The page token, returned by a previous call, to request the next page of results.",
+	//       "description": "Optional. The page token, returned by a previous call, to request the next page of results.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "parent": {
-	//       "description": "Required The \"resource name\" of the region, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}",
+	//       "description": "Required. The \"resource name\" of the region, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/regions/[^/]+$",
 	//       "required": true,
@@ -7567,7 +7566,7 @@ func (c *ProjectsRegionsWorkflowTemplatesUpdateCall) Do(opts ...googleapi.CallOp
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -7581,7 +7580,7 @@ func (c *ProjectsRegionsWorkflowTemplatesUpdateCall) Do(opts ...googleapi.CallOp
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "Output-only The \"resource name\" of the template, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}/workflowTemplates/{template_id}",
+	//       "description": "Output only. The \"resource name\" of the template, as described in https://cloud.google.com/apis/design/resource_names of the form projects/{project_id}/regions/{region}/workflowTemplates/{template_id}",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/regions/[^/]+/workflowTemplates/[^/]+$",
 	//       "required": true,

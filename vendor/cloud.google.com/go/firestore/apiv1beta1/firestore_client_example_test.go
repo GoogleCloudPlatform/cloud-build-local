@@ -1,4 +1,4 @@
-// Copyright 2017, Google Inc. All rights reserved.
+// Copyright 2017, Google LLC All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,11 +19,10 @@ package firestore_test
 import (
 	"io"
 
-	firestore "cloud.google.com/go/firestore/apiv1beta1"
-	firestorepb "google.golang.org/genproto/googleapis/firestore/v1beta1"
-
+	"cloud.google.com/go/firestore/apiv1beta1"
 	"golang.org/x/net/context"
 	"google.golang.org/api/iterator"
+	firestorepb "google.golang.org/genproto/googleapis/firestore/v1beta1"
 )
 
 func ExampleNewClient() {

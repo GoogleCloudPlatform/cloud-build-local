@@ -1,11 +1,11 @@
 {
  "kind": "discovery#restDescription",
- "etag": "\"YWOzh2SDasdU84ArJnpYek-OMdg/4WoYXkNzYhdlch4lwv0Xtu5LyYc\"",
+ "etag": "\"YWOzh2SDasdU84ArJnpYek-OMdg/ENjO5SkN5azpBUa_i_cGnnAH868\"",
  "discoveryVersion": "v1",
  "id": "compute:beta",
  "name": "compute",
  "version": "beta",
- "revision": "20170919",
+ "revision": "20171107",
  "title": "Compute Engine API",
  "description": "Creates and runs virtual machines on Google Cloud Platform.",
  "ownerDomain": "google.com",
@@ -193,7 +193,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -214,6 +216,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -301,7 +305,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -322,6 +328,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -391,7 +399,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -412,6 +422,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -510,7 +522,7 @@
     },
     "addressType": {
      "type": "string",
-     "description": "The type of address to reserve. If unspecified, defaults to EXTERNAL.",
+     "description": "The type of address to reserve, either INTERNAL or EXTERNAL. If unspecified, defaults to EXTERNAL.",
      "enum": [
       "EXTERNAL",
       "INTERNAL",
@@ -648,7 +660,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -669,6 +683,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -756,7 +772,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -777,6 +795,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -846,7 +866,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -867,6 +889,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -998,7 +1022,7 @@
     },
     "source": {
      "type": "string",
-     "description": "Specifies a valid partial or full URL to an existing Persistent Disk resource. When creating a new instance, one of initializeParams.sourceImage or disks.source is required.\n\nIf desired, you can also attach existing non-root persistent disks using this property. This field is only applicable for persistent disks.\n\nNote that for InstanceTemplate, specify the disk name, not the URL for the disk."
+     "description": "Specifies a valid partial or full URL to an existing Persistent Disk resource. When creating a new instance, one of initializeParams.sourceImage or disks.source is required except for local SSD.\n\nIf desired, you can also attach existing non-root persistent disks using this property. This field is only applicable for persistent disks.\n\nNote that for InstanceTemplate, specify the disk name, not the URL for the disk."
     },
     "type": {
      "type": "string",
@@ -1046,7 +1070,7 @@
     },
     "sourceImage": {
      "type": "string",
-     "description": "The source image to create this disk. When creating a new instance, one of initializeParams.sourceImage or disks.source is required.\n\nTo create a disk with one of the public operating system images, specify the image by its family name. For example, specify family/debian-8 to use the latest Debian 8 image:\n\nprojects/debian-cloud/global/images/family/debian-8 \n\nAlternatively, use a specific version of a public operating system image:\n\nprojects/debian-cloud/global/images/debian-8-jessie-vYYYYMMDD \n\nTo create a disk with a private image that you created, specify the image name in the following format:\n\nglobal/images/my-private-image \n\nYou can also specify a private image by its image family, which returns the latest version of the image in that family. Replace the image name with family/family-name:\n\nglobal/images/family/my-private-family \n\nIf the source image is deleted later, this field will not be set."
+     "description": "The source image to create this disk. When creating a new instance, one of initializeParams.sourceImage or disks.source is required except for local SSD.\n\nTo create a disk with one of the public operating system images, specify the image by its family name. For example, specify family/debian-8 to use the latest Debian 8 image:\n\nprojects/debian-cloud/global/images/family/debian-8 \n\nAlternatively, use a specific version of a public operating system image:\n\nprojects/debian-cloud/global/images/debian-8-jessie-vYYYYMMDD \n\nTo create a disk with a custom image that you created, specify the image name in the following format:\n\nglobal/images/my-custom-image \n\nYou can also specify a custom image by its image family, which returns the latest version of the image in that family. Replace the image name with family/family-name:\n\nglobal/images/family/my-image-family \n\nIf the source image is deleted later, this field will not be set."
     },
     "sourceImageEncryptionKey": {
      "$ref": "CustomerEncryptionKey",
@@ -1251,7 +1275,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -1272,6 +1298,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -1359,7 +1387,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -1380,6 +1410,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -1497,7 +1529,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -1518,6 +1552,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -1622,20 +1658,20 @@
    "properties": {
     "filter": {
      "type": "string",
-     "description": "A filter string, compatible with a Stackdriver Monitoring filter string for TimeSeries.list API call. This filter is used to select a specific TimeSeries for the purpose of autoscaling and to determine whether the metric is exporting per-instance or global data.\n\nFor the filter to be valid for autoscaling purposes, the following rules apply:  \n- You can only use the AND operator for joining selectors. \n- You can only use direct equality comparison operator (=) without any functions for each selector. \n- You can specify the metric in both the filter string and in the metric field. However, if specified in both places, the metric must be identical. \n- The monitored resource type determines what kind of values are expected for the metric. If it is a gce_instance, the autoscaler expects the metric to include a separate TimeSeries for each instance in a group. In such a case, you cannot filter on resource labels.\nIf the resource type is any other value, the autoscaler expects this metric to contain values that apply to the entire autoscaled instance group and resource label filtering can be performed to point autoscaler at the correct TimeSeries to scale upon. This is / called a global metric for the purpose of autoscaling.\n\nIf not specified, the type defaults to gce_instance.  \n\nYou should provide a filter that is selective enough to pick just one TimeSeries for the autoscaled group or for each of the instances (if you are using gce_instance resource type). If multiple TimeSeries are returned upon the query execution, the autoscaler will sum their respective values to obtain its scaling value."
+     "description": "A filter string, compatible with a Stackdriver Monitoring filter string for TimeSeries.list API call. This filter is used to select a specific TimeSeries for the purpose of autoscaling and to determine whether the metric is exporting per-instance or per-group data.\n\nFor the filter to be valid for autoscaling purposes, the following rules apply:  \n- You can only use the AND operator for joining selectors. \n- You can only use direct equality comparison operator (=) without any functions for each selector. \n- You can specify the metric in both the filter string and in the metric field. However, if specified in both places, the metric must be identical. \n- The monitored resource type determines what kind of values are expected for the metric. If it is a gce_instance, the autoscaler expects the metric to include a separate TimeSeries for each instance in a group. In such a case, you cannot filter on resource labels.\nIf the resource type is any other value, the autoscaler expects this metric to contain values that apply to the entire autoscaled instance group and resource label filtering can be performed to point autoscaler at the correct TimeSeries to scale upon. This is called a per-group metric for the purpose of autoscaling.\n\nIf not specified, the type defaults to gce_instance.  \n\nYou should provide a filter that is selective enough to pick just one TimeSeries for the autoscaled group or for each of the instances (if you are using gce_instance resource type). If multiple TimeSeries are returned upon the query execution, the autoscaler will sum their respective values to obtain its scaling value."
     },
     "metric": {
      "type": "string",
-     "description": "The identifier (type) of the Stackdriver Monitoring metric. The metric cannot have negative values and should be a utilization metric, which means that the number of virtual machines handling requests should increase or decrease proportionally to the metric.\n\nThe metric must have a value type of INT64 or DOUBLE."
+     "description": "The identifier (type) of the Stackdriver Monitoring metric. The metric cannot have negative values.\n\nThe metric must have a value type of INT64 or DOUBLE."
     },
     "singleInstanceAssignment": {
      "type": "number",
-     "description": "If scaling is based on a global metric value that represents the total amount of work to be done or resource usage, set this value to an amount assigned for a single instance of the scaled group. Autoscaler will keep the number of instances proportional to the value of this metric, the metric itself should not change value due to group resizing.\n\nA good metric to use with the target is for example pubsub.googleapis.com/subscription/num_undelivered_messages or a custom metric exporting the total number of requests coming to your instances.\n\nA bad example would be a metric exporting an average or median latency, since this value can't include a chunk assignable to a single instance, it could be better used with utilization_target instead.",
+     "description": "If scaling is based on a per-group metric value that represents the total amount of work to be done or resource usage, set this value to an amount assigned for a single instance of the scaled group. Autoscaler will keep the number of instances proportional to the value of this metric, the metric itself should not change value due to group resizing.\n\nA good metric to use with the target is for example pubsub.googleapis.com/subscription/num_undelivered_messages or a custom metric exporting the total number of requests coming to your instances.\n\nA bad example would be a metric exporting an average or median latency, since this value can't include a chunk assignable to a single instance, it could be better used with utilization_target instead.",
      "format": "double"
     },
     "utilizationTarget": {
      "type": "number",
-     "description": "The target value of the metric that autoscaler should maintain. This must be a positive value.\n\nFor example, a good metric to use as a utilization_target is compute.googleapis.com/instance/network/received_bytes_count. The autoscaler will work to keep this value constant for each of the instances.",
+     "description": "The target value of the metric that autoscaler should maintain. This must be a positive value. A utilization metric scales number of virtual machines handling requests to increase or decrease proportionally to the metric.\n\nFor example, a good metric to use as a utilization_target is compute.googleapis.com/instance/network/received_bytes_count. The autoscaler will work to keep this value constant for each of the instances.",
      "format": "double"
     },
     "utilizationTargetType": {
@@ -1806,7 +1842,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -1827,6 +1865,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -2059,7 +2099,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -2080,6 +2122,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -2215,7 +2259,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -2236,6 +2282,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -2305,7 +2353,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -2326,6 +2376,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -2568,7 +2620,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -2589,6 +2643,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -2676,7 +2732,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -2697,6 +2755,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -2766,7 +2826,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -2787,6 +2849,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -3044,6 +3108,14 @@
      "type": "string",
      "description": "[Output Only] Last detach timestamp in RFC3339 text format."
     },
+    "licenseCodes": {
+     "type": "array",
+     "description": "Integer license codes indicating which licenses are attached to this disk.",
+     "items": {
+      "type": "string",
+      "format": "int64"
+     }
+    },
     "licenses": {
      "type": "array",
      "description": "Any applicable publicly visible licenses.",
@@ -3076,7 +3148,7 @@
     },
     "sourceImage": {
      "type": "string",
-     "description": "The source image used to create this disk. If the source image is deleted, this field will not be set.\n\nTo create a disk with one of the public operating system images, specify the image by its family name. For example, specify family/debian-8 to use the latest Debian 8 image:\n\nprojects/debian-cloud/global/images/family/debian-8 \n\nAlternatively, use a specific version of a public operating system image:\n\nprojects/debian-cloud/global/images/debian-8-jessie-vYYYYMMDD \n\nTo create a disk with a private image that you created, specify the image name in the following format:\n\nglobal/images/my-private-image \n\nYou can also specify a private image by its image family, which returns the latest version of the image in that family. Replace the image name with family/family-name:\n\nglobal/images/family/my-private-family"
+     "description": "The source image used to create this disk. If the source image is deleted, this field will not be set.\n\nTo create a disk with one of the public operating system images, specify the image by its family name. For example, specify family/debian-8 to use the latest Debian 8 image:\n\nprojects/debian-cloud/global/images/family/debian-8 \n\nAlternatively, use a specific version of a public operating system image:\n\nprojects/debian-cloud/global/images/debian-8-jessie-vYYYYMMDD \n\nTo create a disk with a custom image that you created, specify the image name in the following format:\n\nglobal/images/my-custom-image \n\nYou can also specify a custom image by its image family, which returns the latest version of the image in that family. Replace the image name with family/family-name:\n\nglobal/images/family/my-image-family"
     },
     "sourceImageEncryptionKey": {
      "$ref": "CustomerEncryptionKey",
@@ -3182,7 +3254,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -3203,6 +3277,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -3290,7 +3366,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -3311,6 +3389,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -3463,7 +3543,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -3484,6 +3566,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -3571,7 +3655,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -3592,6 +3678,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -3661,7 +3749,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -3682,6 +3772,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -3762,7 +3854,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -3783,6 +3877,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -4018,7 +4114,7 @@
     },
     "targetTags": {
      "type": "array",
-     "description": "A list of instance tags indicating sets of instances located in the network that may make network connections as specified in allowed[]. If no targetTags are specified, the firewall rule applies to all instances on the specified network.",
+     "description": "A list of tags that controls which instances the firewall rule applies to. If targetTags are specified, then the firewall rule applies only to instances in the VPC network that have one of those tags. If no targetTags are specified, the firewall rule applies to all instances on the specified network.",
      "items": {
       "type": "string"
      }
@@ -4064,7 +4160,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -4085,6 +4183,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -4162,7 +4262,7 @@
    "properties": {
     "IPAddress": {
      "type": "string",
-     "description": "The IP address that this forwarding rule is serving on behalf of.\n\nFor global forwarding rules, the address must be a global IP. For regional forwarding rules, the address must live in the same region as the forwarding rule. By default, this field is empty and an ephemeral IPv4 address from the same scope (global or regional) will be assigned. A regional forwarding rule supports IPv4 only. A global forwarding rule supports either IPv4 or IPv6.\n\nWhen the load balancing scheme is INTERNAL, this can only be an RFC 1918 IP address belonging to the network/subnetwork configured for the forwarding rule. A reserved address cannot be used. If the field is empty, the IP address will be automatically allocated from the internal IP range of the subnetwork or network configured for this forwarding rule."
+     "description": "The IP address that this forwarding rule is serving on behalf of.\n\nAddresses are restricted based on the forwarding rule's load balancing scheme (EXTERNAL or INTERNAL) and scope (global or regional).\n\nWhen the load balancing scheme is EXTERNAL, for global forwarding rules, the address must be a global IP, and for regional forwarding rules, the address must live in the same region as the forwarding rule. If this field is empty, an ephemeral IPv4 address from the same scope (global or regional) will be assigned. A regional forwarding rule supports IPv4 only. A global forwarding rule supports either IPv4 or IPv6.\n\nWhen the load balancing scheme is INTERNAL, this can only be an RFC 1918 IP address belonging to the network/subnet configured for the forwarding rule. By default, if this field is empty, an ephemeral internal IP address will be automatically allocated from the IP range of the subnet or network configured for this forwarding rule.\n\nAn address can be specified either by a literal IP address or a URL reference to an existing Address resource. The following examples are all valid:  \n- 100.1.2.3 \n- https://www.googleapis.com/compute/v1/projects/project/regions/region/addresses/address \n- projects/project/regions/region/addresses/address \n- regions/region/addresses/address \n- global/addresses/address \n- address"
     },
     "IPProtocol": {
      "type": "string",
@@ -4332,7 +4432,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -4353,6 +4455,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -4440,7 +4544,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -4461,6 +4567,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -4530,7 +4638,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -4551,6 +4661,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -4628,10 +4740,14 @@
      "enum": [
       "FEATURE_TYPE_UNSPECIFIED",
       "MULTI_IP_SUBNET",
+      "SECURE_BOOT",
+      "UEFI_COMPATIBLE",
       "VIRTIO_SCSI_MULTIQUEUE",
       "WINDOWS"
      ],
      "enumDescriptions": [
+      "",
+      "",
       "",
       "",
       "",
@@ -4846,7 +4962,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -4867,6 +4985,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -5084,7 +5204,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -5105,6 +5227,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -5259,7 +5383,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -5280,6 +5406,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -5390,6 +5518,14 @@
      "description": "Labels to apply to this image. These can be later modified by the setLabels method.",
      "additionalProperties": {
       "type": "string"
+     }
+    },
+    "licenseCodes": {
+     "type": "array",
+     "description": "Integer license codes indicating which licenses are attached to this image.",
+     "items": {
+      "type": "string",
+      "format": "int64"
      }
     },
     "licenses": {
@@ -5533,7 +5669,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -5554,6 +5692,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -5618,6 +5758,10 @@
     "creationTimestamp": {
      "type": "string",
      "description": "[Output Only] Creation timestamp in RFC3339 text format."
+    },
+    "deletionProtection": {
+     "type": "boolean",
+     "description": "Whether the resource should be protected against deletion."
     },
     "description": {
      "type": "string",
@@ -5789,7 +5933,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -5810,6 +5956,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -5968,7 +6116,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -5989,6 +6139,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -6076,7 +6228,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -6097,6 +6251,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -6377,7 +6533,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -6398,6 +6556,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -6500,7 +6660,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -6521,6 +6683,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -6746,7 +6910,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -6767,6 +6933,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -6906,7 +7074,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -6927,6 +7097,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -7027,7 +7199,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -7048,6 +7222,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -7153,7 +7329,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -7174,6 +7352,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -7261,7 +7441,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -7282,6 +7464,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -7511,7 +7695,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -7532,6 +7718,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -7642,7 +7830,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -7663,6 +7853,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -7794,11 +7986,11 @@
   "Interconnect": {
    "id": "Interconnect",
    "type": "object",
-   "description": "Protocol definitions for Mixer API to support Interconnect. Next available tag: 23",
+   "description": "Represents an Interconnects resource. The Interconnects resource is a dedicated connection between Google's network and your on-premises network. For more information, see the  Dedicated overview page.",
    "properties": {
     "adminEnabled": {
      "type": "boolean",
-     "description": "Administrative status of the interconnect. When this is set to ?true?, the Interconnect is functional and may carry traffic (assuming there are functional InterconnectAttachments and other requirements are satisfied). When set to ?false?, no packets will be carried over this Interconnect and no BGP routes will be exchanged over it. By default, it is set to ?true?."
+     "description": "Administrative status of the interconnect. When this is set to true, the Interconnect is functional and can carry traffic. When set to false, no packets can be carried over the interconnect and no BGP routes are exchanged over it. By default, the status is set to true."
     },
     "circuitInfos": {
      "type": "array",
@@ -7806,10 +7998,6 @@
      "items": {
       "$ref": "InterconnectCircuitInfo"
      }
-    },
-    "connectionAuthorization": {
-     "type": "string",
-     "description": "[Output Only] URL to retrieve the Letter Of Authority and Customer Facility Assignment (LOA-CFA) documentation relating to this Interconnect. This documentation authorizes the facility provider to connect to the specified crossconnect ports."
     },
     "creationTimestamp": {
      "type": "string",
@@ -7852,10 +8040,13 @@
     },
     "interconnectType": {
      "type": "string",
+     "description": "Type of interconnect. Note that \"IT_PRIVATE\" has been deprecated in favor of \"DEDICATED\"",
      "enum": [
+      "DEDICATED",
       "IT_PRIVATE"
      ],
      "enumDescriptions": [
+      "",
       ""
      ]
     },
@@ -7866,6 +8057,7 @@
     },
     "linkType": {
      "type": "string",
+     "description": "Type of link requested. This field indicates speed of each of the links in the bundle, not the entire bundle. Only 10G per link is allowed for a dedicated interconnect. Options: Ethernet_10G_LR",
      "enum": [
       "LINK_TYPE_ETHERNET_10G_LR"
      ],
@@ -7926,7 +8118,7 @@
   "InterconnectAttachment": {
    "id": "InterconnectAttachment",
    "type": "object",
-   "description": "Protocol definitions for Mixer API to support InterconnectAttachment. Next available tag: 18",
+   "description": "Represents an InterconnectAttachment (VLAN attachment) resource. For more information, see  Creating VLAN Attachments.",
    "properties": {
     "cloudRouterIpAddress": {
      "type": "string",
@@ -7942,7 +8134,7 @@
     },
     "description": {
      "type": "string",
-     "description": "An optional description of this resource. Provide this property when you create the resource."
+     "description": "An optional description of this resource."
     },
     "googleReferenceId": {
      "type": "string",
@@ -7981,7 +8173,7 @@
     },
     "privateInterconnectInfo": {
      "$ref": "InterconnectAttachmentPrivateInfo",
-     "description": "[Output Only] Information specific to a Private InterconnectAttachment. Only populated if the interconnect that this is attached is of type IT_PRIVATE."
+     "description": "[Output Only] Information specific to an InterconnectAttachment. This property is populated if the interconnect that this is attached to is of type DEDICATED."
     },
     "region": {
      "type": "string",
@@ -8036,7 +8228,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -8057,6 +8251,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -8144,7 +8340,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -8165,6 +8363,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -8216,7 +8416,7 @@
   "InterconnectAttachmentPrivateInfo": {
    "id": "InterconnectAttachmentPrivateInfo",
    "type": "object",
-   "description": "Private information for an interconnect attachment when this belongs to an interconnect of type IT_PRIVATE.",
+   "description": "Information for an interconnect attachment when this belongs to an interconnect of type DEDICATED.",
    "properties": {
     "tag8021q": {
      "type": "integer",
@@ -8246,7 +8446,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -8267,6 +8469,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -8322,7 +8526,7 @@
    "properties": {
     "customerDemarcId": {
      "type": "string",
-     "description": "Customer-side demarc ID for this circuit. This will only be set if it was provided by the Customer to Google during circuit turn-up."
+     "description": "Customer-side demarc ID for this circuit."
     },
     "googleCircuitId": {
      "type": "string",
@@ -8373,7 +8577,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -8394,6 +8600,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -8445,7 +8653,7 @@
   "InterconnectLocation": {
    "id": "InterconnectLocation",
    "type": "object",
-   "description": "Protocol definitions for Mixer API to support InterconnectLocation.",
+   "description": "Represents an InterconnectLocations resource. The InterconnectLocations resource describes the locations where you can connect to Google's networks. For more information, see  Colocation Facilities.",
    "properties": {
     "address": {
      "type": "string",
@@ -8453,23 +8661,33 @@
     },
     "availabilityZone": {
      "type": "string",
-     "description": "Availability zone for this location. Within a city, maintenance will not be simultaneously scheduled in more than one availability zone. Example: \"zone1\" or \"zone2\"."
+     "description": "[Output Only] Availability zone for this location. Within a metropolitan area (metro), maintenance will not be simultaneously scheduled in more than one availability zone. Example: \"zone1\" or \"zone2\"."
     },
     "city": {
      "type": "string",
-     "description": "City designator used by the Interconnect UI to locate this InterconnectLocation within the Continent. For example: \"Chicago, IL\", \"Amsterdam, Netherlands\"."
+     "description": "[Output Only] Metropolitan area designator that indicates which city an interconnect is located. For example: \"Chicago, IL\", \"Amsterdam, Netherlands\"."
     },
     "continent": {
      "type": "string",
-     "description": "Continent for this location. Used by the location picker in the Interconnect UI.",
+     "description": "[Output Only] Continent for this location.",
      "enum": [
+      "AFRICA",
+      "ASIA_PAC",
       "C_AFRICA",
       "C_ASIA_PAC",
       "C_EUROPE",
       "C_NORTH_AMERICA",
-      "C_SOUTH_AMERICA"
+      "C_SOUTH_AMERICA",
+      "EUROPE",
+      "NORTH_AMERICA",
+      "SOUTH_AMERICA"
      ],
      "enumDescriptions": [
+      "",
+      "",
+      "",
+      "",
+      "",
       "",
       "",
       "",
@@ -8563,7 +8781,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -8584,6 +8804,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -8646,10 +8868,14 @@
      "type": "string",
      "description": "Identifies the network presence of this location.",
      "enum": [
+      "GLOBAL",
+      "LOCAL_REGION",
       "LP_GLOBAL",
       "LP_LOCAL_REGION"
      ],
      "enumDescriptions": [
+      "",
+      "",
       "",
       ""
      ]
@@ -8657,10 +8883,6 @@
     "region": {
      "type": "string",
      "description": "URL for the region of this location."
-    },
-    "regionKey": {
-     "type": "string",
-     "description": "Scope key for the region of this location."
     }
    }
   },
@@ -8678,19 +8900,25 @@
     },
     "description": {
      "type": "string",
-     "description": "Short user-visible description of the purpose of the outage."
+     "description": "A description about the purpose of the outage."
     },
     "endTime": {
      "type": "string",
+     "description": "Scheduled end time for the outage (milliseconds since Unix epoch).",
      "format": "int64"
     },
     "issueType": {
      "type": "string",
+     "description": "Form this outage is expected to take. Note that the \"IT_\" versions of this enum have been deprecated in favor of the unprefixed values.",
      "enum": [
       "IT_OUTAGE",
-      "IT_PARTIAL_OUTAGE"
+      "IT_PARTIAL_OUTAGE",
+      "OUTAGE",
+      "PARTIAL_OUTAGE"
      ],
      "enumDescriptions": [
+      "",
+      "",
       "",
       ""
      ]
@@ -8701,25 +8929,33 @@
     },
     "source": {
      "type": "string",
+     "description": "The party that generated this notification. Note that \"NSRC_GOOGLE\" has been deprecated in favor of \"GOOGLE\"",
      "enum": [
+      "GOOGLE",
       "NSRC_GOOGLE"
      ],
      "enumDescriptions": [
+      "",
       ""
      ]
     },
     "startTime": {
      "type": "string",
-     "description": "Scheduled start and end times for the outage (milliseconds since Unix epoch).",
+     "description": "Scheduled start time for the outage (milliseconds since Unix epoch).",
      "format": "int64"
     },
     "state": {
      "type": "string",
+     "description": "State of this notification. Note that the \"NS_\" versions of this enum have been deprecated in favor of the unprefixed values.",
      "enum": [
+      "ACTIVE",
+      "CANCELLED",
       "NS_ACTIVE",
       "NS_CANCELED"
      ],
      "enumDescriptions": [
+      "",
+      "",
       "",
       ""
      ]
@@ -8735,10 +8971,28 @@
      "type": "boolean",
      "description": "[Output Only] Deprecated. This field no longer reflects whether a license charges a usage fee."
     },
+    "creationTimestamp": {
+     "type": "string",
+     "description": "[Output Only] Creation timestamp in RFC3339 text format."
+    },
+    "description": {
+     "type": "string",
+     "description": "An optional textual description of the resource; provided by the client when the resource is created."
+    },
+    "id": {
+     "type": "string",
+     "description": "[Output Only] The unique identifier for the resource. This identifier is defined by the server.",
+     "format": "uint64"
+    },
     "kind": {
      "type": "string",
      "description": "[Output Only] Type of resource. Always compute#license for licenses.",
      "default": "compute#license"
+    },
+    "licenseCode": {
+     "type": "string",
+     "description": "[Output Only] The unique code used to attach this license to images, snapshots, and disks.",
+     "format": "uint64"
     },
     "name": {
      "type": "string",
@@ -8750,9 +9004,219 @@
       ]
      }
     },
+    "resourceRequirements": {
+     "$ref": "LicenseResourceRequirements"
+    },
     "selfLink": {
      "type": "string",
      "description": "[Output Only] Server-defined URL for the resource."
+    },
+    "transferable": {
+     "type": "boolean",
+     "description": "If false, licenses will not be copied from the source resource when creating an image from a disk, disk from snapshot, or snapshot from disk."
+    }
+   }
+  },
+  "LicenseCode": {
+   "id": "LicenseCode",
+   "type": "object",
+   "properties": {
+    "creationTimestamp": {
+     "type": "string",
+     "description": "[Output Only] Creation timestamp in RFC3339 text format."
+    },
+    "description": {
+     "type": "string",
+     "description": "[Output Only] Description of this License Code."
+    },
+    "id": {
+     "type": "string",
+     "description": "[Output Only] The unique identifier for the resource. This identifier is defined by the server.",
+     "format": "uint64"
+    },
+    "kind": {
+     "type": "string",
+     "description": "[Output Only] Type of resource. Always compute#licenseCode for licenses.",
+     "default": "compute#licenseCode"
+    },
+    "licenseAlias": {
+     "type": "array",
+     "description": "[Output Only] URL and description aliases of Licenses with the same License Code.",
+     "items": {
+      "$ref": "LicenseCodeLicenseAlias"
+     }
+    },
+    "name": {
+     "type": "string",
+     "description": "[Output Only] Name of the resource. The name is 1-20 characters long and must be a valid 64 bit integer.",
+     "pattern": "[0-9]{0,20}?",
+     "annotations": {
+      "required": [
+       "compute.licenses.insert"
+      ]
+     }
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "[Output Only] Server-defined URL for the resource."
+    },
+    "state": {
+     "type": "string",
+     "description": "[Output Only] Current state of this License Code.",
+     "enum": [
+      "DISABLED",
+      "ENABLED",
+      "RESTRICTED",
+      "STATE_UNSPECIFIED",
+      "TERMINATED"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      "",
+      "",
+      ""
+     ]
+    },
+    "transferable": {
+     "type": "boolean",
+     "description": "[Output Only] If true, the license will remain attached when creating images or snapshots from disks. Otherwise, the license is not transferred."
+    }
+   }
+  },
+  "LicenseCodeLicenseAlias": {
+   "id": "LicenseCodeLicenseAlias",
+   "type": "object",
+   "properties": {
+    "description": {
+     "type": "string",
+     "description": "[Output Only] Description of this License Code."
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "[Output Only] URL of license corresponding to this License Code."
+    }
+   }
+  },
+  "LicenseResourceRequirements": {
+   "id": "LicenseResourceRequirements",
+   "type": "object",
+   "properties": {
+    "minGuestCpuCount": {
+     "type": "integer",
+     "description": "Minimum number of guest cpus required to use the Instance. Enforced at Instance creation and Instance start.",
+     "format": "int32"
+    },
+    "minMemoryMb": {
+     "type": "integer",
+     "description": "Minimum memory required to use the Instance. Enforced at Instance creation and Instance start.",
+     "format": "int32"
+    }
+   }
+  },
+  "LicensesListResponse": {
+   "id": "LicensesListResponse",
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "[Output Only] Unique identifier for the resource; defined by the server."
+    },
+    "items": {
+     "type": "array",
+     "description": "A list of License resources.",
+     "items": {
+      "$ref": "License"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "[Output Only] This token allows you to get the next page of results for list requests. If the number of results is larger than maxResults, use the nextPageToken as a value for the query parameter pageToken in the next list request. Subsequent list requests will have their own nextPageToken to continue paging through the results."
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "[Output Only] Server-defined URL for this resource."
+    },
+    "warning": {
+     "type": "object",
+     "description": "[Output Only] Informational warning message.",
+     "properties": {
+      "code": {
+       "type": "string",
+       "description": "[Output Only] A warning code, if applicable. For example, Compute Engine returns NO_RESULTS_ON_PAGE if there are no results in the response.",
+       "enum": [
+        "CLEANUP_FAILED",
+        "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
+        "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
+        "EXTERNAL_API_WARNING",
+        "FIELD_VALUE_OVERRIDEN",
+        "INJECTED_KERNELS_DEPRECATED",
+        "MISSING_TYPE_DEPENDENCY",
+        "NEXT_HOP_ADDRESS_NOT_ASSIGNED",
+        "NEXT_HOP_CANNOT_IP_FORWARD",
+        "NEXT_HOP_INSTANCE_NOT_FOUND",
+        "NEXT_HOP_INSTANCE_NOT_ON_NETWORK",
+        "NEXT_HOP_NOT_RUNNING",
+        "NOT_CRITICAL_ERROR",
+        "NO_RESULTS_ON_PAGE",
+        "REQUIRED_TOS_AGREEMENT",
+        "RESOURCE_IN_USE_BY_OTHER_RESOURCE_WARNING",
+        "RESOURCE_NOT_DELETED",
+        "SCHEMA_VALIDATION_IGNORED",
+        "SINGLE_INSTANCE_PROPERTY_TEMPLATE",
+        "UNDECLARED_PROPERTIES",
+        "UNREACHABLE"
+       ],
+       "enumDescriptions": [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+       ]
+      },
+      "data": {
+       "type": "array",
+       "description": "[Output Only] Metadata about this warning in key: value format. For example:\n\"data\": [ { \"key\": \"scope\", \"value\": \"zones/us-east1-d\" }",
+       "items": {
+        "type": "object",
+        "properties": {
+         "key": {
+          "type": "string",
+          "description": "[Output Only] A key that provides more detail on the warning being returned. For example, for warnings where there are no results in a list request for a particular zone, this key might be scope and the key value might be the zone name. Other examples might be a key indicating a deprecated resource and a suggested replacement, or a warning about invalid network settings (for example, if an instance attempts to perform IP forwarding but is not enabled for IP forwarding)."
+         },
+         "value": {
+          "type": "string",
+          "description": "[Output Only] A warning data value corresponding to the key."
+         }
+        }
+       }
+      },
+      "message": {
+       "type": "string",
+       "description": "[Output Only] A human-readable description of the warning code."
+      }
+     }
     }
    }
   },
@@ -8939,7 +9403,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -8960,6 +9426,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -9047,7 +9515,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -9068,6 +9538,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -9137,7 +9609,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -9158,6 +9632,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -9546,7 +10022,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -9567,6 +10045,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -9836,7 +10316,9 @@
         "enum": [
          "CLEANUP_FAILED",
          "DEPRECATED_RESOURCE_USED",
+         "DEPRECATED_TYPE_USED",
          "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+         "EXPERIMENTAL_TYPE_USED",
          "EXTERNAL_API_WARNING",
          "FIELD_VALUE_OVERRIDEN",
          "INJECTED_KERNELS_DEPRECATED",
@@ -9857,6 +10339,8 @@
          "UNREACHABLE"
         ],
         "enumDescriptions": [
+         "",
+         "",
          "",
          "",
          "",
@@ -9949,7 +10433,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -9970,6 +10456,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -10057,7 +10545,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -10078,6 +10568,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -10147,7 +10639,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -10168,6 +10662,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -10455,6 +10951,7 @@
       "INSTANCE_GROUP_MANAGERS",
       "INSTANCE_TEMPLATES",
       "INTERCONNECTS",
+      "INTERNAL_ADDRESSES",
       "IN_USE_ADDRESSES",
       "LOCAL_SSD_TOTAL_GB",
       "NETWORKS",
@@ -10462,6 +10959,8 @@
       "NVIDIA_P100_GPUS",
       "PREEMPTIBLE_CPUS",
       "PREEMPTIBLE_LOCAL_SSD_GB",
+      "PREEMPTIBLE_NVIDIA_K80_GPUS",
+      "PREEMPTIBLE_NVIDIA_P100_GPUS",
       "REGIONAL_AUTOSCALERS",
       "REGIONAL_INSTANCE_GROUP_MANAGERS",
       "ROUTERS",
@@ -10484,6 +10983,9 @@
       "VPN_TUNNELS"
      ],
      "enumDescriptions": [
+      "",
+      "",
+      "",
       "",
       "",
       "",
@@ -10662,7 +11164,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -10683,6 +11187,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -10770,7 +11276,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -10791,6 +11299,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -10878,7 +11388,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -10899,6 +11411,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -11081,7 +11595,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -11102,6 +11618,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -11230,7 +11748,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -11251,6 +11771,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -11466,7 +11988,9 @@
         "enum": [
          "CLEANUP_FAILED",
          "DEPRECATED_RESOURCE_USED",
+         "DEPRECATED_TYPE_USED",
          "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+         "EXPERIMENTAL_TYPE_USED",
          "EXTERNAL_API_WARNING",
          "FIELD_VALUE_OVERRIDEN",
          "INJECTED_KERNELS_DEPRECATED",
@@ -11487,6 +12011,8 @@
          "UNREACHABLE"
         ],
         "enumDescriptions": [
+         "",
+         "",
          "",
          "",
          "",
@@ -11575,7 +12101,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -11596,6 +12124,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -11754,7 +12284,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -11775,6 +12307,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -11929,7 +12463,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -11950,6 +12486,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -12133,7 +12671,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -12154,6 +12694,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -12410,7 +12952,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -12431,6 +12975,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -12623,6 +13169,14 @@
       "type": "string"
      }
     },
+    "licenseCodes": {
+     "type": "array",
+     "description": "Integer license codes indicating which licenses are attached to this snapshot.",
+     "items": {
+      "type": "string",
+      "format": "int64"
+     }
+    },
     "licenses": {
      "type": "array",
      "description": "[Output Only] A list of public visible licenses that apply to this snapshot. This can be because the original image had licenses attached (such as a Windows image).",
@@ -12731,7 +13285,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -12752,6 +13308,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -12881,7 +13439,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -12902,6 +13462,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -13059,7 +13621,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -13080,6 +13644,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -13167,7 +13733,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -13188,6 +13756,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -13282,7 +13852,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -13303,6 +13875,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -13491,7 +14065,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -13512,6 +14088,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -13657,7 +14235,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -13678,6 +14258,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -13817,7 +14399,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -13838,6 +14422,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -13925,7 +14511,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -13946,6 +14534,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -14015,7 +14605,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -14036,6 +14628,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -14202,7 +14796,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -14223,6 +14819,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -14327,7 +14925,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -14348,6 +14948,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -14469,7 +15071,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -14490,6 +15094,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -14684,7 +15290,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -14705,6 +15313,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -14870,7 +15480,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -14891,6 +15503,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -15060,7 +15674,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -15081,6 +15697,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -15168,7 +15786,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -15189,6 +15809,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -15258,7 +15880,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -15279,6 +15903,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -15497,7 +16123,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -15518,6 +16146,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -15820,7 +16450,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -15841,6 +16473,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -15928,7 +16562,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -15949,6 +16585,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -16018,7 +16656,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -16039,6 +16679,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -16125,7 +16767,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -16146,6 +16790,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -16316,7 +16962,9 @@
        "enum": [
         "CLEANUP_FAILED",
         "DEPRECATED_RESOURCE_USED",
+        "DEPRECATED_TYPE_USED",
         "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+        "EXPERIMENTAL_TYPE_USED",
         "EXTERNAL_API_WARNING",
         "FIELD_VALUE_OVERRIDEN",
         "INJECTED_KERNELS_DEPRECATED",
@@ -16337,6 +16985,8 @@
         "UNREACHABLE"
        ],
        "enumDescriptions": [
+        "",
+        "",
         "",
         "",
         "",
@@ -20854,7 +21504,7 @@
      "id": "compute.images.list",
      "path": "{project}/global/images",
      "httpMethod": "GET",
-     "description": "Retrieves the list of private images available to the specified project. Private images are images you create that belong to your project. This method does not get any images that belong to other projects, including publicly-available images, like Debian 8. If you want to get a list of publicly-available images, use this method to make a request to the respective image project, such as debian-cloud or windows-cloud.",
+     "description": "Retrieves the list of custom images available to the specified project. Custom images are images you create that belong to your project. This method does not get any images that belong to other projects, including publicly-available images, like Debian 8. If you want to get a list of publicly-available images, use this method to make a request to the respective image project, such as debian-cloud or windows-cloud.",
      "parameters": {
       "filter": {
        "type": "string",
@@ -23094,6 +23744,58 @@
       "https://www.googleapis.com/auth/compute"
      ]
     },
+    "setDeletionProtection": {
+     "id": "compute.instances.setDeletionProtection",
+     "path": "{project}/zones/{zone}/instances/{resource}/setDeletionProtection",
+     "httpMethod": "POST",
+     "description": "Sets deletion protection on the instance.",
+     "parameters": {
+      "deletionProtection": {
+       "type": "boolean",
+       "description": "Whether the resource should be protected against deletion.",
+       "default": "true",
+       "location": "query"
+      },
+      "project": {
+       "type": "string",
+       "description": "Project ID for this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      },
+      "requestId": {
+       "type": "string",
+       "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed.\n\nFor example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments.\n\nThe request ID must be a valid UUID with the exception that zero UUID is not supported (00000000-0000-0000-0000-000000000000).",
+       "location": "query"
+      },
+      "resource": {
+       "type": "string",
+       "description": "Name of the resource for this request.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "zone": {
+       "type": "string",
+       "description": "The name of the zone for this request.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "zone",
+      "resource"
+     ],
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute"
+     ]
+    },
     "setDiskAutoDelete": {
      "id": "compute.instances.setDiskAutoDelete",
      "path": "{project}/zones/{zone}/instances/{instance}/setDiskAutoDelete",
@@ -23646,7 +24348,7 @@
      "id": "compute.instances.stop",
      "path": "{project}/zones/{zone}/instances/{instance}/stop",
      "httpMethod": "POST",
-     "description": "Stops a running instance, shutting it down cleanly, and allows you to restart the instance at a later time. Stopped instances do not incur per-minute, virtual machine usage charges while they are stopped, but any resources that the virtual machine is using, such as persistent disks and static IP addresses, will continue to be charged until they are deleted. For more information, see Stopping an instance.",
+     "description": "Stops a running instance, shutting it down cleanly, and allows you to restart the instance at a later time. Stopped instances do not incur VM usage charges while they are stopped. However, resources that the VM is using, such as persistent disks and static IP addresses, will continue to be charged until they are deleted. For more information, see Stopping an instance.",
      "parameters": {
       "instance": {
        "type": "string",
@@ -24454,8 +25156,84 @@
     }
    }
   },
+  "licenseCodes": {
+   "methods": {
+    "get": {
+     "id": "compute.licenseCodes.get",
+     "path": "{project}/global/licenseCodes/{licenseCode}",
+     "httpMethod": "GET",
+     "description": "Return a specified license code. License codes are mirrored across all projects that have permissions to read the License Code.",
+     "parameters": {
+      "licenseCode": {
+       "type": "string",
+       "description": "Number corresponding to the License code resource to return.",
+       "required": true,
+       "pattern": "[0-9]{0,61}?",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "Project ID for this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "licenseCode"
+     ],
+     "response": {
+      "$ref": "LicenseCode"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/compute.readonly"
+     ]
+    }
+   }
+  },
   "licenses": {
    "methods": {
+    "delete": {
+     "id": "compute.licenses.delete",
+     "path": "{project}/global/licenses/{license}",
+     "httpMethod": "DELETE",
+     "description": "Deletes the specified license.",
+     "parameters": {
+      "license": {
+       "type": "string",
+       "description": "Name of the license resource to delete.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "Project ID for this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      },
+      "requestId": {
+       "type": "string",
+       "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed.\n\nFor example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments.\n\nThe request ID must be a valid UUID with the exception that zero UUID is not supported (00000000-0000-0000-0000-000000000000).",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "license"
+     ],
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute"
+     ]
+    },
     "get": {
      "id": "compute.licenses.get",
      "path": "{project}/global/licenses/{license}",
@@ -24483,6 +25261,91 @@
      ],
      "response": {
       "$ref": "License"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/compute.readonly"
+     ]
+    },
+    "insert": {
+     "id": "compute.licenses.insert",
+     "path": "{project}/global/licenses",
+     "httpMethod": "POST",
+     "description": "Create a License resource in the specified project.",
+     "parameters": {
+      "project": {
+       "type": "string",
+       "description": "Project ID for this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      },
+      "requestId": {
+       "type": "string",
+       "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed.\n\nFor example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments.\n\nThe request ID must be a valid UUID with the exception that zero UUID is not supported (00000000-0000-0000-0000-000000000000).",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "project"
+     ],
+     "request": {
+      "$ref": "License"
+     },
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/devstorage.full_control",
+      "https://www.googleapis.com/auth/devstorage.read_only",
+      "https://www.googleapis.com/auth/devstorage.read_write"
+     ]
+    },
+    "list": {
+     "id": "compute.licenses.list",
+     "path": "{project}/global/licenses",
+     "httpMethod": "GET",
+     "description": "Retrieves the list of licenses available in the specified project. This method does not get any licenses that belong to other projects, including licenses attached to publicly-available images, like Debian 8. If you want to get a list of publicly-available licenses, use this method to make a request to the respective image project, such as debian-cloud or windows-cloud.",
+     "parameters": {
+      "filter": {
+       "type": "string",
+       "description": "Sets a filter {expression} for filtering listed resources. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use name ne example-instance.\n\nYou can filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nTo filter on multiple expressions, provide each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests. Acceptable values are 0 to 500, inclusive. (Default: 500)",
+       "default": "500",
+       "format": "uint32",
+       "minimum": "0",
+       "location": "query"
+      },
+      "orderBy": {
+       "type": "string",
+       "description": "Sorts list results by a certain order. By default, results are returned in alphanumerical order based on the resource name.\n\nYou can also sort results in descending order based on the creation timestamp using orderBy=\"creationTimestamp desc\". This sorts results based on the creationTimestamp field in reverse chronological order (newest result first). Use this to sort resources like operations so that the newest operation is returned first.\n\nCurrently, only sorting by name or creationTimestamp desc is supported.",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Specifies a page token to use. Set pageToken to the nextPageToken returned by a previous list request to get the next page of results.",
+       "location": "query"
+      },
+      "project": {
+       "type": "string",
+       "description": "Project ID for this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project"
+     ],
+     "response": {
+      "$ref": "LicensesListResponse"
      },
      "scopes": [
       "https://www.googleapis.com/auth/cloud-platform",
