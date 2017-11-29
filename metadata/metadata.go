@@ -35,6 +35,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -98,11 +99,43 @@ type RealUpdater struct {
 	Local bool
 }
 
+// findIP extracts an ip address from a string using a regex pattern.
+func findIP(input string) string {
+	if input == "" {
+		return input
+	}
+	numBlock := "(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])"
+	regexPattern := numBlock + "\\." + numBlock + "\\." + numBlock + "\\." + numBlock
+
+	regEx := regexp.MustCompile(regexPattern)
+	return regEx.FindString(input)
+}
+
 func (r RealUpdater) getAddress() string {
-	if r.Local {
+	if !r.Local {
+		return metadataHostedIP
+	}
+	// If DOCKER_HOST not set (the usual case when r.Local is true)
+	// then use localhost:8082 for the address of the spoofed metadata server.
+	dh := os.Getenv("DOCKER_HOST")
+	if dh == "" {
 		return "localhost:8082"
 	}
-	return metadataHostedIP
+
+	// If DOCKER_HOST is set, then the user may be using minikube locally.
+	// This feature was added to support the minikube use case.
+
+	// If an ip cannot be extracted from DOCKER_HOST using the findIP regex function
+	// then use localhost:8082 for the address of the spoofed metadata server and log a warning.
+	dh = findIP(dh)
+	if dh == "" {
+		log.Println("Warning DOCKER_HOST environment variable set but does not contain a valid ip address, falling back to using localhost:8082 for spoofed metadata server address")
+		return "localhost:8082"
+	}
+
+	// The spoofed metadata server will be created at the docker host address defined by DOCKER_HOST,
+	// so need to return the docker host address instead of localhost.
+	return dh + ":8082"
 }
 
 // SetToken updates the spoofed metadata server's credentials.
