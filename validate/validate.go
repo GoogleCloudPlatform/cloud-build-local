@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -56,16 +57,20 @@ const (
 )
 
 var (
-	validUserSubstKeyRE   = regexp.MustCompile(`^_[A-Z0-9_]+$`)
-	validBuiltInVariables = map[string]struct{}{
-		"PROJECT_ID":  struct{}{},
-		"BUILD_ID":    struct{}{},
-		"REPO_NAME":   struct{}{},
-		"BRANCH_NAME": struct{}{},
-		"TAG_NAME":    struct{}{},
-		"REVISION_ID": struct{}{},
-		"COMMIT_SHA":  struct{}{},
-		"SHORT_SHA":   struct{}{},
+	validUserSubstKeyRE = regexp.MustCompile(`^_[A-Z0-9_]+$`)
+
+	// validBuiltInSubstitutions is the list of valid built-in substitution variables.
+	// The boolean values determine if the variable can be used in the
+	// --substitutions flag (gcloud / local builder).
+	validBuiltInSubstitutions = map[string]bool{
+		"PROJECT_ID":  false,
+		"BUILD_ID":    false,
+		"REPO_NAME":   true,
+		"BRANCH_NAME": true,
+		"TAG_NAME":    true,
+		"REVISION_ID": true,
+		"COMMIT_SHA":  true,
+		"SHORT_SHA":   true,
 	}
 	validVolumeNameRE   = regexp.MustCompile("^[a-zA-Z0-9][a-zA-Z0-9_.-]+$")
 	reservedVolumePaths = map[string]struct{}{
@@ -93,19 +98,19 @@ func CheckBuild(b *cb.Build) error {
 		return fmt.Errorf("timeout exceeds the timeout limit of %v", maxTimeoutSeconds*time.Second)
 	}
 
-	if err := CheckSubstitutions(b.Substitutions); err != nil {
+	if err := CheckSubstitutionsLoose(b.Substitutions); err != nil {
 		return fmt.Errorf("invalid .substitutions field: %v", err)
 	}
 
-	if err := CheckImages(b.Images); err != nil {
-		return fmt.Errorf("invalid .images field: %v", err)
+	if err := CheckArtifacts(b); err != nil {
+		return fmt.Errorf("invalid .artifacts field: %v", err)
 	}
 
 	if err := CheckBuildSteps(b.Steps); err != nil {
 		return fmt.Errorf("invalid .steps field: %v", err)
 	}
 
-	if missingSubs, err := CheckSubstitutionTemplate(b.Images, b.Steps, b.Substitutions); err != nil {
+	if missingSubs, err := CheckSubstitutionTemplate(b.Images, b.Tags, b.Steps, b.Substitutions); err != nil {
 		return err
 	} else if len(missingSubs) > 0 {
 		// If the user doesn't specifically allow loose substitutions, the warnings
@@ -113,10 +118,6 @@ func CheckBuild(b *cb.Build) error {
 		if b.GetOptions().GetSubstitutionOption() != cb.BuildOptions_ALLOW_LOOSE {
 			return fmt.Errorf(strings.Join(missingSubs, ";"))
 		}
-	}
-
-	if err := checkBuildTags(b.Tags); err != nil {
-		return err
 	}
 
 	if err := checkSecrets(b); err != nil {
@@ -131,11 +132,34 @@ func CheckBuildAfterSubstitutions(b *cb.Build) error {
 	if err := checkBuildStepNames(b.Steps); err != nil {
 		return err
 	}
+
+	var err error
+	if b.Tags, err = sanitizeBuildTags(b.Tags); err != nil {
+		return err
+	}
+
 	return checkImageNames(b.Images)
 }
 
 // CheckSubstitutions validates the substitutions map.
 func CheckSubstitutions(substitutions map[string]string) error {
+	if err := CheckSubstitutionsLoose(substitutions); err != nil {
+		return err
+	}
+
+	// Also check that all the substitions have the user-defined format.
+	for k, _ := range substitutions {
+		if !validUserSubstKeyRE.MatchString(k) {
+			return fmt.Errorf("substitution key %q does not respect format %q", k, validUserSubstKeyRE)
+		}
+	}
+
+	return nil
+}
+
+// CheckSubstitutionsLoose validates the substitutions map, accepting some
+// built-in substitutions overrides.
+func CheckSubstitutionsLoose(substitutions map[string]string) error {
 	if substitutions == nil {
 		// Callers can request builds without substitutions.
 		return nil
@@ -150,7 +174,9 @@ func CheckSubstitutions(substitutions map[string]string) error {
 			return fmt.Errorf("substitution key %q too long (max: %d)", k, maxSubstKeyLength)
 		}
 		if !validUserSubstKeyRE.MatchString(k) {
-			return fmt.Errorf("substitution key %q does not respect format %q", k, validUserSubstKeyRE)
+			if overridable, ok := validBuiltInSubstitutions[k]; !ok || !overridable {
+				return fmt.Errorf("substitution key %q does not respect format %q and is not an overridable built-in substitutions", k, validUserSubstKeyRE)
+			}
 		}
 		if len(v) > maxSubstValueLength {
 			return fmt.Errorf("substitution value %q too long (max: %d)", v, maxSubstValueLength)
@@ -163,7 +189,7 @@ func CheckSubstitutions(substitutions map[string]string) error {
 // CheckSubstitutionTemplate checks that all the substitution variables are used
 // and all the variables found in the template are used too. It may returns an
 // error and a list of string warnings.
-func CheckSubstitutionTemplate(images []string, steps []*cb.BuildStep, substitutions map[string]string) ([]string, error) {
+func CheckSubstitutionTemplate(images, tags []string, steps []*cb.BuildStep, substitutions map[string]string) ([]string, error) {
 	warnings := []string{}
 
 	// substitutionsUsed is used to check that all the substitution variables
@@ -184,7 +210,7 @@ func CheckSubstitutionTemplate(images []string, steps []*cb.BuildStep, substitut
 					warnings = append(warnings, fmt.Sprintf("key in the template %q is not matched in the substitution data", p.Key))
 					continue
 				}
-				if _, ok := validBuiltInVariables[p.Key]; !ok {
+				if _, ok := validBuiltInSubstitutions[p.Key]; !ok {
 					return fmt.Errorf("key in the template %q is not a valid built-in substitution", p.Key)
 				}
 			}
@@ -219,6 +245,12 @@ func CheckSubstitutionTemplate(images []string, steps []*cb.BuildStep, substitut
 			return warnings, err
 		}
 	}
+	for _, t := range tags {
+		if err := checkParameters(t); err != nil {
+			return warnings, err
+		}
+	}
+
 	for k, v := range substitutionsUsed {
 		if v == false {
 			warnings = append(warnings, fmt.Sprintf("key %q in the substitution data is not matched in the template", k))
@@ -227,16 +259,36 @@ func CheckSubstitutionTemplate(images []string, steps []*cb.BuildStep, substitut
 	return warnings, nil
 }
 
-// CheckImages checks the number of images and image's length are under limits.
-func CheckImages(images []string) error {
-	if len(images) > maxNumImages {
+// CheckArtifacts checks the number of images, and images' length are under
+// limits. Also copies top-level images to the .artifacts.images sub-field.
+func CheckArtifacts(b *cb.Build) error {
+	if len(b.Images) > 0 {
+		if len(b.GetArtifacts().GetImages()) > 0 && !reflect.DeepEqual(b.GetArtifacts().GetImages(), b.Images) {
+			return errors.New("cannot specify different .images and .artifacts.images")
+		}
+		if b.Artifacts == nil {
+			b.Artifacts = &cb.Artifacts{}
+		}
+		// Copy .images to .artifacts.images.
+		b.Artifacts.Images = b.Images
+	}
+
+	// Validate .artifacts.images.
+	if len(b.GetArtifacts().GetImages()) > maxNumImages {
 		return fmt.Errorf("cannot specify more than %d images to build", maxNumImages)
 	}
-	for ii, i := range images {
+	for ii, i := range b.GetArtifacts().GetImages() {
 		if len(i) > MaxImageLength {
 			return fmt.Errorf("image %d too long (max: %d)", ii, MaxImageLength)
 		}
 	}
+
+	
+	// clients rely only on .artifacts.images.
+	if len(b.GetArtifacts().GetImages()) > 0 {
+		b.Images = b.GetArtifacts().GetImages()
+	}
+
 	return nil
 }
 
@@ -477,15 +529,28 @@ func checkImageNames(images []string) error {
 	return nil
 }
 
-// checkBuildTags validates the tags list.
-func checkBuildTags(tags []string) error {
+// sanitizeBuildTags validates and sanitizes the tags list.
+func sanitizeBuildTags(tags []string) ([]string, error) {
 	if len(tags) > maxNumTags {
-		return fmt.Errorf("number of tags %d exceeded (max: %d)", len(tags), maxNumTags)
+		return nil, fmt.Errorf("number of tags %d exceeded (max: %d)", len(tags), maxNumTags)
 	}
+
+	// Strip empty strings. This might happen as a result of a substitution which
+	// has been applied without a value (e.g., $BRANCH_NAME when the source is not
+	// from a branch.
+	uniques := map[string]bool{}
+	cp := []string{}
 	for _, t := range tags {
-		if !validBuildTagRE.MatchString(t) {
-			return fmt.Errorf("invalid build tag %q: must match format %q", t, validBuildTagRE)
+		if t != "" && !uniques[t] {
+			cp = append(cp, t)
+			uniques[t] = true
 		}
 	}
-	return nil
+
+	for _, t := range cp {
+		if !validBuildTagRE.MatchString(t) {
+			return nil, fmt.Errorf("invalid build tag %q: must match format %q", t, validBuildTagRE)
+		}
+	}
+	return cp, nil
 }

@@ -48,6 +48,7 @@ type mockRunner struct {
 	localImages      map[string]bool
 	remoteImages     map[string]bool
 	remotePushesFail bool
+	remotePullsFail  bool
 	dockerRunHandler func(args []string, out, err io.Writer) error
 	localFiles       map[string]string
 	volumes          map[string]bool
@@ -173,9 +174,13 @@ func (r *mockRunner) Run(args []string, in io.Reader, out, err io.Writer, _ stri
 			return nil
 		}
 		// Image not present.
-		return fmt.Errorf("exit status 1")
+		return errors.New("exit status 1")
 	}
 	if startsWith(args, "docker", "run") && contains(args, "gcr.io/cloud-builders/docker", "pull") {
+		if r.remotePullsFail {
+			// Failed pull.
+			return errors.New("exit status 1")
+		}
 		tag := args[len(args)-1]
 		if r.remoteImages[tag] {
 			// Successful pull.
@@ -195,7 +200,7 @@ Status: Downloaded newer image for gcr.io/test/busybox:latest
 	if startsWith(args, "docker", "run") && contains(args, "gcr.io/cloud-builders/docker", "push") {
 		if r.remotePushesFail {
 			// Failed push.
-			return fmt.Errorf("exit status 1")
+			return errors.New("exit status 1")
 		}
 		tag := args[len(args)-1]
 		io.WriteString(out, `The push refers to a repository [skelterjohn/ubuntu] (len: 1)
@@ -395,6 +400,7 @@ func TestFetchBuilder(t *testing.T) {
 	testCases := []struct {
 		name         string
 		buildRequest cb.Build
+		pullsFail    bool
 		wantErr      error
 		wantCommands []string
 	}{{
@@ -423,15 +429,28 @@ func TestFetchBuilder(t *testing.T) {
 				Name: "gcr.io/invalid-build-step",
 			}},
 		},
+		pullsFail: true,
 		// no image in remoteImages
 		wantCommands: []string{
 			"docker inspect gcr.io/invalid-build-step",
+			// Retry this 10 times.
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
+			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
 			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
 		},
-		wantErr: errors.New(`error pulling build step "gcr.io/invalid-build-step": exit status 1 for tag "gcr.io/invalid-build-step"`),
+		wantErr: errors.New(`error pulling build step "gcr.io/invalid-build-step": exit status 1`),
 	}}
 	for _, tc := range testCases {
 		r := newMockRunner(t, tc.name)
+		r.remotePullsFail = tc.pullsFail
 		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", true, false, false)
 		var gotErr error
 		var gotDigest string
@@ -449,13 +468,16 @@ func TestFetchBuilder(t *testing.T) {
 			}
 		}
 		if !reflect.DeepEqual(gotErr, tc.wantErr) {
-			t.Errorf("%s: Wanted error %v, but got %v", tc.name, tc.wantErr, gotErr)
+			t.Errorf("%s: Wanted %q, but got %q", tc.name, tc.wantErr, gotErr)
 		}
 		if tc.wantCommands != nil {
 			if len(r.commands) != len(tc.wantCommands) {
 				t.Errorf("%s: Wrong number of commands: want %d, got %d", tc.name, len(tc.wantCommands), len(r.commands))
 			}
 			for i := range r.commands {
+				if i >= len(tc.wantCommands) {
+					break
+				}
 				if match, _ := regexp.MatchString(tc.wantCommands[i], r.commands[i]); !match {
 					t.Errorf("%s: command %d didn't match!\n===Want:\n%s\n===Got:\n%s", tc.name, i, tc.wantCommands[i], r.commands[i])
 				}
@@ -1176,31 +1198,39 @@ func TestBuildTiming(t *testing.T) {
 			if b.Timing.BuildTotal == nil {
 				t.Errorf("got build.Timing.BuildTotal = nil, want TimeSpan value")
 			}
+			if !isEndTimeAfterStartTime(b.Timing.BuildTotal) {
+				t.Errorf("unexpected build total time:\n got %+v\nwant TimeSpan EndTime to occur after StartTime", b.Timing.BuildTotal)
+			}
+
 			expectedStepTimings := len(tc.buildRequest.Steps)
 			if tc.hasError {
 				// If there as an error, not all the build steps will be timed,
 				// so test case value for expected number of steps.
 				expectedStepTimings = tc.stepTimings
 			}
-			if len(buildStepTimes) != expectedStepTimings {
-				t.Errorf("unexpected number of build step times:\n got %d\nwant %d", len(buildStepTimes), expectedStepTimings)
-			}
-
-			// Validate TimeSpans.
-			if !isEndTimeAfterStartTime(b.Timing.BuildTotal) {
-				t.Errorf("unexpected build total time:\n got %+v\nwant TimeSpan EndTime to occur after StartTime", b.Timing.BuildTotal)
-			}
+			stepTimings := 0
 			for _, bs := range buildStepTimes {
+				if bs == nil {
+					continue // do not evaluate nil timings
+				}
+				stepTimings++
 				if !isEndTimeAfterStartTime(bs) {
 					t.Errorf("unexpected build step time:\n got %+v\nwant TimeSpan EndTime to occur after StartTime", bs)
 				}
 			}
+			if stepTimings != expectedStepTimings {
+				t.Errorf("unexpected number of build step times:\n got %d\nwant %d", stepTimings, expectedStepTimings)
+			}
 
-			// Verify step timing order.
 			if tc.hasError {
 				// If there is an error, just verify the order of the step timings that exist.
+				
+				// We do not need to check the WaitFor field below because the error test case has consecutive steps.
 				prevStep := buildStepTimes[0]
 				for i := 1; i < len(buildStepTimes); i++ {
+					if buildStepTimes[i] == nil {
+						continue
+					}
 					if buildStepTimes[i].Start.Before(prevStep.End) {
 						t.Errorf("build step %d started before step %d ended", i, i-1)
 					}
@@ -1208,6 +1238,7 @@ func TestBuildTiming(t *testing.T) {
 				}
 				return
 			}
+			// Otherwise, verify the order of all step timings.
 			buildSteps := tc.buildRequest.Steps
 			for i, bs := range buildSteps {
 				if bs.WaitFor != nil {
@@ -1312,18 +1343,22 @@ func TestBuildTimingOutOfOrder(t *testing.T) {
 
 			buildStepTimes := b.Timing.BuildSteps
 
-			// Verify build step and total build timings properly captured.
+			// Verify build total timings.
 			if b.Timing.BuildTotal == nil {
 				t.Errorf("got build.Timing.BuildTotal = nil, want TimeSpan value")
 			}
-			if len(buildStepTimes) != len(tc.buildRequest.Steps) {
-				t.Errorf("unexpected number of build step times:\n got %d\nwant %d", len(buildStepTimes), len(tc.buildRequest.Steps))
-			}
-			// Validate TimeSpans.
 			if !isEndTimeAfterStartTime(b.Timing.BuildTotal) {
 				t.Errorf("unexpected build total time:\n got %+v\nwant TimeSpan EndTime to occur after StartTime", b.Timing.BuildTotal)
 			}
+
+			// Verify build step timings.
+			if len(buildStepTimes) != len(tc.buildRequest.Steps) {
+				t.Errorf("unexpected number of build step times:\n got %d\nwant %d", len(buildStepTimes), len(tc.buildRequest.Steps))
+			}
 			for _, bs := range buildStepTimes {
+				if bs == nil {
+					t.Error("unexpected build step time:\n got nil")
+				}
 				if !isEndTimeAfterStartTime(bs) {
 					t.Errorf("unexpected build step time:\n got %+v\nwant TimeSpan EndTime to occur after StartTime", bs)
 				}

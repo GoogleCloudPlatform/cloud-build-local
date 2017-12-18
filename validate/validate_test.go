@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -100,9 +101,42 @@ func TestCheckSubstitutions(t *testing.T) {
 	}
 }
 
+func TestCheckSubstitutionsLoose(t *testing.T) {
+	for _, c := range []struct {
+		substitutions map[string]string
+		wantErr       bool
+	}{{
+		substitutions: map[string]string{
+			"REPO_NAME":   "foo",
+			"BRANCH_NAME": "foo",
+			"TAG_NAME":    "foo",
+			"REVISION_ID": "foo",
+			"COMMIT_SHA":  "foo",
+			"SHORT_SHA":   "foo",
+		},
+		wantErr: false,
+	}, {
+		substitutions: map[string]string{
+			"PROJECT_ID": "foo",
+		},
+		wantErr: true,
+	}, {
+		substitutions: map[string]string{
+			"BUILD_ID": "foo",
+		},
+		wantErr: true,
+	}} {
+		if err := CheckSubstitutionsLoose(c.substitutions); err == nil && c.wantErr {
+			t.Errorf("CheckSubstitutionsLoose(%v) did not return error", c.substitutions)
+		} else if err != nil && !c.wantErr {
+			t.Errorf("CheckSubstitutionsLoose(%v) got unexpected error: %v", c.substitutions, err)
+		}
+	}
+}
+
 func TestCheckSubstitutionTemplate(t *testing.T) {
 	for _, c := range []struct {
-		images        []string
+		images, tags  []string
 		steps         []*cb.BuildStep
 		substitutions map[string]string
 		wantErr       bool
@@ -138,7 +172,7 @@ func TestCheckSubstitutionTemplate(t *testing.T) {
 		substitutions: map[string]string{},
 		wantErr:       true,
 	}} {
-		warnings, err := CheckSubstitutionTemplate(c.images, c.steps, c.substitutions)
+		warnings, err := CheckSubstitutionTemplate(c.images, c.tags, c.steps, c.substitutions)
 		if err == nil && c.wantErr {
 			t.Errorf("CheckSubstitutionTemplate(%v,%v,%v) did not return error", c.images, c.steps, c.substitutions)
 		} else if err != nil && !c.wantErr {
@@ -330,13 +364,54 @@ func TestCheckBuildAfterSubstitutions(t *testing.T) {
 	}
 }
 
-func TestCheckImages(t *testing.T) {
+func TestCheckArtifacts(t *testing.T) {
 	for _, c := range []struct {
-		images  []string
-		wantErr bool
+		images    []string
+		artifacts *cb.Artifacts
+		wantErr   bool
+		wantOut   *cb.Build
 	}{{
+		// Images are propagated from top-level to artifacts.
 		images:  []string{"hello", "world"},
 		wantErr: false,
+		wantOut: &cb.Build{
+			Images: []string{"hello", "world"},
+			Artifacts: &cb.Artifacts{
+				Images: []string{"hello", "world"},
+			},
+		},
+	}, {
+		// Images are propagated from artifacts back to top-level.
+		artifacts: &cb.Artifacts{
+			Images: []string{"hello", "world"},
+		},
+		wantErr: false,
+		wantOut: &cb.Build{
+			Images: []string{"hello", "world"},
+			Artifacts: &cb.Artifacts{
+				Images: []string{"hello", "world"},
+			},
+		},
+	}, {
+		// Can't specify different top-level and artifacts.images.
+		images: []string{"goodbye", "world"},
+		artifacts: &cb.Artifacts{
+			Images: []string{"hello", "world"},
+		},
+		wantErr: true,
+	}, {
+		// Can specify same top-level and artifacts.images.
+		images: []string{"hello", "world"},
+		artifacts: &cb.Artifacts{
+			Images: []string{"hello", "world"},
+		},
+		wantErr: false,
+		wantOut: &cb.Build{
+			Images: []string{"hello", "world"},
+			Artifacts: &cb.Artifacts{
+				Images: []string{"hello", "world"},
+			},
+		},
 	}, {
 		images:  manyStrings(maxNumImages + 1),
 		wantErr: true,
@@ -344,10 +419,16 @@ func TestCheckImages(t *testing.T) {
 		images:  []string{strings.Repeat("a", MaxImageLength+1)},
 		wantErr: true,
 	}} {
-		if err := CheckImages(c.images); err == nil && c.wantErr {
-			t.Errorf("CheckImages(%v) did not return error", c.images)
+		b := &cb.Build{
+			Images:    c.images,
+			Artifacts: c.artifacts,
+		}
+		if err := CheckArtifacts(b); err == nil && c.wantErr {
+			t.Errorf("CheckArtifacts(%v) did not return error", b)
 		} else if err != nil && !c.wantErr {
-			t.Errorf("CheckImages(%v) got unexpected error: %v", c.images, err)
+			t.Errorf("CheckArtifacts(%v) got unexpected error: %v", b, err)
+		} else if err == nil && !reflect.DeepEqual(b, c.wantOut) {
+			t.Errorf("CheckArtifacts modified build to %+v, want %+v", b, c.wantOut)
 		}
 	}
 }
@@ -973,8 +1054,9 @@ func TestCheckBuildTags(t *testing.T) {
 	}
 
 	for _, c := range []struct {
-		tags    []string
-		wantErr bool
+		tags     []string
+		wantTags []string
+		wantErr  bool
 	}{{
 		tags:    []string{},
 		wantErr: false,
@@ -985,9 +1067,6 @@ func TestCheckBuildTags(t *testing.T) {
 		tags:    []string{"_"},
 		wantErr: false,
 	}, {
-		tags:    []string{""},
-		wantErr: true,
-	}, {
 		tags:    []string{"%"},
 		wantErr: true,
 	}, {
@@ -996,11 +1075,32 @@ func TestCheckBuildTags(t *testing.T) {
 	}, {
 		tags:    hugeTagList,
 		wantErr: true,
+	}, {
+		// strip empty tags
+		tags:     []string{""},
+		wantTags: []string{},
+	}, {
+		// strip empty tags
+		tags:     []string{"a", "", "b", "", "", "c", ""},
+		wantTags: []string{"a", "b", "c"},
+	}, {
+		// strip duplicates
+		tags:     []string{"a", "a", "a"},
+		wantTags: []string{"a"},
+	}, {
+		// strip duplicates and empty tags
+		tags:     []string{"a", "", "b", "c", "", "b", "d", "a", "", "e", "b", "a"},
+		wantTags: []string{"a", "b", "c", "d", "e"},
 	}} {
-		if err := checkBuildTags(c.tags); err == nil && c.wantErr {
+		got, err := sanitizeBuildTags(c.tags)
+		if err == nil && c.wantErr {
 			t.Errorf("checkBuildTags(%v) did not return error", c.tags)
 		} else if err != nil && !c.wantErr {
 			t.Errorf("checkBuildTags(%v) got unexpected error: %v", c.tags, err)
+		}
+
+		if c.wantTags != nil && !reflect.DeepEqual(got, c.wantTags) {
+			t.Errorf("checkBuildTags(%v) got: %+v, want: %+v", c.tags, got, c.wantTags)
 		}
 	}
 }

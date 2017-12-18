@@ -144,15 +144,6 @@ func run(source string) error {
 		return fmt.Errorf("Error loading config file: %v", err)
 	}
 
-	// Parse substitutions.
-	if *substitutions != "" {
-		substMap, err := common.ParseSubstitutionsFlag(*substitutions)
-		if err != nil {
-			return fmt.Errorf("Error parsing substitutions flag: %v", err)
-		}
-		buildConfig.Substitutions = substMap
-	}
-
 	// Get the ProjectId to feed both the build and the metadata server.
 	// This command uses a runner without dryrun to return the real project.
 	projectInfo, err := gcloud.ProjectInfo(&runner.RealRunner{})
@@ -164,6 +155,22 @@ func run(source string) error {
 	// Validate the build.
 	if err := validate.CheckBuild(buildConfig); err != nil {
 		return fmt.Errorf("Error validating build: %v", err)
+	}
+	// Do not accept built-in substitutions in the build config.
+	if err := validate.CheckSubstitutions(buildConfig.Substitutions); err != nil {
+		return fmt.Errorf("Error validating build's substitutions: %v", err)
+	}
+
+	// Parse substitutions.
+	if *substitutions != "" {
+		substMap, err := common.ParseSubstitutionsFlag(*substitutions)
+		if err != nil {
+			return fmt.Errorf("Error parsing substitutions flag: %v", err)
+		}
+		if err := validate.CheckSubstitutionsLoose(substMap); err != nil {
+			return err
+		}
+		buildConfig.Substitutions = substMap
 	}
 
 	// Apply substitutions.

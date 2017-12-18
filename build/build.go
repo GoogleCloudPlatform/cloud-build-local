@@ -35,6 +35,7 @@ import (
 	cb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 
 	"github.com/GoogleCloudPlatform/container-builder-local/common"
+	"github.com/GoogleCloudPlatform/container-builder-local/gsutil"
 	"github.com/GoogleCloudPlatform/container-builder-local/runner"
 	"github.com/GoogleCloudPlatform/container-builder-local/volume"
 	"google.golang.org/api/cloudkms/v1"
@@ -127,6 +128,9 @@ type Build struct {
 
 	// timing holds timing information for build execution phases.
 	Timing TimingInfo
+
+	// gsutilHelper provides helper methods for calling gsutil commands in docker.
+	gsutilHelper gsutil.Helper
 }
 
 // TimingInfo holds timing information for build execution phases.
@@ -172,6 +176,7 @@ func New(r runner.Runner, rq cb.Build, ts oauth2.TokenSource,
 		local:            local,
 		push:             push,
 		dryrun:           dryrun,
+		gsutilHelper:     gsutil.New(r),
 	}
 }
 
@@ -192,7 +197,6 @@ func (b *Build) Start() {
 			log.Printf("Failed to delete homevol: %v", err)
 		}
 	}()
-
 	// Fetch and run the build steps.
 	b.UpdateStatus(StatusBuild)
 	if err := b.runBuildSteps(); err != nil {
@@ -200,16 +204,17 @@ func (b *Build) Start() {
 		return
 	}
 
-	// push the images
 	if b.push {
 		b.UpdateStatus(StatusPush)
+		// Push the images.
 		if err := b.pushImages(); err != nil {
 			b.FailBuild(err)
 			return
 		}
+		
 	}
 
-	// build is done
+	// Build is done.
 	b.UpdateStatus(StatusDone)
 }
 
@@ -411,6 +416,20 @@ func (b *Build) dockerPull(tag string, outWriter, errWriter io.Writer) (string, 
 	return scrapePullDigest(buf.String())
 }
 
+func (b *Build) dockerPullWithRetries(tag string, outWriter, errWriter io.Writer, attempt int) (string, error) {
+	digest, err := b.dockerPull(tag, outWriter, errWriter)
+	if err != nil {
+		if attempt < maxPushRetries {
+			time.Sleep(common.Backoff(500*time.Millisecond, 10*time.Second, attempt))
+			return b.dockerPullWithRetries(tag, outWriter, errWriter, attempt+1)
+		}
+		b.Log.WriteMainEntry("ERROR: failed to pull because we ran out of retries.")
+		log.Print("Failed to pull because we ran out of retries.")
+		return "", err
+	}
+	return digest, nil
+}
+
 func (b *Build) detectPushFailure(output string) error {
 	const dnsFailure = "no such host"
 	const networkFailure = "network is unreachable"
@@ -587,6 +606,7 @@ func (b *Build) dockerPush(tag string) (map[string]string, error) {
 
 // runWithScrapedLogging executes the command and returns the output (stdin, stderr), with logging.
 func (b *Build) runWithScrapedLogging(logPrefix string, cmd []string) (string, error) {
+	
 	var buf bytes.Buffer
 	outWriter := io.MultiWriter(b.Log.MakeWriter(logPrefix+":STDOUT", -1, true), &buf)
 	errWriter := io.MultiWriter(b.Log.MakeWriter(logPrefix+":STDERR", -1, false), &buf)
@@ -596,6 +616,7 @@ func (b *Build) runWithScrapedLogging(logPrefix string, cmd []string) (string, e
 
 // runAndScrape executes the command and returns the output (stdin, stderr), without logging.
 func (b *Build) runAndScrape(cmd []string) (string, error) {
+	
 	var buf bytes.Buffer
 	outWriter := io.Writer(&buf)
 	errWriter := io.Writer(&buf)
@@ -618,14 +639,13 @@ func (b *Build) fetchBuilder(name string, stepIdentifier string, stepIdx int) (s
 		return digest, nil
 	}
 	fmt.Fprintf(outWriter, "Pulling image: %s\n", name)
-	_, err = b.dockerPull(name, outWriter, errWriter)
-	if err == errorScrapingDigest {
+	if _, err := b.dockerPullWithRetries(name, outWriter, errWriter, 0); err == errorScrapingDigest {
 		return "", nil
-	}
-	if err != nil {
+	} else if err != nil {
 		return "", fmt.Errorf("error pulling build step %q: %v", name, err)
 	}
-	// always return empty string for a pulled image, since we won't run at the digest, and therefore not guaranteed to be the same image
+	// always return empty string for a pulled image, since we won't run at the
+	// digest, and therefore not guaranteed to be the same image
 	return "", nil
 }
 
@@ -718,42 +738,18 @@ func (r realKMS) Decrypt(key, enc string) (string, error) {
 	return resp.Plaintext, nil
 }
 
-func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan struct{}, done chan<- struct{}, timingChan chan *buildStepTime, errors chan error) {
+func (b *Build) timeAndRunStep(ctx context.Context, step *cb.BuildStep, idx int, waitChans []chan struct{}, done chan<- struct{}, errors chan<- error) {
+	// Wait for preceding steps to finish before executing.
+	// If a preceding step fails, the context will cancel and waiting goroutines will die.
+	
 	for _, ch := range waitChans {
-		<-ch
-	}
-	start := timeNow()
-	// timeStepFunc times the step and should be called whether or not the step has an error.
-	// The function should be called before any errors are passed into the errors channel.
-	// It must also be called before the done channel is closed, otherwise consecutive
-	// build steps may start before this function has been timed.
-	timeStepFunc := func() {
-		ts := &TimeSpan{start, timeNow()}
-		timingChan <- &buildStepTime{
-			stepIdx:  idx,
-			timeSpan: ts,
+		select {
+		case <-ch:
+			continue
+		case <-ctx.Done():
+			return
 		}
-		close(timingChan)
 	}
-
-	// handleStepError times the step and sends an error to the errors channel.
-	handleStepError := func(err error) {
-		timeStepFunc()
-		errors <- err
-	}
-	success := false
-
-	ctx := context.Background()
-	if err := b.EventLogger.StartStep(ctx, idx); err != nil {
-		log.Printf("Error publishing start-step event: %v", err)
-		
-	}
-	defer func(idx int) {
-		if err := b.EventLogger.FinishStep(ctx, idx, success); err != nil {
-			log.Printf("Error publishing finish-step event: %v", err)
-			
-		}
-	}(idx)
 
 	var stepIdentifier string
 	if b.HasMultipleSteps {
@@ -763,19 +759,59 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 			stepIdentifier = fmt.Sprintf("Step #%d", idx)
 		}
 	}
+
+	b.Mu.Lock()
+	b.Timing.BuildSteps[idx] = &TimeSpan{Start: timeNow()}
+	b.Mu.Unlock()
+
+	if b.HasMultipleSteps {
+		b.Log.WriteMainEntry(fmt.Sprintf("Starting %s", stepIdentifier))
+	}
+
+	if err := b.EventLogger.StartStep(ctx, idx); err != nil {
+		log.Printf("Error publishing start-step event: %v", err)
+		
+	}
+
+	err := b.runStep(ctx, step, idx, stepIdentifier, done)
+
+	b.Mu.Lock()
+	b.Timing.BuildSteps[idx].End = timeNow()
+	b.Mu.Unlock()
+
+	if b.HasMultipleSteps {
+		b.Log.WriteMainEntry(fmt.Sprintf("Finished %s", stepIdentifier))
+	}
+
+	if err := b.EventLogger.FinishStep(ctx, idx, err == nil); err != nil {
+		log.Printf("Error publishing finish-step event: %v", err)
+		
+	}
+
+	// If another step executing in parallel fails and sends an error, this step
+	// will be blocked from sending an error on the channel.
+	// Listen for context cancellation so that the goroutine exits.
+	if err != nil {
+		select {
+		case errors <- err:
+		case <-ctx.Done():
+		}
+		return
+	}
+	// A step is only done if it executes successfully.
+	close(done)
+}
+
+func (b *Build) runStep(ctx context.Context, step *cb.BuildStep, idx int, stepIdentifier string, done chan<- struct{}) error {
+	
 	outWriter := b.Log.MakeWriter(fmt.Sprintf("%s", stepIdentifier), idx, true)
 	errWriter := b.Log.MakeWriter(fmt.Sprintf("%s", stepIdentifier), idx, false)
 
 	digest, err := b.fetchBuilder(step.Name, stepIdentifier, idx)
 	if err != nil {
-		handleStepError(err)
-		return
+		return err
 	}
 	b.recordStepDigest(idx, digest)
-
-	if b.HasMultipleSteps {
-		b.Log.WriteMainEntry(fmt.Sprintf("Starting %s", stepIdentifier))
-	}
 
 	runTarget := step.Name
 	if digest != "" { // only remove tag / original digest if the digest exists from the builder
@@ -798,8 +834,7 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 	if len(step.SecretEnv) > 0 {
 		kms, err := b.getKMSClient()
 		if err != nil {
-			handleStepError(err)
-			return
+			return err
 		}
 		for _, se := range step.SecretEnv {
 			// Figure out which KMS key to use to decrypt the value. Admin's validations in CreateBuild
@@ -809,13 +844,11 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 					kmsKeyName := sec.KmsKeyName
 					plaintext, err := kms.Decrypt(kmsKeyName, base64.StdEncoding.EncodeToString(val))
 					if err != nil {
-						handleStepError(fmt.Errorf("Failed to decrypt %q using key %q: %v", se, kmsKeyName, err))
-						return
+						return fmt.Errorf("Failed to decrypt %q using key %q: %v", se, kmsKeyName, err)
 					}
 					dec, err := base64.StdEncoding.DecodeString(plaintext)
 					if err != nil {
-						handleStepError(fmt.Errorf("Plaintext was not base64-decodeable: %v", err))
-						return
+						return fmt.Errorf("Plaintext was not base64-decodeable: %v", err)
 					}
 					args = append(args, "--env", fmt.Sprintf("%s=%s", se, string(dec)))
 					break
@@ -826,15 +859,12 @@ func (b *Build) fetchAndRunStep(step *cb.BuildStep, idx int, waitChans []chan st
 
 	args = append(args, runTarget)
 	args = append(args, step.Args...)
+	
+	// This might allow us to use sync.ErrGroup or a similar package to manage the step goroutines.
 	if err := b.Runner.Run(args, nil, outWriter, errWriter, ""); err != nil {
-		handleStepError(fmt.Errorf("build step %q failed: %v", runTarget, err))
-	} else {
-		defer close(done)
-		defer timeStepFunc() // step was successful
+		return fmt.Errorf("build step %q failed: %v", runTarget, err)
 	}
-	if b.HasMultipleSteps {
-		b.Log.WriteMainEntry(fmt.Sprintf("Finished %s", stepIdentifier))
-	}
+	return nil
 }
 
 func (b *Build) runBuildSteps() error {
@@ -874,7 +904,6 @@ func (b *Build) runBuildSteps() error {
 	b.HasMultipleSteps = len(b.Request.Steps) > 1
 	errors := make(chan error)
 	var finishedChannels []chan struct{}
-	var timingChannels []chan *buildStepTime
 	b.idxChan = map[int]chan struct{}{}
 	b.idxTranslate = map[string]int{}
 	for idx, step := range b.Request.Steps {
@@ -882,6 +911,12 @@ func (b *Build) runBuildSteps() error {
 			b.idxTranslate[step.Id] = idx
 		}
 	}
+
+	b.Timing.BuildSteps = make([]*TimeSpan, len(b.Request.Steps))
+
+	
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	for idx, step := range b.Request.Steps {
 		finishedStep := make(chan struct{})
 		b.idxChan[idx] = finishedStep
@@ -889,27 +924,18 @@ func (b *Build) runBuildSteps() error {
 		if err != nil {
 			return err
 		}
-		timing := make(chan *buildStepTime, 1)
-		go b.fetchAndRunStep(step, idx, waitChans, finishedStep, timing, errors)
+		go b.timeAndRunStep(ctx, step, idx, waitChans, finishedStep, errors)
 		finishedChannels = append(finishedChannels, finishedStep)
-		timingChannels = append(timingChannels, timing)
 	}
-	// When a step has an error and doesn't finish, we still want the step timing.
-	
-	// We could possibly pass errors in that channel too. Reducing the number of channels can make the code clearer.
-	for i, ch := range finishedChannels {
+	for _, ch := range finishedChannels {
 		select {
 		case <-ch:
-			t := <-timingChannels[i]
-			b.Timing.BuildSteps = append(b.Timing.BuildSteps, t.timeSpan)
 			continue
 		case err := <-errors:
-			t := <-timingChannels[i] // time an unfinished step
-			b.Timing.BuildSteps = append(b.Timing.BuildSteps, t.timeSpan)
 			return err
 		}
 	}
-	// verify that all the right images were built
+	// Verify that all the right images were built
 	var missing []string
 	for _, image := range b.Request.Images {
 		if !b.imageIsLocal(image) {
@@ -1043,6 +1069,24 @@ func (b *Build) pushImages() error {
 		}
 		b.Mu.Unlock()
 	}
+	return nil
+}
+
+// pushArtifacts pushes ArtifactObjects to a specified bucket.
+// The Images under Artifacts are pushed separately from this function.
+func (b *Build) pushArtifacts() error {
+	
+	if b.Request.Artifacts.Objects == nil {
+		return nil
+	}
+
+	// Check that the bucket exists.
+	bucket := b.Request.Artifacts.Objects.Location
+	exists := b.gsutilHelper.BucketExists(bucket)
+	if !exists {
+		return fmt.Errorf("bucket %q does not exist", bucket)
+	}
+
 	return nil
 }
 

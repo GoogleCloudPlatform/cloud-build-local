@@ -112,7 +112,9 @@ func SubstituteBuildFields(b *cb.Build) error {
 	for i, img := range b.Images {
 		b.Images[i] = applyReplacements(img)
 	}
-
+	for i, t := range b.Tags {
+		b.Tags[i] = applyReplacements(t)
+	}
 	return nil
 }
 
