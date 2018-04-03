@@ -19,14 +19,16 @@ import (
 	"fmt"
 	"regexp"
 
-	cb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
+	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 )
 
 var (
-	unbracedKeyRE     = `([A-Z_][A-Z0-9_]*)`
-	bracedKeyRE       = fmt.Sprintf(`{%s}`, unbracedKeyRE)
-	validSubstKeyRE   = regexp.MustCompile(`^\$(?:` + bracedKeyRE + `|` + unbracedKeyRE + `)`)
-	maxShortShaLength = 7
+	unbracedKeyRE   = `([A-Z_][A-Z0-9_]*)`
+	bracedKeyRE     = fmt.Sprintf(`{%s}`, unbracedKeyRE)
+	validSubstKeyRE = regexp.MustCompile(`^\$(?:` + bracedKeyRE + `|` + unbracedKeyRE + `)`)
+
+	// MaxShortShaLength is the length of the shortsha.
+	MaxShortShaLength = 7
 )
 
 // SubstituteBuildFields does an in-place string substitution of build parameters.
@@ -34,7 +36,7 @@ var (
 // If a built-in substitution value is not defined (perhaps a sourceless build,
 // or storage source), then the corresponding substitutions will result in an
 // empty string.
-func SubstituteBuildFields(b *cb.Build) error {
+func SubstituteBuildFields(b *pb.Build) error {
 	repoName := ""
 	branchName := ""
 	tagName := ""
@@ -53,13 +55,14 @@ func SubstituteBuildFields(b *cb.Build) error {
 			commitSHA = rrs.GetCommitSha()
 			shortSHA = commitSHA
 			// Length of commit SHA can be less than maxShortShaLength.
-			if len(shortSHA) > maxShortShaLength {
-				shortSHA = shortSHA[0:maxShortShaLength]
+			if len(shortSHA) > MaxShortShaLength {
+				shortSHA = shortSHA[0:MaxShortShaLength]
 			}
 		}
 	}
 
 	// Built-in substitutions.
+	// LINT.IfChange
 	replacements := map[string]string{
 		"PROJECT_ID":  b.ProjectId,
 		"BUILD_ID":    b.Id,
@@ -70,6 +73,7 @@ func SubstituteBuildFields(b *cb.Build) error {
 		"COMMIT_SHA":  commitSHA,
 		"SHORT_SHA":   shortSHA,
 	}
+	// LINT.ThenChange(//depot/google3/cloud/build/admin/api_webhook.go)
 
 	// Add user-defined substitutions, overriding built-in substitutions.
 	for k, v := range b.Substitutions {

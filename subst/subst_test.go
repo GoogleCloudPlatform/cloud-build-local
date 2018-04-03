@@ -19,7 +19,7 @@ import (
 	"reflect"
 	"testing"
 
-	cb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
+	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 )
 
 const (
@@ -32,38 +32,38 @@ const (
 	shortRevisionID = "abcd"
 )
 
-func addProjectSourceAndProvenance(b *cb.Build) {
+func addProjectSourceAndProvenance(b *pb.Build) {
 	b.Id = buildID
 	b.ProjectId = projectID
-	b.Source = &cb.Source{Source: &cb.Source_RepoSource{RepoSource: &cb.RepoSource{
+	b.Source = &pb.Source{Source: &pb.Source_RepoSource{RepoSource: &pb.RepoSource{
 		ProjectId: projectID,
 		RepoName:  repoName,
 	}}}
-	b.SourceProvenance = &cb.SourceProvenance{
-		ResolvedRepoSource: &cb.RepoSource{
+	b.SourceProvenance = &pb.SourceProvenance{
+		ResolvedRepoSource: &pb.RepoSource{
 			ProjectId: projectID,
 			RepoName:  repoName,
-			Revision:  &cb.RepoSource_CommitSha{CommitSha: longRevisionID},
+			Revision:  &pb.RepoSource_CommitSha{CommitSha: longRevisionID},
 		},
 	}
 }
 
-func addBranchName(b *cb.Build) {
-	b.GetSource().GetRepoSource().Revision = &cb.RepoSource_BranchName{BranchName: branchName}
+func addBranchName(b *pb.Build) {
+	b.GetSource().GetRepoSource().Revision = &pb.RepoSource_BranchName{BranchName: branchName}
 }
 
-func addTagName(b *cb.Build) {
-	b.GetSource().GetRepoSource().Revision = &cb.RepoSource_TagName{TagName: tagName}
+func addTagName(b *pb.Build) {
+	b.GetSource().GetRepoSource().Revision = &pb.RepoSource_TagName{TagName: tagName}
 }
-func addRevision(b *cb.Build) {
-	b.GetSource().GetRepoSource().Revision = &cb.RepoSource_CommitSha{CommitSha: longRevisionID}
-}
-
-func setRevisionID(b *cb.Build, revisionID string) {
-	b.GetSourceProvenance().GetResolvedRepoSource().Revision = &cb.RepoSource_CommitSha{CommitSha: revisionID}
+func addRevision(b *pb.Build) {
+	b.GetSource().GetRepoSource().Revision = &pb.RepoSource_CommitSha{CommitSha: longRevisionID}
 }
 
-func checkBuild(got, want *cb.Build) error {
+func setRevisionID(b *pb.Build, revisionID string) {
+	b.GetSourceProvenance().GetResolvedRepoSource().Revision = &pb.RepoSource_CommitSha{CommitSha: revisionID}
+}
+
+func checkBuild(got, want *pb.Build) error {
 	if !reflect.DeepEqual(want.Images, got.Images) {
 		return fmt.Errorf("images: got %q, want %q", got.Images, want.Images)
 	}
@@ -94,8 +94,8 @@ func checkBuild(got, want *cb.Build) error {
 }
 
 func TestBranch(t *testing.T) {
-	b := &cb.Build{
-		Steps: []*cb.BuildStep{{
+	b := &pb.Build{
+		Steps: []*pb.BuildStep{{
 			Name:       "gcr.io/$PROJECT_ID/my-builder:${BRANCH_NAME}",
 			Args:       []string{"gcr.io/$PROJECT_ID/$BRANCH_NAME:${REVISION_ID}"},
 			Env:        []string{"REPO_NAME=$REPO_NAME", "BUILD_ID=${BUILD_ID}"},
@@ -111,8 +111,8 @@ func TestBranch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error while substituting build fields: %v", err)
 	}
-	if err := checkBuild(b, &cb.Build{
-		Steps: []*cb.BuildStep{{
+	if err := checkBuild(b, &pb.Build{
+		Steps: []*pb.BuildStep{{
 			Name:       "gcr.io/my-project/my-builder:my-branch",
 			Args:       []string{"gcr.io/my-project/my-branch:abcdefg1234567"},
 			Env:        []string{"REPO_NAME=my-repo", "BUILD_ID=build-id"},
@@ -127,8 +127,8 @@ func TestBranch(t *testing.T) {
 }
 
 func TestTag(t *testing.T) {
-	b := &cb.Build{
-		Steps: []*cb.BuildStep{{
+	b := &pb.Build{
+		Steps: []*pb.BuildStep{{
 			Name: "gcr.io/$PROJECT_ID/my-builder:$TAG_NAME",
 			Args: []string{"gcr.io/$PROJECT_ID/$TAG_NAME:$REVISION_ID"},
 			Env:  []string{"REPO_NAME=$REPO_NAME", "BUILD_ID=$BUILD_ID"},
@@ -143,8 +143,8 @@ func TestTag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error while substituting build fields: %v", err)
 	}
-	if err := checkBuild(b, &cb.Build{
-		Steps: []*cb.BuildStep{{
+	if err := checkBuild(b, &pb.Build{
+		Steps: []*pb.BuildStep{{
 			Name: "gcr.io/my-project/my-builder:my-tag",
 			Args: []string{"gcr.io/my-project/my-tag:abcdefg1234567"},
 			Env:  []string{"REPO_NAME=my-repo", "BUILD_ID=build-id"},
@@ -158,8 +158,8 @@ func TestTag(t *testing.T) {
 }
 
 func TestRevision(t *testing.T) {
-	b := &cb.Build{
-		Steps: []*cb.BuildStep{{
+	b := &pb.Build{
+		Steps: []*pb.BuildStep{{
 			Name: "gcr.io/$PROJECT_ID/my-builder",
 			Args: []string{"gcr.io/$PROJECT_ID/thing:$REVISION_ID"},
 			Env:  []string{"REPO_NAME=$REPO_NAME", "BUILD_ID=$BUILD_ID"},
@@ -173,8 +173,8 @@ func TestRevision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error while substituting build fields: %v", err)
 	}
-	if err := checkBuild(b, &cb.Build{
-		Steps: []*cb.BuildStep{{
+	if err := checkBuild(b, &pb.Build{
+		Steps: []*pb.BuildStep{{
 			Name: "gcr.io/my-project/my-builder",
 			Args: []string{"gcr.io/my-project/thing:abcdefg1234567"},
 			Env:  []string{"REPO_NAME=my-repo", "BUILD_ID=build-id"},
@@ -188,20 +188,20 @@ func TestRevision(t *testing.T) {
 
 func TestShortSha(t *testing.T) {
 	for _, test := range []struct {
-		b          *cb.Build
-		want       *cb.Build
+		b          *pb.Build
+		want       *pb.Build
 		revisionID string
 	}{{
 		// Length of commit SHA exceeds maxShortShaLength characters.
-		b: &cb.Build{
-			Steps: []*cb.BuildStep{{
+		b: &pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/$PROJECT_ID/my-builder",
 				Args: []string{"gcr.io/$PROJECT_ID/thing:$SHORT_SHA"},
 			}},
 			Tags: []string{"$SHORT_SHA"},
 		},
-		want: &cb.Build{
-			Steps: []*cb.BuildStep{{
+		want: &pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/my-project/my-builder",
 				Args: []string{"gcr.io/my-project/thing:abcdefg"},
 			}},
@@ -210,15 +210,15 @@ func TestShortSha(t *testing.T) {
 		revisionID: longRevisionID,
 	}, {
 		// Length of commit SHA does not exceed maxShortShaLength characters.
-		b: &cb.Build{
-			Steps: []*cb.BuildStep{{
+		b: &pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/$PROJECT_ID/my-builder",
 				Args: []string{"gcr.io/$PROJECT_ID/thing:$SHORT_SHA"},
 			}},
 			Tags: []string{"$SHORT_SHA"},
 		},
-		want: &cb.Build{
-			Steps: []*cb.BuildStep{{
+		want: &pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/my-project/my-builder",
 				Args: []string{"gcr.io/my-project/thing:abcd"},
 			}},
@@ -239,8 +239,8 @@ func TestShortSha(t *testing.T) {
 }
 
 func TestUnknownFields(t *testing.T) {
-	b := &cb.Build{
-		Steps: []*cb.BuildStep{{
+	b := &pb.Build{
+		Steps: []*pb.BuildStep{{
 			Name: "gcr.io/$PROJECT_ID/my-builder",
 			Args: []string{"gcr.io/$PROJECT_ID/thing:$REVISION_ID"},
 			Env:  []string{"REPO_NAME=$REPO_NAME", "BUILD_ID=$BUILD_ID"},
@@ -251,8 +251,8 @@ func TestUnknownFields(t *testing.T) {
 	if err := SubstituteBuildFields(b); err != nil {
 		t.Fatalf("Error while substituting build fields: %v", err)
 	}
-	if err := checkBuild(b, &cb.Build{
-		Steps: []*cb.BuildStep{{
+	if err := checkBuild(b, &pb.Build{
+		Steps: []*pb.BuildStep{{
 			Name: "gcr.io/my-project/my-builder",
 			Args: []string{"gcr.io/my-project/thing:abcdefg1234567"},
 			Env:  []string{"REPO_NAME=my-repo", "BUILD_ID=build-id"},
@@ -347,8 +347,8 @@ func TestUserSubstitutions(t *testing.T) {
 	}}
 
 	for _, tc := range testCases {
-		b := &cb.Build{
-			Steps: []*cb.BuildStep{{
+		b := &pb.Build{
+			Steps: []*pb.BuildStep{{
 				Dir: tc.template,
 			}},
 			Substitutions: tc.substitutions,
@@ -365,8 +365,8 @@ func TestUserSubstitutions(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		if err := checkBuild(b, &cb.Build{
-			Steps: []*cb.BuildStep{{
+		if err := checkBuild(b, &pb.Build{
+			Steps: []*pb.BuildStep{{
 				Dir: tc.want,
 			}},
 			Tags: []string{tc.want},
@@ -393,8 +393,8 @@ func TestSubstitutions(t *testing.T) {
 	}}
 
 	for _, tc := range testCases {
-		b := &cb.Build{
-			Steps: []*cb.BuildStep{{
+		b := &pb.Build{
+			Steps: []*pb.BuildStep{{
 				Dir: tc.template,
 			}},
 			Substitutions: tc.substitutions,
@@ -411,8 +411,8 @@ func TestSubstitutions(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		if err := checkBuild(b, &cb.Build{
-			Steps: []*cb.BuildStep{{
+		if err := checkBuild(b, &pb.Build{
+			Steps: []*pb.BuildStep{{
 				Dir: tc.want,
 			}},
 			Tags: []string{tc.want},

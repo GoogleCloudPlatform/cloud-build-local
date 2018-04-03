@@ -21,9 +21,10 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
-	cb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
-	"github.com/golang/protobuf/ptypes/duration"
+	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
+	duration "github.com/golang/protobuf/ptypes/duration"
 )
 
 const (
@@ -137,38 +138,38 @@ func TestCheckSubstitutionsLoose(t *testing.T) {
 func TestCheckSubstitutionTemplate(t *testing.T) {
 	for _, c := range []struct {
 		images, tags  []string
-		steps         []*cb.BuildStep
+		steps         []*pb.BuildStep
 		substitutions map[string]string
 		wantErr       bool
 		wantWarnings  int
 	}{{
-		steps: []*cb.BuildStep{{Name: "$_FOO"}},
+		steps: []*pb.BuildStep{{Name: "$_FOO"}},
 		substitutions: map[string]string{
 			"_FOO": "Bar",
 		},
 		wantWarnings: 0,
 	}, {
-		steps:        []*cb.BuildStep{{Name: "$$FOO"}},
+		steps:        []*pb.BuildStep{{Name: "$$FOO"}},
 		wantWarnings: 0,
 	}, {
-		steps:         []*cb.BuildStep{{Name: "$_FOO"}},
+		steps:         []*pb.BuildStep{{Name: "$_FOO"}},
 		substitutions: map[string]string{}, // missing substitution
 		wantWarnings:  1,
 	}, {
-		steps: []*cb.BuildStep{{Name: "Baz"}}, // missing variable in template
+		steps: []*pb.BuildStep{{Name: "Baz"}}, // missing variable in template
 		substitutions: map[string]string{
 			"_FOO": "Bar",
 		},
 		wantWarnings: 1,
 	}, {
 		// missing variable in template and missing variable in map
-		steps: []*cb.BuildStep{{Name: "$_BAZ"}},
+		steps: []*pb.BuildStep{{Name: "$_BAZ"}},
 		substitutions: map[string]string{
 			"_FOO": "Bar",
 		},
 		wantWarnings: 2,
 	}, {
-		steps:         []*cb.BuildStep{{Name: "$FOO"}}, // invalid built-in substitution
+		steps:         []*pb.BuildStep{{Name: "$FOO"}}, // invalid built-in substitution
 		substitutions: map[string]string{},
 		wantErr:       true,
 	}} {
@@ -186,125 +187,125 @@ func TestCheckSubstitutionTemplate(t *testing.T) {
 
 func TestValidateBuild(t *testing.T) {
 	testCases := []struct {
-		build *cb.Build
+		build *pb.Build
 		valid bool
 	}{{
 		build: makeTestBuild("valid-build"),
 		valid: true,
 	}, {
-		build: &cb.Build{
+		build: &pb.Build{
 			Id:    "name-only",
-			Steps: []*cb.BuildStep{{Name: "foo"}},
+			Steps: []*pb.BuildStep{{Name: "foo"}},
 		},
 		valid: true,
 	}, {
 		// fails because dir must be a relative path.
-		build: &cb.Build{
+		build: &pb.Build{
 			Id: "step-absolute-dir",
-			Steps: []*cb.BuildStep{{
+			Steps: []*pb.BuildStep{{
 				Name: "test",
 				Dir:  "/a/b/c",
 			}},
 		},
-		valid: false,
+		valid: true,
 	}, {
 		// fails because dir cannot refer to parent directory.
-		build: &cb.Build{
+		build: &pb.Build{
 			Id: "step-parent-dir",
-			Steps: []*cb.BuildStep{{
+			Steps: []*pb.BuildStep{{
 				Name: "test",
 				Dir:  "../b/c",
 			}},
 		},
-		valid: false,
+		valid: true,
 	}, {
 		// fails because dir cannot refer to parent directory.
-		build: &cb.Build{
+		build: &pb.Build{
 			Id: "step-parent-dir2",
-			Steps: []*cb.BuildStep{{
+			Steps: []*pb.BuildStep{{
 				Name: "test",
 				Dir:  "a/../b/../../c",
 			}},
 		},
-		valid: false,
+		valid: true,
 	}, {
 		// fails because Id is startstep.
-		build: &cb.Build{
+		build: &pb.Build{
 			Id: "startstep-id",
-			Steps: []*cb.BuildStep{{
+			Steps: []*pb.BuildStep{{
 				Name: "test",
 				Id:   StartStep,
 			}},
 		},
 		valid: false,
 	}, {
-		build: &cb.Build{
+		build: &pb.Build{
 			Id: "check-buildsteps-failure",
 		},
 		valid: false,
 	}, {
 		// A completely empty build request should error, but it should not panic.
-		build: &cb.Build{},
+		build: &pb.Build{},
 		valid: false,
 	}, {
-		build: &cb.Build{
+		build: &pb.Build{
 			Id: "bad-env",
-			Steps: []*cb.BuildStep{{
+			Steps: []*pb.BuildStep{{
 				Name: "foo",
 				Env:  []string{"foobar"},
 			}},
 		},
 		valid: false,
 	}, {
-		build: &cb.Build{
+		build: &pb.Build{
 			Id: "good-env",
-			Steps: []*cb.BuildStep{{
+			Steps: []*pb.BuildStep{{
 				Name: "foo",
 				Env:  []string{"foo=bar"},
 			}},
 		},
 		valid: true,
 	}, {
-		build: &cb.Build{
+		build: &pb.Build{
 			Id: "check-images-failure",
-			Steps: []*cb.BuildStep{{
+			Steps: []*pb.BuildStep{{
 				Name: "okay",
 			}},
 			Images: manyStrings(maxNumImages + 1),
 		},
 		valid: false,
 	}, {
-		build: &cb.Build{
+		build: &pb.Build{
 			Id: "check-substitutions-failure",
-			Steps: []*cb.BuildStep{{
+			Steps: []*pb.BuildStep{{
 				Name: "$_UNKNOWN_SUBSTITUTION $_ANOTHER_ONE",
 			}},
 		},
 		valid: false,
 	}, {
-		build: &cb.Build{
+		build: &pb.Build{
 			Id: "check-substitutions-failure",
-			Steps: []*cb.BuildStep{{
+			Steps: []*pb.BuildStep{{
 				Name: "$_UNKNOWN_SUBSTITUTION $_ANOTHER_ONE",
 			}},
-			Options: &cb.BuildOptions{
-				SubstitutionOption: cb.BuildOptions_ALLOW_LOOSE,
+			Options: &pb.BuildOptions{
+				SubstitutionOption: pb.BuildOptions_ALLOW_LOOSE,
 			},
 		},
 		valid: true,
 	}, {
-		build: &cb.Build{
+		build: &pb.Build{
 			Id:      "name-only",
-			Steps:   []*cb.BuildStep{{Name: "foo"}},
-			Timeout: &duration.Duration{Seconds: 86400},
+			Steps:   []*pb.BuildStep{{Name: "foo"}},
+			Timeout: &duration.Duration{Seconds: int64(MaxTimeout.Seconds())},
 		},
 		valid: true,
 	}, {
 		// fails because timeout is too big.
-		build: &cb.Build{
+		build: &pb.Build{
 			Id:      "name-only",
-			Steps:   []*cb.BuildStep{{Name: "foo"}},
-			Timeout: &duration.Duration{Seconds: 86401},
+			Steps:   []*pb.BuildStep{{Name: "foo"}},
+			Timeout: &duration.Duration{Seconds: int64(MaxTimeout.Seconds()) + 1},
 		},
 		valid: false,
 	}}
@@ -323,30 +324,30 @@ func TestValidateBuild(t *testing.T) {
 
 func TestCheckBuildAfterSubstitutions(t *testing.T) {
 	testCases := []struct {
-		build *cb.Build
+		build *pb.Build
 		valid bool
 	}{{
 		build: makeTestBuild("valid-build"),
 		valid: true,
 	}, {
-		build: &cb.Build{
-			Steps: []*cb.BuildStep{{Name: "foo"}},
+		build: &pb.Build{
+			Steps: []*pb.BuildStep{{Name: "foo"}},
 		},
 		valid: true,
 	}, {
-		build: &cb.Build{
-			Steps:  []*cb.BuildStep{{Name: "foo"}},
+		build: &pb.Build{
+			Steps:  []*pb.BuildStep{{Name: "foo"}},
 			Images: []string{"foo"},
 		},
 		valid: true,
 	}, {
-		build: &cb.Build{
-			Steps: []*cb.BuildStep{{Name: "gcr.io/:broken"}},
+		build: &pb.Build{
+			Steps: []*pb.BuildStep{{Name: "gcr.io/:broken"}},
 		},
 		valid: false,
 	}, {
-		build: &cb.Build{
-			Steps:  []*cb.BuildStep{{Name: "foo"}},
+		build: &pb.Build{
+			Steps:  []*pb.BuildStep{{Name: "foo"}},
 			Images: []string{"gcr.io/:broken"},
 		},
 		valid: false,
@@ -367,48 +368,48 @@ func TestCheckBuildAfterSubstitutions(t *testing.T) {
 func TestCheckArtifacts(t *testing.T) {
 	for _, c := range []struct {
 		images    []string
-		artifacts *cb.Artifacts
+		artifacts *pb.Artifacts
 		wantErr   bool
-		wantOut   *cb.Build
+		wantOut   *pb.Build
 	}{{
 		// Images are propagated from top-level to artifacts.
 		images:  []string{"hello", "world"},
 		wantErr: false,
-		wantOut: &cb.Build{
+		wantOut: &pb.Build{
 			Images: []string{"hello", "world"},
-			Artifacts: &cb.Artifacts{
+			Artifacts: &pb.Artifacts{
 				Images: []string{"hello", "world"},
 			},
 		},
 	}, {
 		// Images are propagated from artifacts back to top-level.
-		artifacts: &cb.Artifacts{
+		artifacts: &pb.Artifacts{
 			Images: []string{"hello", "world"},
 		},
 		wantErr: false,
-		wantOut: &cb.Build{
+		wantOut: &pb.Build{
 			Images: []string{"hello", "world"},
-			Artifacts: &cb.Artifacts{
+			Artifacts: &pb.Artifacts{
 				Images: []string{"hello", "world"},
 			},
 		},
 	}, {
 		// Can't specify different top-level and artifacts.images.
 		images: []string{"goodbye", "world"},
-		artifacts: &cb.Artifacts{
+		artifacts: &pb.Artifacts{
 			Images: []string{"hello", "world"},
 		},
 		wantErr: true,
 	}, {
 		// Can specify same top-level and artifacts.images.
 		images: []string{"hello", "world"},
-		artifacts: &cb.Artifacts{
+		artifacts: &pb.Artifacts{
 			Images: []string{"hello", "world"},
 		},
 		wantErr: false,
-		wantOut: &cb.Build{
+		wantOut: &pb.Build{
 			Images: []string{"hello", "world"},
-			Artifacts: &cb.Artifacts{
+			Artifacts: &pb.Artifacts{
 				Images: []string{"hello", "world"},
 			},
 		},
@@ -418,8 +419,83 @@ func TestCheckArtifacts(t *testing.T) {
 	}, {
 		images:  []string{strings.Repeat("a", MaxImageLength+1)},
 		wantErr: true,
+	}, {
+		// .artifacts.location not specified.
+		artifacts: &pb.Artifacts{
+			Objects: &pb.Artifacts_ArtifactObjects{
+				Paths: []string{"doesnotmatter"},
+			},
+		},
+		wantErr: true,
+	}, {
+		// .artifacts.location string does not begin with "gs://"
+		artifacts: &pb.Artifacts{
+			Objects: &pb.Artifacts_ArtifactObjects{
+				Location: "some-bucket",
+				Paths:    []string{"doesnotmatter"},
+			},
+		},
+		wantErr: true,
+	}, {
+		// If .artifacts.location has no trailing slash, suffix a trailing slash.
+		artifacts: &pb.Artifacts{
+			Objects: &pb.Artifacts_ArtifactObjects{
+				Location: "gs://some-bucket",
+				Paths:    []string{"doesnotmatter"},
+			},
+		},
+		wantOut: &pb.Build{
+			Artifacts: &pb.Artifacts{
+				Objects: &pb.Artifacts_ArtifactObjects{
+					Location: "gs://some-bucket/",
+					Paths:    []string{"doesnotmatter"},
+				},
+			},
+		},
+	}, {
+		// If .artifacts.location already has a trailing slash, a slash should not be suffixed.
+		artifacts: &pb.Artifacts{
+			Objects: &pb.Artifacts_ArtifactObjects{
+				Location: "gs://some-bucket/",
+				Paths:    []string{"doesnotmatter"},
+			},
+		},
+		wantOut: &pb.Build{
+			Artifacts: &pb.Artifacts{
+				Objects: &pb.Artifacts_ArtifactObjects{
+					Location: "gs://some-bucket/",
+					Paths:    []string{"doesnotmatter"},
+				},
+			},
+		},
+	}, {
+		// No .artifacts.paths specified.
+		artifacts: &pb.Artifacts{
+			Objects: &pb.Artifacts_ArtifactObjects{
+				Location: "gs://some-bucket/",
+			},
+		},
+		wantErr: true,
+	}, {
+		// Length of .artifacts.paths exceeds maximum.
+		artifacts: &pb.Artifacts{
+			Objects: &pb.Artifacts_ArtifactObjects{
+				Location: "gs://some-bucket/",
+				Paths:    manyStrings(maxArtifactsPaths + 1),
+			},
+		},
+		wantErr: true,
+	}, {
+		// Duplicate .artifacts.paths strings.
+		artifacts: &pb.Artifacts{
+			Objects: &pb.Artifacts_ArtifactObjects{
+				Location: "gs://some-bucket/",
+				Paths:    []string{"twins.xml", "twins.xml"},
+			},
+		},
+		wantErr: true,
 	}} {
-		b := &cb.Build{
+		b := &pb.Build{
 			Images:    c.images,
 			Artifacts: c.artifacts,
 		}
@@ -435,14 +511,15 @@ func TestCheckArtifacts(t *testing.T) {
 
 func TestCheckBuildSteps(t *testing.T) {
 	for _, c := range []struct {
-		steps   []*cb.BuildStep
+		steps   []*pb.BuildStep
+		timeout time.Duration
 		wantErr bool
 	}{{
-		steps:   []*cb.BuildStep{{Name: "foo"}},
+		steps:   []*pb.BuildStep{{Name: "foo"}},
 		wantErr: false,
 	}, {
 		// serial buildsteps
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name:    "gcr.io/my-project",
 			Env:     []string{"FOO=bar", "X=BAZ", "BUZ=78"},
 			Args:    []string{"a", "b", "c"},
@@ -467,7 +544,7 @@ func TestCheckBuildSteps(t *testing.T) {
 		wantErr: false,
 	}, {
 		// mixed dependencies buildsteps
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name:    "gcr.io/my-project",
 			Id:      "A",
 			WaitFor: []string{StartStep},
@@ -482,7 +559,7 @@ func TestCheckBuildSteps(t *testing.T) {
 		wantErr: false,
 	}, {
 		// multiple startstep buildsteps
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name:    "gcr.io/my-project",
 			WaitFor: []string{StartStep},
 		}, {
@@ -493,7 +570,7 @@ func TestCheckBuildSteps(t *testing.T) {
 		wantErr: false,
 	}, {
 		// multiple dependencies buildsteps
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name:    "gcr.io/my-project",
 			Id:      "A",
 			WaitFor: []string{StartStep},
@@ -508,7 +585,7 @@ func TestCheckBuildSteps(t *testing.T) {
 		wantErr: false,
 	}, {
 		// fails because step depends on a step that is not yet defined.
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name:    "gcr.io/my-project",
 			Id:      "A",
 			WaitFor: []string{StartStep},
@@ -520,7 +597,7 @@ func TestCheckBuildSteps(t *testing.T) {
 		wantErr: true,
 	}, {
 		// fails because multiple buildsteps share the same Id.
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name:    "gcr.io/my-project",
 			Id:      "A",
 			WaitFor: []string{StartStep},
@@ -531,7 +608,7 @@ func TestCheckBuildSteps(t *testing.T) {
 		wantErr: true,
 	}, {
 		// fails because step depends on a step that is not yet defined.
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name:    "gcr.io/my-project",
 			Id:      "A",
 			WaitFor: []string{"B"},
@@ -547,31 +624,31 @@ func TestCheckBuildSteps(t *testing.T) {
 		wantErr: true,
 	}, {
 		// fails because step missing name
-		steps:   []*cb.BuildStep{{}},
+		steps:   []*pb.BuildStep{{}},
 		wantErr: true,
 	}, {
 		// fails because step name too long
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name: strings.Repeat("a", maxStepNameLength+1),
 		}},
 		wantErr: true,
 	}, {
 		// fails because too many envs
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name: "okay",
 			Env:  manyStrings(maxNumEnvs + 1),
 		}},
 		wantErr: true,
 	}, {
 		// fails because env too long
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name: "okay",
 			Env:  []string{"a=" + strings.Repeat("b", maxEnvLength)},
 		}},
 		wantErr: true,
 	}, {
 		// fails because too many args
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name: "okay",
 			Args: manyStrings(maxNumArgs + 1),
 		}},
@@ -582,120 +659,120 @@ func TestCheckBuildSteps(t *testing.T) {
 		wantErr: true,
 	}, {
 		// fails because arg too long
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name: "okay",
 			Args: []string{strings.Repeat("a", maxArgLength+1)},
 		}},
 		wantErr: true,
 	}, {
 		// fails because dir too long
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name: "okay",
 			Dir:  strings.Repeat("a", maxDirLength+1),
 		}},
 		wantErr: true,
 	}, {
 		// happy build with volumes.
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
 		}, {
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
 		}},
 	}, {
 		// happy build with more volumes.
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
 		}, {
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
 		}, {
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
 		}},
 	}, {
 		// fails because volume isn't used 2+ times
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
 		}},
 		wantErr: true,
 	}, {
 		// fails because volume isn't used 2+ times, even when another is
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
 		}, {
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "othervol", Path: "/foo"}},
+			Volumes: []*pb.Volume{{Name: "othervol", Path: "/foo"}},
 		}, {
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "othervol", Path: "/foo"}},
+			Volumes: []*pb.Volume{{Name: "othervol", Path: "/foo"}},
 		}},
 		wantErr: true,
 	}, {
 		// fails because volume name is invalid
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "@#()*$@)(*$@", Path: "/foo"}},
+			Volumes: []*pb.Volume{{Name: "@#()*$@)(*$@", Path: "/foo"}},
 		}, {
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "@#()*$@)(*$@", Path: "/foo"}},
+			Volumes: []*pb.Volume{{Name: "@#()*$@)(*$@", Path: "/foo"}},
 		}},
 		wantErr: true,
 	}, {
 		// fails because volume path is invalid
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "myvol", Path: ")(!*!)($*@#"}},
+			Volumes: []*pb.Volume{{Name: "myvol", Path: ")(!*!)($*@#"}},
 		}, {
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
 		}},
 		wantErr: true,
 	}, {
 		// fails because volume path is reserved
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "myvol", Path: "/workspace"}},
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/workspace"}},
 		}, {
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
 		}},
 		wantErr: true,
 	}, {
 		// fails because volume path starts with /cloudbuild/
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "myvol", Path: "/cloudbuild/foo"}},
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/cloudbuild/foo"}},
 		}, {
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
 		}},
 		wantErr: true,
 	}, {
 		// fails because volume path is not absolute
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "myvol", Path: "/absolute"}},
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/absolute"}},
 		}, {
 			Name:    "okay",
-			Volumes: []*cb.Volume{{Name: "myvol", Path: "relative"}},
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "relative"}},
 		}},
 		wantErr: true,
 	}, {
 		// fails because volume name is specified twice in the same step
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name: "okay",
-			Volumes: []*cb.Volume{
+			Volumes: []*pb.Volume{
 				{Name: "myvol", Path: "/foo"},
 				{Name: "myvol", Path: "/bar"},
 			},
 		}, {
 			Name: "okay",
-			Volumes: []*cb.Volume{
+			Volumes: []*pb.Volume{
 				{Name: "myvol", Path: "/foo"},
 				{Name: "othervol", Path: "/bar"},
 			},
@@ -703,22 +780,38 @@ func TestCheckBuildSteps(t *testing.T) {
 		wantErr: true,
 	}, {
 		// fails because volume path is specified twice in the same step
-		steps: []*cb.BuildStep{{
+		steps: []*pb.BuildStep{{
 			Name: "okay",
-			Volumes: []*cb.Volume{
+			Volumes: []*pb.Volume{
 				{Name: "myvol", Path: "/foo"},
 				{Name: "othervol", Path: "/foo"},
 			},
 		}, {
 			Name: "okay",
-			Volumes: []*cb.Volume{
+			Volumes: []*pb.Volume{
 				{Name: "myvol", Path: "/foo"},
 				{Name: "othervol", Path: "/bar"},
 			},
 		}},
 		wantErr: true,
+	}, {
+		// happy case with per-step timeouts and no build timeout
+		steps: []*pb.BuildStep{{Name: "happy-step-timeout", Timeout: &duration.Duration{Seconds: int64(MaxTimeout.Seconds())}}},
+	}, {
+		// happy case with per-step timeouts and build timeout
+		steps:   []*pb.BuildStep{{Name: "happy-step-and-build-timeout", Timeout: &duration.Duration{Seconds: 1}}},
+		timeout: 10 * time.Second,
+	}, {
+		// fails because step timeout > build timeout
+		steps:   []*pb.BuildStep{{Name: "unhappy-step-and-build-timeout", Timeout: &duration.Duration{Seconds: 10}}},
+		timeout: time.Second,
+		wantErr: true,
+	}, {
+		// fails because step timeout > MaxTimeout
+		steps:   []*pb.BuildStep{{Name: "step-timeout-too-big", Timeout: &duration.Duration{Seconds: int64(MaxTimeout.Seconds()) + 1}}},
+		wantErr: true,
 	}} {
-		if err := CheckBuildSteps(c.steps); err == nil && c.wantErr {
+		if err := CheckBuildSteps(c.steps, c.timeout); err == nil && c.wantErr {
 			t.Errorf("CheckBuildSteps(%v) did not return error", c.steps)
 		} else if err != nil && !c.wantErr {
 			t.Errorf("CheckBuildSteps(%v) got unexpected error: %v", c.steps, err)
@@ -727,10 +820,10 @@ func TestCheckBuildSteps(t *testing.T) {
 }
 
 // manySteps returns a slice of n BuildSteps.
-func manySteps(n int) []*cb.BuildStep {
-	out := []*cb.BuildStep{}
+func manySteps(n int) []*pb.BuildStep {
+	out := []*pb.BuildStep{}
 	for i := 0; i < n; i++ {
-		out = append(out, &cb.BuildStep{
+		out = append(out, &pb.BuildStep{
 			Name: "foo",
 		})
 	}
@@ -747,12 +840,12 @@ func manyStrings(n int) []string {
 }
 
 // makeTestBuild should return a valid build after substitutions.
-func makeTestBuild(buildID string) *cb.Build {
-	return &cb.Build{
+func makeTestBuild(buildID string) *pb.Build {
+	return &pb.Build{
 		Id:        buildID,
 		ProjectId: projectID,
-		Status:    cb.Build_STATUS_UNKNOWN,
-		Steps: []*cb.BuildStep{{
+		Status:    pb.Build_STATUS_UNKNOWN,
+		Steps: []*pb.BuildStep{{
 			Name: "gcr.io/my-project/my-builder",
 			Args: []string{"gcr.io/some/image/tag"},
 		}, {
@@ -781,18 +874,18 @@ func TestCheckSecrets(t *testing.T) {
 
 	for _, c := range []struct {
 		desc    string
-		b       *cb.Build
+		b       *pb.Build
 		wantErr error
 	}{{
 		desc: "Build with no secrets",
-		b:    &cb.Build{},
+		b:    &pb.Build{},
 	}, {
 		desc: "Build with one secret, used once",
-		b: &cb.Build{
-			Steps: []*cb.BuildStep{{
+		b: &pb.Build{
+			Steps: []*pb.BuildStep{{
 				SecretEnv: []string{"MY_SECRET"},
 			}},
-			Secrets: []*cb.Secret{{
+			Secrets: []*pb.Secret{{
 				KmsKeyName: kmsKeyName,
 				SecretEnv: map[string][]byte{
 					"MY_SECRET": []byte("hunter2"),
@@ -801,8 +894,8 @@ func TestCheckSecrets(t *testing.T) {
 		},
 	}, {
 		desc: "Build with one secret, never used",
-		b: &cb.Build{
-			Secrets: []*cb.Secret{{
+		b: &pb.Build{
+			Secrets: []*pb.Secret{{
 				KmsKeyName: kmsKeyName,
 				SecretEnv: map[string][]byte{
 					"MY_SECRET": []byte("hunter2"),
@@ -812,16 +905,16 @@ func TestCheckSecrets(t *testing.T) {
 		wantErr: errors.New(`secretEnv "MY_SECRET" is defined without being used`),
 	}, {
 		desc: "Build with no secrets, but secret is used",
-		b: &cb.Build{
-			Steps: []*cb.BuildStep{{
+		b: &pb.Build{
+			Steps: []*pb.BuildStep{{
 				SecretEnv: []string{"MY_SECRET"},
 			}},
 		},
 		wantErr: errors.New(`secretEnv "MY_SECRET" is used without being defined`),
 	}, {
 		desc: "Build with secret defined twice with different keys",
-		b: &cb.Build{
-			Secrets: []*cb.Secret{{
+		b: &pb.Build{
+			Secrets: []*pb.Secret{{
 				KmsKeyName: kmsKeyName,
 				SecretEnv: map[string][]byte{
 					"MY_SECRET": []byte("hunter2"),
@@ -836,16 +929,16 @@ func TestCheckSecrets(t *testing.T) {
 		wantErr: errors.New(`secretEnv "MY_SECRET" is defined more than once`),
 	}, {
 		desc: "Build with secret without any secret_envs",
-		b: &cb.Build{
-			Secrets: []*cb.Secret{{
+		b: &pb.Build{
+			Secrets: []*pb.Secret{{
 				KmsKeyName: kmsKeyName,
 			}},
 		},
 		wantErr: errors.New("secret 0 defines no secretEnvs"),
 	}, {
 		desc: "Build with secret key defined twice",
-		b: &cb.Build{
-			Secrets: []*cb.Secret{{
+		b: &pb.Build{
+			Secrets: []*pb.Secret{{
 				KmsKeyName: kmsKeyName,
 				SecretEnv: map[string][]byte{
 					"MY_SECRET": []byte("hunter2"),
@@ -860,11 +953,11 @@ func TestCheckSecrets(t *testing.T) {
 		wantErr: errors.New(`kmsKeyName "projects/my-project/locations/global/keyRings/my-key-ring/cryptoKeys/my-crypto-key" is used by more than one secret`),
 	}, {
 		desc: "Build with secret_env specified twice in the same step",
-		b: &cb.Build{
-			Steps: []*cb.BuildStep{{
+		b: &pb.Build{
+			Steps: []*pb.BuildStep{{
 				SecretEnv: []string{"MY_SECRET", "MY_SECRET"},
 			}},
-			Secrets: []*cb.Secret{{
+			Secrets: []*pb.Secret{{
 				KmsKeyName: kmsKeyName,
 				SecretEnv: map[string][]byte{
 					"MY_SECRET": []byte("hunter2"),
@@ -874,11 +967,11 @@ func TestCheckSecrets(t *testing.T) {
 		wantErr: errors.New(`Step 0 uses the secretEnv "MY_SECRET" more than once`),
 	}, {
 		desc: "Build with secret value >1 KB",
-		b: &cb.Build{
-			Steps: []*cb.BuildStep{{
+		b: &pb.Build{
+			Steps: []*pb.BuildStep{{
 				SecretEnv: []string{"MY_SECRET"},
 			}},
-			Secrets: []*cb.Secret{{
+			Secrets: []*pb.Secret{{
 				KmsKeyName: kmsKeyName,
 				SecretEnv: map[string][]byte{
 					"MY_SECRET": []byte(strings.Repeat("a", 2000)),
@@ -888,22 +981,22 @@ func TestCheckSecrets(t *testing.T) {
 		wantErr: errors.New(`secretEnv value for "MY_SECRET" cannot exceed 1KB`),
 	}, {
 		desc: "Happy case: Build with acceptable secret values",
-		b: &cb.Build{
-			Steps: []*cb.BuildStep{{
+		b: &pb.Build{
+			Steps: []*pb.BuildStep{{
 				SecretEnv: makeSecretEnvs(maxNumSecretEnvs),
 			}},
-			Secrets: []*cb.Secret{{
+			Secrets: []*pb.Secret{{
 				KmsKeyName: kmsKeyName,
 				SecretEnv:  makeSecrets(maxNumSecretEnvs),
 			}},
 		},
 	}, {
 		desc: "Build with too many secret values",
-		b: &cb.Build{
-			Steps: []*cb.BuildStep{{
+		b: &pb.Build{
+			Steps: []*pb.BuildStep{{
 				SecretEnv: makeSecretEnvs(maxNumSecretEnvs + 1),
 			}},
-			Secrets: []*cb.Secret{{
+			Secrets: []*pb.Secret{{
 				KmsKeyName: kmsKeyName,
 				SecretEnv:  makeSecrets(maxNumSecretEnvs + 1),
 			}},
@@ -911,12 +1004,12 @@ func TestCheckSecrets(t *testing.T) {
 		wantErr: errors.New("build defines more than 100 secret values"),
 	}, {
 		desc: "Step has env and secret_env collision",
-		b: &cb.Build{
-			Steps: []*cb.BuildStep{{
+		b: &pb.Build{
+			Steps: []*pb.BuildStep{{
 				Env:       []string{"MY_SECRET=awesome"},
 				SecretEnv: []string{"MY_SECRET"},
 			}},
-			Secrets: []*cb.Secret{{
+			Secrets: []*pb.Secret{{
 				KmsKeyName: kmsKeyName,
 				SecretEnv: map[string][]byte{
 					"MY_SECRET": []byte("hunter2"),
@@ -926,13 +1019,13 @@ func TestCheckSecrets(t *testing.T) {
 		wantErr: errors.New(`step 0 has secret and non-secret env "MY_SECRET"`),
 	}, {
 		desc: "Build has secret and non-secret env in separate steps (which is okay)",
-		b: &cb.Build{
-			Steps: []*cb.BuildStep{{
+		b: &pb.Build{
+			Steps: []*pb.BuildStep{{
 				Env: []string{"MY_SECRET=awesome"},
 			}, {
 				SecretEnv: []string{"MY_SECRET"},
 			}},
-			Secrets: []*cb.Secret{{
+			Secrets: []*pb.Secret{{
 				KmsKeyName: kmsKeyName,
 				SecretEnv: map[string][]byte{
 					"MY_SECRET": []byte("hunter2"),
@@ -1019,15 +1112,15 @@ var invalidNames = []string{
 
 func TestCheckBuildStepName(t *testing.T) {
 	for _, name := range validNames {
-		step := &cb.BuildStep{Name: name}
-		steps := []*cb.BuildStep{step}
+		step := &pb.BuildStep{Name: name}
+		steps := []*pb.BuildStep{step}
 		if err := checkBuildStepNames(steps); err != nil {
 			t.Errorf("checkBuildStepNames(%v) got unexpected error: %v", steps, err)
 		}
 	}
 	for _, name := range invalidNames {
-		step := &cb.BuildStep{Name: name}
-		steps := []*cb.BuildStep{step}
+		step := &pb.BuildStep{Name: name}
+		steps := []*pb.BuildStep{step}
 		if err := checkBuildStepNames(steps); err == nil {
 			t.Errorf("checkBuildStepNames(%v) did not return error", steps)
 		}

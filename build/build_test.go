@@ -23,6 +23,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"path"
 	"reflect"
 	"regexp"
 	"strings"
@@ -30,10 +32,14 @@ import (
 	"testing"
 	"time"
 
+	durpb "github.com/golang/protobuf/ptypes/duration"
+	"github.com/GoogleCloudPlatform/container-builder-local/gsutil"
 	"github.com/GoogleCloudPlatform/container-builder-local/runner"
+	"github.com/spf13/afero"
 	"golang.org/x/oauth2"
+	"github.com/google/uuid"
 
-	cb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
+	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 )
 
 const (
@@ -126,7 +132,61 @@ func (r *mockRunner) Clean() error {
 	return nil
 }
 
-func (r *mockRunner) Run(args []string, in io.Reader, out, err io.Writer, _ string) error {
+func (r *mockRunner) gsutil(ctx context.Context, args []string, in io.Reader, out, err io.Writer) error {
+	if startsWith(args, "cp") {
+		uri := args[1]
+		filename := args[2]
+
+		switch uri {
+		case "gs://some-bucket/source.zip":
+			r.localFiles[filename] = "FAKE_ZIPFILE_CONTENTS"
+			return nil
+		case "gs://some-bucket/source.zip#1234":
+			r.localFiles[filename] = "FAKE_ZIPFILE_CONTENTS"
+			return nil
+		case "gs://some-bucket/fail-unpack.zip":
+			r.localFiles[filename] = "FAKE_ZIPFILE_THAT_FAILS_TO_UNPACK"
+			return nil
+		case "gs://some-bucket/source.tgz":
+			r.localFiles[filename] = "FAKE_TARBALL_CONTENTS"
+			return nil
+		case "gs://some-bucket/source.foo_bar_baz":
+			r.localFiles[filename] = "FAKE_TARBALL_CONTENTS"
+			return nil
+		case "gs://some-bucket/fail-fetch.tgz":
+			r.localFiles[filename] = "INCOMPLETE_TARBALL"
+			return fmt.Errorf("exit status 1")
+		case "gs://some-bucket/fail-unpack.tgz":
+			r.localFiles[filename] = "FAKE_TARBALL_THAT_FAILS_TO_UNPACK"
+			return nil
+		default:
+			r.t.Errorf("%s: Unexpected gsutil URI: %q", r.testCaseName, uri)
+			return nil
+		}
+	}
+	if startsWith(args, "cat") {
+		uri := args[2]
+		switch uri {
+		case "gs://some-bucket/source.tgz":
+			fmt.Fprint(out, "FAKE_TARBALL_CONTENTS")
+			return nil
+		case "gs://some-bucket/fail-fetch.tgz":
+			fmt.Fprint(out, "INCOMPLETE_TARBALL")
+			return fmt.Errorf("exit status 1")
+		case "gs://some-bucket/fail-unpack.tgz":
+			fmt.Fprint(out, "FAKE_TARBALL_THAT_FAILS_TO_UNPACK")
+			return nil
+		default:
+			r.t.Errorf("%s: Unexpected gsutil URI: %q", r.testCaseName, uri)
+			return nil
+		}
+	}
+
+	return fmt.Errorf("%s: unexpected gsutil command passed to mockRunner: %q", r.testCaseName, args)
+}
+
+func (r *mockRunner) Run(ctx context.Context, args []string, in io.Reader, out, err io.Writer, _ string) error {
+	
 	r.mu.Lock()
 	r.commands = append(r.commands, strings.Join(args, " "))
 	r.mu.Unlock()
@@ -140,6 +200,9 @@ func (r *mockRunner) Run(args []string, in io.Reader, out, err io.Writer, _ stri
 			return fmt.Errorf("bad args for 'sleep': got %s, want integer value", args[1])
 		}
 		time.Sleep(dur)
+	}
+	if startsWith(args, "gsutil") {
+		return r.gsutil(ctx, args[1:], in, out, err)
 	}
 	if startsWith(args, "docker", "images") {
 		if args[2] != "-q" {
@@ -222,6 +285,14 @@ ea358092da77: Image successfully pushed
 		// Successful push.
 		return nil
 	}
+	if startsWith(args, "docker", "run") && contains(args, "gcr.io/cloud-builders/gsutil") {
+		for i, a := range args {
+			if a == "gcr.io/cloud-builders/gsutil" && i < len(args)-2 {
+				return r.gsutil(ctx, args[i+1:], in, out, err)
+			}
+		}
+		return fmt.Errorf("no commands for gcr.io/cloud-builders/gsutil: %+v", args)
+	}
 	if startsWith(args, "docker", "run") && r.dockerRunHandler != nil {
 		return r.dockerRunHandler(args, out, err)
 	}
@@ -242,52 +313,8 @@ ea358092da77: Image successfully pushed
 		r.t.Errorf("Unexpected docker volume call: %v", args)
 		return nil
 	}
-	if startsWith(args, "gsutil", "cp") {
-		uri := args[2]
-		filename := args[3]
-		switch uri {
-		case "gs://some-bucket/source.zip":
-			r.localFiles[filename] = "FAKE_ZIPFILE_CONTENTS"
-			return nil
-		case "gs://some-bucket/source.zip#1234":
-			r.localFiles[filename] = "FAKE_ZIPFILE_CONTENTS"
-			return nil
-		case "gs://some-bucket/fail-unpack.zip":
-			r.localFiles[filename] = "FAKE_ZIPFILE_THAT_FAILS_TO_UNPACK"
-			return nil
-		case "gs://some-bucket/source.tgz":
-			r.localFiles[filename] = "FAKE_TARBALL_CONTENTS"
-			return nil
-		case "gs://some-bucket/source.foo_bar_baz":
-			r.localFiles[filename] = "FAKE_TARBALL_CONTENTS"
-			return nil
-		case "gs://some-bucket/fail-fetch.tgz":
-			r.localFiles[filename] = "INCOMPLETE_TARBALL"
-			return fmt.Errorf("exit status 1")
-		case "gs://some-bucket/fail-unpack.tgz":
-			r.localFiles[filename] = "FAKE_TARBALL_THAT_FAILS_TO_UNPACK"
-			return nil
-		default:
-			r.t.Errorf("%s: Unexpected gsutil URI: %q", r.testCaseName, uri)
-			return nil
-		}
-	}
-	if startsWith(args, "gsutil", "cat") {
-		uri := args[3]
-		switch uri {
-		case "gs://some-bucket/source.tgz":
-			fmt.Fprint(out, "FAKE_TARBALL_CONTENTS")
-			return nil
-		case "gs://some-bucket/fail-fetch.tgz":
-			fmt.Fprint(out, "INCOMPLETE_TARBALL")
-			return fmt.Errorf("exit status 1")
-		case "gs://some-bucket/fail-unpack.tgz":
-			fmt.Fprint(out, "FAKE_TARBALL_THAT_FAILS_TO_UNPACK")
-			return nil
-		default:
-			r.t.Errorf("%s: Unexpected gsutil URI: %q", r.testCaseName, uri)
-			return nil
-		}
+	if startsWith(args, "docker", "rm") {
+		return nil
 	}
 	if startsWith(args, "unzip") {
 		filename := args[1]
@@ -333,9 +360,7 @@ ea358092da77: Image successfully pushed
 	if startsWith(args, "/root/write_docker_creds.bash") {
 		return nil
 	}
-	if startsWith(args, "docker", "rm") {
-		return nil
-	}
+
 	r.t.Errorf("%s: unexpected command passed to mockRunner: %q", r.testCaseName, args)
 	return nil
 }
@@ -364,25 +389,25 @@ func (s *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var commonBuildRequest = cb.Build{
-	Source: &cb.Source{
-		Source: &cb.Source_RepoSource{
-			RepoSource: &cb.RepoSource{},
+var commonBuildRequest = pb.Build{
+	Source: &pb.Source{
+		Source: &pb.Source_RepoSource{
+			RepoSource: &pb.RepoSource{},
 		},
 	},
-	SourceProvenance: &cb.SourceProvenance{
-		ResolvedRepoSource: &cb.RepoSource{
-			Revision: &cb.RepoSource_CommitSha{CommitSha: "commit-sha"},
+	SourceProvenance: &pb.SourceProvenance{
+		ResolvedRepoSource: &pb.RepoSource{
+			Revision: &pb.RepoSource_CommitSha{CommitSha: "commit-sha"},
 		},
 	},
-	Steps: []*cb.BuildStep{{
+	Steps: []*pb.BuildStep{{
 		Name: "gcr.io/my-project/my-compiler",
 	}, {
 		Name:    "gcr.io/my-project/my-builder",
 		Env:     []string{"FOO=bar", "BAZ=buz"},
 		Args:    []string{"a", "b", "c"},
 		Dir:     "foo/bar/../baz",
-		Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+		Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
 	}},
 	Images: []string{"gcr.io/build-output-tag-1", "gcr.io/build-output-tag-2", "gcr.io/build-output-tag-no-digest"},
 }
@@ -397,9 +422,10 @@ func mockTokenSource() oauth2.TokenSource {
 
 func TestFetchBuilder(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
 	testCases := []struct {
 		name         string
-		buildRequest cb.Build
+		buildRequest pb.Build
 		pullsFail    bool
 		wantErr      error
 		wantCommands []string
@@ -414,8 +440,8 @@ func TestFetchBuilder(t *testing.T) {
 		},
 	}, {
 		name: "TestFetchBuilderExists",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/cached-build-step",
 			}},
 		},
@@ -424,8 +450,8 @@ func TestFetchBuilder(t *testing.T) {
 		},
 	}, {
 		name: "TestFetchBuilderFail",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/invalid-build-step",
 			}},
 		},
@@ -446,17 +472,17 @@ func TestFetchBuilder(t *testing.T) {
 			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
 			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/invalid-build-step",
 		},
-		wantErr: errors.New(`error pulling build step "gcr.io/invalid-build-step": exit status 1`),
+		wantErr: errors.New(`error pulling build step 0 "gcr.io/invalid-build-step": exit status 1`),
 	}}
 	for _, tc := range testCases {
 		r := newMockRunner(t, tc.name)
 		r.remotePullsFail = tc.pullsFail
-		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", true, false, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
 		var gotErr error
 		var gotDigest string
 		wantDigest := ""
 		for i, bs := range tc.buildRequest.Steps {
-			gotDigest, gotErr = b.fetchBuilder(bs.Name, fmt.Sprintf("Step #%d", i), -1)
+			gotDigest, gotErr = b.fetchBuilder(ctx, bs.Name, fmt.Sprintf("Step #%d", i), 0)
 			if gotErr != nil {
 				break
 			}
@@ -507,8 +533,8 @@ func TestGetWaitChansForStep(t *testing.T) {
 	}{{
 		name: "NoDependencies",
 		build: Build{
-			Request: cb.Build{
-				Steps: []*cb.BuildStep{{
+			Request: pb.Build{
+				Steps: []*pb.BuildStep{{
 					Name: "gcr.io/invalid-build-step0",
 				}, {
 					Name: "gcr.io/invalid-build-step1",
@@ -522,8 +548,8 @@ func TestGetWaitChansForStep(t *testing.T) {
 	}, {
 		name: "IDWithOneDepenedency",
 		build: Build{
-			Request: cb.Build{
-				Steps: []*cb.BuildStep{{
+			Request: pb.Build{
+				Steps: []*pb.BuildStep{{
 					Id:      "A",
 					WaitFor: []string{StartStep},
 				}, {
@@ -540,8 +566,8 @@ func TestGetWaitChansForStep(t *testing.T) {
 	}, {
 		name: "IDWithMultipleDependencies",
 		build: Build{
-			Request: cb.Build{
-				Steps: []*cb.BuildStep{{
+			Request: pb.Build{
+				Steps: []*pb.BuildStep{{
 					Id:      "A",
 					WaitFor: []string{StartStep},
 				}, {
@@ -561,8 +587,8 @@ func TestGetWaitChansForStep(t *testing.T) {
 	}, {
 		name: "StartStepNoDependencies",
 		build: Build{
-			Request: cb.Build{
-				Steps: []*cb.BuildStep{{
+			Request: pb.Build{
+				Steps: []*pb.BuildStep{{
 					Name:    "gcr.io/cached-build-step",
 					WaitFor: []string{StartStep},
 				}},
@@ -571,8 +597,8 @@ func TestGetWaitChansForStep(t *testing.T) {
 	}, {
 		name: "StartStepsMultipleDependencies",
 		build: Build{
-			Request: cb.Build{
-				Steps: []*cb.BuildStep{{
+			Request: pb.Build{
+				Steps: []*pb.BuildStep{{
 					Name:    "gcr.io/cached-build-step",
 					Id:      "A",
 					WaitFor: []string{StartStep},
@@ -589,8 +615,8 @@ func TestGetWaitChansForStep(t *testing.T) {
 	}, {
 		name: "NoIDWithDependency",
 		build: Build{
-			Request: cb.Build{
-				Steps: []*cb.BuildStep{{
+			Request: pb.Build{
+				Steps: []*pb.BuildStep{{
 					Name:    "gcr.io/cached-build-step",
 					Id:      "A",
 					WaitFor: []string{StartStep},
@@ -607,8 +633,8 @@ func TestGetWaitChansForStep(t *testing.T) {
 	}, {
 		name: "InvalidBuildTranslateNotPopulated",
 		build: Build{
-			Request: cb.Build{
-				Steps: []*cb.BuildStep{{
+			Request: pb.Build{
+				Steps: []*pb.BuildStep{{
 					Name:    "gcr.io/cached-build-step",
 					Id:      "B",
 					WaitFor: []string{"A"},
@@ -643,15 +669,18 @@ func TestGetWaitChansForStep(t *testing.T) {
 
 func TestRunBuildSteps(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
+	exit1Err := errors.New("exit status 1")
 
 	testCases := []struct {
 		name                 string
-		buildRequest         cb.Build
+		buildRequest         pb.Build
 		opFailsToWrite       bool
-		opFailsWithErr       bool
+		opError              error
 		argsOfStepAfterError string
 		wantErr              error
 		wantCommands         []string
+		wantStepStatus       []pb.Build_Status
 	}{{
 		name:         "TestRunBuilder",
 		buildRequest: commonBuildRequest,
@@ -673,30 +702,31 @@ func TestRunBuildSteps(t *testing.T) {
 			"docker rm -f step_0 step_1",
 			"docker volume rm myvol",
 		},
+		wantStepStatus: []pb.Build_Status{pb.Build_SUCCESS, pb.Build_SUCCESS},
 	}, {
 		name: "TestRunBuilderSubdir",
-		buildRequest: cb.Build{
-			Source: &cb.Source{
-				Source: &cb.Source_RepoSource{
-					RepoSource: &cb.RepoSource{
+		buildRequest: pb.Build{
+			Source: &pb.Source{
+				Source: &pb.Source_RepoSource{
+					RepoSource: &pb.RepoSource{
 						Dir: "subdir",
 					},
 				},
 			},
-			SourceProvenance: &cb.SourceProvenance{
-				ResolvedRepoSource: &cb.RepoSource{
+			SourceProvenance: &pb.SourceProvenance{
+				ResolvedRepoSource: &pb.RepoSource{
 					Dir:      "subdir",
-					Revision: &cb.RepoSource_CommitSha{CommitSha: "commit-sha"},
+					Revision: &pb.RepoSource_CommitSha{CommitSha: "commit-sha"},
 				},
 			},
-			Steps: []*cb.BuildStep{{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/my-project/my-compiler",
 			}, {
 				Name:    "gcr.io/my-project/my-builder",
 				Env:     []string{"FOO=bar", "BAZ=buz"},
 				Args:    []string{"a", "b", "c"},
 				Dir:     "foo/bar/../baz",
-				Volumes: []*cb.Volume{{Name: "myvol", Path: "/foo"}},
+				Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
 			}},
 			Images: []string{"gcr.io/build-output-tag-1", "gcr.io/build-output-tag-2", "gcr.io/build-output-tag-no-digest"},
 		},
@@ -718,37 +748,50 @@ func TestRunBuildSteps(t *testing.T) {
 			"docker rm -f step_0 step_1",
 			"docker volume rm myvol",
 		},
+		wantStepStatus: []pb.Build_Status{pb.Build_SUCCESS, pb.Build_SUCCESS},
 	}, {
 		name:           "TestRunBuilderFailExplicit",
 		buildRequest:   commonBuildRequest,
-		opFailsWithErr: true,
-		wantErr:        errors.New(`build step "gcr.io/my-project/my-compiler" failed: exit status 1`),
+		opError:        exit1Err,
+		wantErr:        errors.New(`build step 0 "gcr.io/my-project/my-compiler" failed: exit status 1`),
+		wantStepStatus: []pb.Build_Status{pb.Build_FAILURE, pb.Build_QUEUED},
 	}, {
 		name:           "TestRunBuilderFailImplicit",
 		buildRequest:   commonBuildRequest,
 		opFailsToWrite: true,
 		wantErr:        errors.New(`failed to find one or more images after execution of build steps: ["gcr.io/build-output-tag-1" "gcr.io/build-output-tag-no-digest"]`),
+		wantStepStatus: []pb.Build_Status{pb.Build_SUCCESS, pb.Build_SUCCESS},
 	}, {
 		name:           "TestRunBuilderFailConfirmNoContinuation",
 		buildRequest:   commonBuildRequest,
-		opFailsWithErr: true,
-		wantErr:        errors.New(`build step "gcr.io/my-project/my-compiler" failed: exit status 1`),
+		opError:        exit1Err,
+		wantErr:        errors.New(`build step 0 "gcr.io/my-project/my-compiler" failed: exit status 1`),
+		wantStepStatus: []pb.Build_Status{pb.Build_FAILURE, pb.Build_QUEUED},
+	}, {
+		name:           "Step Timeout",
+		buildRequest:   commonBuildRequest,
+		opError:        context.DeadlineExceeded,
+		wantErr:        fmt.Errorf(`build step 0 "gcr.io/my-project/my-compiler" failed: %v`, context.DeadlineExceeded),
+		wantStepStatus: []pb.Build_Status{pb.Build_TIMEOUT, pb.Build_QUEUED},
+	}, {
+		name:           "Step Canceled",
+		buildRequest:   commonBuildRequest,
+		opError:        context.Canceled,
+		wantErr:        fmt.Errorf(`build step 0 "gcr.io/my-project/my-compiler" failed: %v`, context.Canceled),
+		wantStepStatus: []pb.Build_Status{pb.Build_CANCELLED, pb.Build_QUEUED},
 	}}
 	for _, tc := range testCases {
 		r := newMockRunner(t, tc.name)
-		r.dockerRunHandler = func(_ []string, _, _ io.Writer) error {
+		r.dockerRunHandler = func([]string, io.Writer, io.Writer) error {
 			if !tc.opFailsToWrite {
 				r.localImages["gcr.io/build-output-tag-1"] = true
 				r.localImages["gcr.io/build-output-tag-no-digest"] = true
 			}
 			r.localImages["gcr.io/build-output-tag-2"] = true
-			if tc.opFailsWithErr {
-				return fmt.Errorf("exit status 1")
-			}
-			return nil
+			return tc.opError
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", true, false, false)
-		gotErr := b.runBuildSteps()
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
+		gotErr := b.runBuildSteps(ctx)
 		if !reflect.DeepEqual(gotErr, tc.wantErr) {
 			t.Errorf("%s: Wanted error %q, but got %q", tc.name, tc.wantErr, gotErr)
 		}
@@ -759,20 +802,46 @@ func TestRunBuildSteps(t *testing.T) {
 				t.Errorf("%s: Commands didn't match!\n===Want:\n%s\n===Got:\n%s", tc.name, want, got)
 			}
 		}
+
+		b.Mu.Lock()
+		if len(b.stepStatus) != len(tc.wantStepStatus) {
+			t.Errorf("%s: want len(b.stepStatus)==%d, got %d", tc.name, len(tc.wantStepStatus), len(b.stepStatus))
+		} else {
+			for i, stepStatus := range tc.wantStepStatus {
+				if b.stepStatus[i] != stepStatus {
+					t.Errorf("%s step %d: want %s, got %s", tc.name, i, stepStatus, b.stepStatus[i])
+				}
+			}
+		}
+		b.Mu.Unlock()
+
+		// Confirm proper population of per-step status in BuildSummary.
+		summary := b.Summary()
+		got := summary.StepStatus
+		if len(got) != len(tc.wantStepStatus) {
+			t.Errorf("%s: build summary wrong size; want %d, got %d", tc.name, len(tc.wantStepStatus), len(got))
+		} else {
+			for i, stepStatus := range tc.wantStepStatus {
+				if got[i] != stepStatus {
+					t.Errorf("%s summary step %d: want %s, got %s", tc.name, i, stepStatus, got[i])
+				}
+			}
+		}
 	}
 }
 
 func TestBuildStepOrder(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
 	testCases := []struct {
 		name         string
-		buildRequest cb.Build
+		buildRequest pb.Build
 		wantErr      error
 		wantCommands []string
 	}{{
 		name: "TestRunBuilderSequentialOneStep",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/my-project/my-builder",
 				Env:  []string{"FOO=bar", "BAZ=buz"},
 				Args: []string{"a", "b", "c"},
@@ -787,8 +856,8 @@ func TestBuildStepOrder(t *testing.T) {
 		},
 	}, {
 		name: "TestRunBuilderSequentialTwoSteps",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/my-project/my-compiler",
 			}, {
 				Name: "gcr.io/my-project/my-builder",
@@ -806,8 +875,8 @@ func TestBuildStepOrder(t *testing.T) {
 		},
 	}, {
 		name: "TestRunBuilderSequentialTenSteps",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/step-one",
 			}, {
 				Name: "gcr.io/step-two",
@@ -843,8 +912,8 @@ func TestBuildStepOrder(t *testing.T) {
 		},
 	}, {
 		name: "TestSerialBuildWithIDs",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/step-one",
 				Id:   "A",
 			}, {
@@ -863,8 +932,8 @@ func TestBuildStepOrder(t *testing.T) {
 		},
 	}, {
 		name: "TestParallelBuilds",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/step-one",
 				Id:   "I",
 				Args: []string{"markCompleted", "I"},
@@ -915,8 +984,8 @@ func TestBuildStepOrder(t *testing.T) {
 		},
 	}, {
 		name: "TestParallelBuildsMultipleWrites",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/step-one",
 				Id:   "I",
 				Args: []string{"markCompleted", "I"},
@@ -981,10 +1050,10 @@ func TestBuildStepOrder(t *testing.T) {
 			}
 			return nil
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", true, false, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
 		errorFromFunction := make(chan error)
 		go func() {
-			errorFromFunction <- b.runBuildSteps()
+			errorFromFunction <- b.runBuildSteps(ctx)
 		}()
 
 		for idx := range tc.buildRequest.Steps {
@@ -1008,9 +1077,10 @@ func TestBuildStepOrder(t *testing.T) {
 
 func TestPushImages(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
 	testCases := []struct {
 		name             string
-		buildRequest     cb.Build
+		buildRequest     pb.Build
 		wantErr          error
 		wantCommands     []string
 		remotePushesFail bool
@@ -1031,9 +1101,9 @@ func TestPushImages(t *testing.T) {
 	}}
 	for _, tc := range testCases {
 		r := newMockRunner(t, tc.name)
-		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", true, true, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, true, false)
 		r.remotePushesFail = tc.remotePushesFail
-		gotErr := b.pushImages()
+		gotErr := b.pushImages(ctx)
 		if !reflect.DeepEqual(gotErr, tc.wantErr) {
 			t.Errorf("%s: Wanted error %q, but got %q", tc.name, tc.wantErr, gotErr)
 		}
@@ -1045,20 +1115,9 @@ func TestPushImages(t *testing.T) {
 			}
 			// Validate side-effects of pushing docker images.
 			wantDigest := "sha256:deadb33f000deadb33f0000123456789abcdeffffffffffffff"
-			if got := b.imageDigests["gcr.io/build-output-tag-1"]; got != wantDigest {
-				t.Errorf("%s: Got digest %q for gcr.io/build-output-tag-1. Wanted %q", tc.name, got, wantDigest)
-			}
-			if got := b.imageDigests["gcr.io/build-output-tag-2"]; got != wantDigest {
-				t.Errorf("%s: Got digest %q for gcr.io/build-output-tag-2. Wanted %q", tc.name, got, wantDigest)
-			}
-			if got := b.imageDigests["gcr.io/build-output-tag-no-digest"]; got != "" {
-				t.Errorf("%s: Got digest %q for gcr.io/build-output-tag-no-digest. Wanted %q", tc.name, got, "")
-			}
 			b.Timing = TimingInfo{}
 			summary := b.Summary()
 			wantSummary := BuildSummary{
-				// We didn't use the Start method, so the build status never got updated.
-				Status: "",
 				BuiltImages: []BuiltImage{{
 					Name:   "gcr.io/build-output-tag-1",
 					Digest: wantDigest,
@@ -1071,17 +1130,272 @@ func TestPushImages(t *testing.T) {
 				}, {
 					Name:   "gcr.io/build-output-tag-2:latest",
 					Digest: wantDigest,
-				},
+				}},
 				// gcr.io/build-output-tag-no-digest doesn't show up at all b/c it has no digest!
-				},
 				BuildStepImages: []string{"", ""},
 				Timing:          TimingInfo{},
+				StepStatus:      []pb.Build_Status{},
 			}
 			if !reflect.DeepEqual(summary, wantSummary) {
-				t.Errorf("unexpected build summary:\n got %+v\nwant %+v", summary, wantSummary)
+				t.Errorf("%s: unexpected build summary:\n got %+v\nwant %+v", tc.name, summary, wantSummary)
 			}
 		}
 	}
+}
+
+type mockGsutilHelper struct {
+	bucket       string
+	numArtifacts int // define num of artifacts to upload
+}
+
+func newMockGsutilHelper(bucket string, numArtifacts int) mockGsutilHelper {
+	return mockGsutilHelper{
+		bucket:       strings.TrimSuffix(bucket, "/"), // remove any trailing slash for consistency
+		numArtifacts: numArtifacts,
+	}
+}
+
+func (g mockGsutilHelper) VerifyBucket(ctx context.Context, bucket string) error {
+	if bucket == g.bucket {
+		return nil
+	}
+	return fmt.Errorf("bucket %q does not exist", bucket)
+}
+
+func (g mockGsutilHelper) UploadArtifacts(ctx context.Context, flags gsutil.DockerFlags, src, dest string) ([]*pb.ArtifactResult, error) {
+	artifacts := []*pb.ArtifactResult{}
+	for i := 0; i < g.numArtifacts; i++ {
+		// NB: We do not care about the actual ArtifactResult contents for build_test, just the number produced.
+		uuid := uuid.New() // mock unique ArtifactResult
+		artifacts = append(artifacts, &pb.ArtifactResult{
+			Location: g.bucket + "/artifact-" + uuid,
+			FileHash: []*pb.FileHashes{{
+				FileHash: []*pb.Hash{{Type: pb.Hash_MD5, Value: []byte("md5" + uuid)}}},
+			},
+		})
+	}
+
+	return artifacts, nil
+}
+
+func (g mockGsutilHelper) UploadArtifactsManifest(ctx context.Context, flags gsutil.DockerFlags, manifest, bucket string, results []*pb.ArtifactResult) (string, error) {
+	b := strings.TrimSuffix(bucket, "/") // remove any trailing forward slash
+	return strings.Join([]string{b, manifest}, "/"), nil
+}
+
+// TestPushArtifacts checks that after artifacts are uploaded, an ArtifactsInfo object is assigned to the build's artifacts field.
+func TestPushArtifacts(t *testing.T) {
+	ctx := context.Background()
+	newUUID = func() string { return "someuuid" }
+	defer func() { newUUID = uuid.New }()
+	buildID := "buildID"
+
+	testCases := []struct {
+		name              string
+		buildRequest      pb.Build
+		gsutilHelper      mockGsutilHelper
+		local             bool
+		wantArtifactsInfo ArtifactsInfo
+		wantErr           bool
+	}{{
+		name: "SuccessPushArtifacts",
+		buildRequest: pb.Build{
+			Id: buildID,
+			Artifacts: &pb.Artifacts{
+				Objects: &pb.Artifacts_ArtifactObjects{
+					Location: "gs://some-bucket",
+					Paths:    []string{"artifact.txt"},
+				},
+			},
+		},
+		gsutilHelper: newMockGsutilHelper("gs://some-bucket", 1),
+		wantArtifactsInfo: ArtifactsInfo{
+			ArtifactManifest: "gs://some-bucket/artifacts-" + buildID + ".json",
+			NumArtifacts:     1,
+		},
+	}, {
+		// If the push is local, there will be no build ID. The manifest will have a different format
+		// and will be assigned some unique identifying string.
+		name: "SuccessPushArtifactsLocal",
+		buildRequest: pb.Build{
+			Artifacts: &pb.Artifacts{
+				Objects: &pb.Artifacts_ArtifactObjects{
+					Location: "gs://some-bucket",
+					Paths:    []string{"artifact.txt"},
+				},
+			},
+		},
+		gsutilHelper: newMockGsutilHelper("gs://some-bucket", 1),
+		local:        true,
+		wantArtifactsInfo: ArtifactsInfo{
+			ArtifactManifest: "gs://some-bucket/artifacts-localbuild_" + newUUID() + ".json",
+			NumArtifacts:     1,
+		},
+	}, {
+		name:         "SuccessNoArtifactsField",
+		buildRequest: commonBuildRequest,
+		gsutilHelper: newMockGsutilHelper("gs://some-bucket", 0),
+	}, {
+		name: "SuccessNoObjectsField",
+		buildRequest: pb.Build{
+			Artifacts: &pb.Artifacts{},
+		},
+		gsutilHelper: newMockGsutilHelper("gs://some-bucket", 0),
+	}, {
+		name: "ErrorBucketDoesNotExist",
+		buildRequest: pb.Build{
+			Artifacts: &pb.Artifacts{
+				Objects: &pb.Artifacts_ArtifactObjects{
+					Location: "gs://idonotexist",
+					Paths:    []string{"artifact.txt"},
+				},
+			},
+		},
+		gsutilHelper: newMockGsutilHelper("gs://some-bucket", 0),
+		wantErr:      true,
+	}}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newMockRunner(t, tc.name)
+
+			local := tc.local
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), local, true, false)
+			b.gsutilHelper = tc.gsutilHelper
+
+			err := b.pushArtifacts(ctx)
+			if tc.wantErr {
+				if err != nil {
+					return
+				}
+				t.Fatal("got nil error, want error")
+			}
+			if err != nil {
+				t.Fatalf("pushArtifacts(): err = %v", err)
+			}
+
+			if b.artifacts.ArtifactManifest != tc.wantArtifactsInfo.ArtifactManifest {
+				t.Errorf("got b.artifacts.ArtifactManifest = %s, want %s", b.artifacts.ArtifactManifest, tc.wantArtifactsInfo.ArtifactManifest)
+			}
+			if b.artifacts.NumArtifacts != tc.wantArtifactsInfo.NumArtifacts {
+				t.Errorf("got b.artifacts.ArtifactManifest = %s, want %s", b.artifacts.NumArtifacts, tc.wantArtifactsInfo.NumArtifacts)
+			}
+		})
+	}
+}
+
+func TestPushArtifactsTiming(t *testing.T) {
+	timeNow = fakeTimeNow
+	defer func() { timeNow = time.Now }()
+	ctx := context.Background()
+
+	testCases := []struct {
+		name               string
+		buildRequest       pb.Build
+		wantArtifactTiming bool
+	}{{
+		name: "NoArtifacts",
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
+				Name: "gcr.io/my-project/my-compiler",
+			}},
+		},
+	}, {
+		name: "HasArtifacts",
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
+				Name: "gcr.io/my-project/my-compiler",
+			}},
+			Artifacts: &pb.Artifacts{
+				Objects: &pb.Artifacts_ArtifactObjects{
+					Location: "gs://some-bucket",
+					Paths:    []string{"artifact.txt"},
+				}},
+		},
+		wantArtifactTiming: true,
+	}}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newMockRunner(t, tc.name)
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, true, false)
+			b.gsutilHelper = newMockGsutilHelper("gs://some-bucket", 0)
+			if err := b.pushArtifacts(ctx); err != nil {
+				t.Fatalf("b.pushArtifacts() = %v", err)
+			}
+
+			// Ensure b.Timing.ArtifactsPushes exists if we expect it to
+			artifactTiming := b.Timing.ArtifactsPushes
+			if tc.wantArtifactTiming && artifactTiming == nil {
+				t.Fatalf("got b.Timing.ArtifactPushes = nil, want TimeSpan value")
+			}
+			if !tc.wantArtifactTiming && artifactTiming != nil {
+				t.Fatalf("got b.Timing.ArtifactPushes = %+v, want nil", artifactTiming)
+			}
+			if artifactTiming != nil && !isEndTimeAfterStartTime(artifactTiming) {
+				t.Errorf("invalid TimeSpan value: got %+v\nwant TimeSpan EndTime to occur after StartTime", artifactTiming)
+			}
+		})
+	}
+}
+
+func TestPushAllTiming(t *testing.T) {
+	ctx := context.Background()
+	newUUID = func() string { return "someuuid" }
+	defer func() { newUUID = uuid.New }()
+
+	testCases := []struct {
+		name         string
+		buildRequest pb.Build
+		hasPushTotal bool
+	}{{
+		name: "Push",
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
+				Name: "gcr.io/my-project/my-compiler",
+			}},
+			Images: []string{"gcr.io/build-output-tag-1", "gcr.io/build-output-tag-2", "gcr.io/build-output-tag-no-digest"},
+			Artifacts: &pb.Artifacts{
+				Objects: &pb.Artifacts_ArtifactObjects{
+					Location: "gs://some-bucket",
+					Paths:    []string{"artifact.txt"},
+				}},
+		},
+		hasPushTotal: true,
+	}, {
+		name: "NoPush",
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
+				Name: "gcr.io/my-project/my-compiler",
+			}},
+		},
+	}}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newMockRunner(t, tc.name)
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, true, false)
+			b.gsutilHelper = newMockGsutilHelper("gs://some-bucket", 1)
+			if err := b.pushAll(ctx); err != nil {
+				t.Fatal(err)
+			}
+
+			pushTotal := b.Timing.PushTotal
+			if !tc.hasPushTotal {
+				if pushTotal != nil {
+					t.Fatalf("got pushTotal = %+v, want nil", pushTotal)
+				}
+				return // desired behavior
+			}
+			if tc.hasPushTotal && pushTotal == nil {
+				t.Fatal("did not get pushTotal")
+			}
+			if pushTotal != nil && pushTotal.End.IsZero() {
+				t.Errorf("got b.Timing.PushTotal.End.IsZero() = true, want false")
+			}
+			if !isEndTimeAfterStartTime(pushTotal) {
+				t.Errorf("unexpected push total time:\n got %+v\nwant TimeSpan EndTime to occur after StartTime", pushTotal)
+			}
+		})
+	}
+
 }
 
 var timeSecs int64
@@ -1098,7 +1412,7 @@ func isEndTimeAfterStartTime(ts *TimeSpan) bool {
 	return ts.End.Sub(ts.Start) > 0
 }
 
-func getStepIndex(id string, buildSteps []*cb.BuildStep) int {
+func getStepIndex(id string, buildSteps []*pb.BuildStep) int {
 	for i, bs := range buildSteps {
 		if bs.Id == id {
 			return i
@@ -1110,10 +1424,11 @@ func getStepIndex(id string, buildSteps []*cb.BuildStep) int {
 func TestBuildTiming(t *testing.T) {
 	timeNow = fakeTimeNow
 	defer func() { timeNow = time.Now }()
+	ctx := context.Background()
 
 	testCases := []struct {
 		name         string
-		buildRequest cb.Build
+		buildRequest pb.Build
 		hasError     bool
 		// stepTimings is only defined when an error is expected, since not all the steps will execute.
 		stepTimings int
@@ -1124,8 +1439,8 @@ func TestBuildTiming(t *testing.T) {
 		name: "PushImagesTimingZeroSteps",
 	}, {
 		name: "PushImagesTimingFiveSteps",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/step-zero",
 			}, {
 				Name: "gcr.io/step-one",
@@ -1139,8 +1454,8 @@ func TestBuildTiming(t *testing.T) {
 		},
 	}, {
 		name: "BuildImagesTimingParallelSteps",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name:    "gcr.io/step-zero",
 				Id:      "A",
 				WaitFor: []string{StartStep},
@@ -1164,8 +1479,8 @@ func TestBuildTiming(t *testing.T) {
 		},
 	}, {
 		name: "BuildStepError",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/step-zero",
 			}, {
 				Name: "gcr.io/step-one",
@@ -1181,7 +1496,7 @@ func TestBuildTiming(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
-			r.dockerRunHandler = func(_ []string, _, _ io.Writer) error {
+			r.dockerRunHandler = func([]string, io.Writer, io.Writer) error {
 				r.mu.Lock()
 				r.localImages["gcr.io/build-output-tag-1"] = true
 				r.localImages["gcr.io/build-output-tag-no-digest"] = true
@@ -1189,8 +1504,8 @@ func TestBuildTiming(t *testing.T) {
 				r.mu.Unlock()
 				return nil
 			}
-			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", true, false, false)
-			b.runBuildSteps()
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
+			b.runBuildSteps(ctx)
 
 			buildStepTimes := b.Timing.BuildSteps
 
@@ -1272,16 +1587,17 @@ func TestBuildTiming(t *testing.T) {
 
 // TestBuildTimingOutOfOrder ensures the correctness of build step timings when steps execute out of order.
 func TestBuildTimingOutOfOrder(t *testing.T) {
+	ctx := context.Background()
 	// Step args specify how long the step should sleep in milliseconds.
 	testCases := []struct {
 		name         string
-		buildRequest cb.Build
+		buildRequest pb.Build
 		finishOrder  []int // order that build steps finish
 		hasError     bool
 	}{{
 		name: "TwoStepsReverseOrder",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/step-zero",
 				Args: []string{"sleep", "25"},
 			}, {
@@ -1293,8 +1609,8 @@ func TestBuildTimingOutOfOrder(t *testing.T) {
 		finishOrder: []int{1, 0},
 	}, {
 		name: "FourStepsReverseOrder",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/step-zero",
 				Args: []string{"sleep", "100"},
 			}, {
@@ -1314,8 +1630,8 @@ func TestBuildTimingOutOfOrder(t *testing.T) {
 		finishOrder: []int{3, 2, 1, 0},
 	}, {
 		name: "MixedOrder",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/step-zero",
 				Args: []string{"sleep", "100"},
 			}, {
@@ -1337,9 +1653,9 @@ func TestBuildTimingOutOfOrder(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
-			r.dockerRunHandler = func(_ []string, _, _ io.Writer) error { return nil }
-			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", true, false, false)
-			b.runBuildSteps()
+			r.dockerRunHandler = func([]string, io.Writer, io.Writer) error { return nil }
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
+			b.runBuildSteps(ctx)
 
 			buildStepTimes := b.Timing.BuildSteps
 
@@ -1375,51 +1691,39 @@ func TestBuildTimingOutOfOrder(t *testing.T) {
 	}
 }
 
-func TestPushTiming(t *testing.T) {
+func TestPushImagesTiming(t *testing.T) {
+	
 	timeNow = fakeTimeNow
 	defer func() { timeNow = time.Now }()
+	ctx := context.Background()
 
 	testCases := []struct {
 		name               string
-		buildRequest       cb.Build
+		buildRequest       pb.Build
 		push               bool
 		wantImagePushTimes int
+		// wantFirstPushTimeOnly is true in cases where we push more than one image with the same digest.
+		// In those cases, only the first pushed image timing should be stored. After an image is pushed,
+		// additional pushes of the same image will take negligible time.
+		wantFirstPushTimeOnly bool
 	}{{
-		name:               "TestPushImagesTiming",
+		name:               "OneImage",
 		buildRequest:       commonBuildRequest,
 		push:               true,
 		wantImagePushTimes: 1,
 	}, {
-		name: "TestPushImagesTimingNoPush",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		name: "NoImage",
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/my-project/my-compiler",
 			}},
 		},
 		push:               false,
 		wantImagePushTimes: 0,
 	}, {
-		name: "TestPushImagesTimingFiveSteps",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
-				Name: "gcr.io/step-one",
-			}, {
-				Name: "gcr.io/step-two",
-			}, {
-				Name: "gcr.io/step-three",
-			}, {
-				Name: "gcr.io/step-four",
-			}, {
-				Name: "gcr.io/step-five",
-			}},
-			Images: []string{"gcr.io/build-output-tag-1", "gcr.io/build-output-tag-2"},
-		},
-		push:               true,
-		wantImagePushTimes: 1,
-	}, {
-		name: "TestPushImagesTimingThreeStepsThreeImages",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		name: "ThreeImages",
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/step-one",
 			}, {
 				Name: "gcr.io/step-two",
@@ -1431,9 +1735,9 @@ func TestPushTiming(t *testing.T) {
 		push:               true,
 		wantImagePushTimes: 3,
 	}, {
-		name: "TestPushImagesTimingParallelSteps",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		name: "ParallelStepsThreeImages",
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name:    "gcr.io/my-project/my-builder",
 				Id:      "A",
 				WaitFor: []string{StartStep},
@@ -1447,28 +1751,32 @@ func TestPushTiming(t *testing.T) {
 				Id:      "D",
 				WaitFor: []string{"A"},
 			}},
-			Images: []string{"gcr.io/build-output-tag-1", "gcr.io/build-output-tag-2", "gcr.io/build-output-tag-no-digest"},
+			Images: []string{"gcr.io/some-image-1", "gcr.io/some-image-2", "gcr.io/some-image-3"},
 		},
 		push:               true,
-		wantImagePushTimes: 1,
+		wantImagePushTimes: 3,
+	}, {
+		// Push three images with the same image digest.
+		name: "SameImageDigest",
+		buildRequest: pb.Build{
+			Steps:  []*pb.BuildStep{{Name: "gcr.io/step-one"}},
+			Images: []string{"gcr.io/build-output-tag-1", "gcr.io/build-output-tag-2", "gcr.io/build-output-tag-no-digest"},
+		},
+		push:                  true,
+		wantImagePushTimes:    1,
+		wantFirstPushTimeOnly: true,
 	}}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
-			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", true, true, false)
-			b.pushImages()
 
-			pushTotal := b.Timing.PushTotal
+			// We record this for the test case where tc.wantFirstPushTimeOnly is true. Since fakeTimeNow increments the second counter after each call,
+			// the first image push start time should start 1 second after pushStart.
+			pushStart := timeNow()
+
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, true, false)
+			b.pushImages(ctx)
 			imagePushes := b.Timing.ImagePushes
-			if !tc.push && pushTotal != nil {
-				t.Errorf("unexpected push total time:\n got %+v\nwant pushTotal to be nil if no push occurs", pushTotal)
-			}
-			if pushTotal != nil && pushTotal.End.IsZero() {
-				t.Errorf("got b.Timing.PushTotal.End.IsZero() = true, want false")
-			}
-			if tc.push && !isEndTimeAfterStartTime(pushTotal) {
-				t.Errorf("unexpected push total time:\n got %+v\nwant TimeSpan EndTime to occur after StartTime", pushTotal)
-			}
 			for _, pushTime := range imagePushes {
 				if !isEndTimeAfterStartTime(pushTime) {
 					t.Errorf("unexpected push total time:\n got %+v\nwant TimeSpan EndTime to occur after StartTime", pushTime)
@@ -1476,8 +1784,14 @@ func TestPushTiming(t *testing.T) {
 			}
 			if len(imagePushes) == tc.wantImagePushTimes {
 				for _, d := range b.imageDigests {
-					if _, ok := imagePushes[d]; !ok {
-						t.Errorf("timing for image push not present:\n wanted time for %v but no such key", d)
+					ts, ok := imagePushes[d.digest]
+					if !ok {
+						t.Errorf("timing for image push not present:\nwanted time for %v but no such key", d)
+					}
+					if tc.wantFirstPushTimeOnly {
+						if diff := ts.Start.Unix() - pushStart.Unix(); diff != 1 {
+							t.Errorf("timing for image %s is not the timing of the first push:\ngot image push timing starts %d seconds after push total start time, want 1 second", d.tag, diff)
+						}
 					}
 				}
 			} else {
@@ -1489,7 +1803,8 @@ func TestPushTiming(t *testing.T) {
 
 func TestBuildStepConcurrency(t *testing.T) {
 	t.Parallel()
-	req := cb.Build{
+	ctx := context.Background()
+	req := pb.Build{
 		// This build is set up such that if build steps don't run concurrently,
 		// the build will time out. Specifically, if A were to run first and alone,
 		// it would timeout waiting for B to run.  If B were to run first and
@@ -1498,7 +1813,7 @@ func TestBuildStepConcurrency(t *testing.T) {
 		//
 		// See comments on type fakeRunner (below) which document how the steps
 		// signal each other.
-		Steps: []*cb.BuildStep{{
+		Steps: []*pb.BuildStep{{
 			Name: "A",
 			// Wait for nothing; free B to run by closing aIsRunning, then wait for bIsRunning.
 			Args: []string{"", "aIsRunning", "bIsRunning"},
@@ -1526,10 +1841,10 @@ func TestBuildStepConcurrency(t *testing.T) {
 	}
 
 	// Run the build.
-	b := New(r, req, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", true, false, false)
+	b := New(r, req, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
 	ret := make(chan error)
 	go func() {
-		ret <- b.runBuildSteps()
+		ret <- b.runBuildSteps(ctx)
 	}()
 
 	// Give the build 10s to complete; it should take <1s.
@@ -1562,11 +1877,11 @@ type fakeRunner struct {
 // channels map.  Specifically, we wait for the first channel given to close,
 // then close the next channel then repeat until we've gone through all the
 // "args".
-func (f *fakeRunner) Run(args []string, _ io.Reader, _, _ io.Writer, _ string) error {
+func (f *fakeRunner) Run(ctx context.Context, args []string, _ io.Reader, _, _ io.Writer, _ string) error {
 	// The "+1" is for the name of the container which is appended to the
 	// dockerRunArgs base command.
-	b := New(nil, cb.Build{}, nil, nopBuildLogger{}, nopEventLogger{}, "", true, false, false)
-	argCount := len(b.dockerRunArgs("", 0)) + 1
+	b := New(nil, pb.Build{}, nil, nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
+	argCount := len(b.dockerRunArgs("", "", 0)) + 1
 	switch {
 	case !startsWith(args, "docker", "run"):
 		// It's not a "docker run" invocation; do nothing.
@@ -1616,8 +1931,8 @@ func dockerRunString(idx int) string {
 }
 
 func dockerRunInStepDir(idx int, stepDir string) string {
-	b := New(nil, cb.Build{}, nil, nopBuildLogger{}, nopEventLogger{}, "", true, false, false)
-	dockerRunArg := b.dockerRunArgs(stepDir, idx)
+	b := New(nil, pb.Build{}, nil, nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
+	dockerRunArg := b.dockerRunArgs(stepDir, "", idx)
 	return strings.Join(dockerRunArg, " ")
 }
 
@@ -1627,6 +1942,59 @@ func (f *fakeRunner) MkdirAll(_ string) error {
 
 func (f *fakeRunner) WriteFile(_, _ string) error {
 	return nil
+}
+
+func fakeTimeSpan() *TimeSpan {
+	return &TimeSpan{fakeTimeNow(), fakeTimeNow()}
+}
+
+func TestSummary(t *testing.T) {
+	b := New(nil, pb.Build{}, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, true, false)
+
+	wantBuildStatus := StatusDone
+	wantStepStatus := []pb.Build_Status{pb.Build_SUCCESS, pb.Build_SUCCESS}
+	wantBuiltImages := []BuiltImage{{Name: "tag", Digest: "digest"}}
+	imageDigests := []imageDigest{{"tag", "digest"}}
+	wantBuildStepImages := []string{"digest1", "digest2"}
+	wantTiming := TimingInfo{
+		BuildSteps:      []*TimeSpan{fakeTimeSpan()},
+		BuildTotal:      fakeTimeSpan(),
+		ImagePushes:     map[string]*TimeSpan{"someimage": fakeTimeSpan()},
+		PushTotal:       fakeTimeSpan(),
+		SourceTotal:     fakeTimeSpan(),
+		ArtifactsPushes: fakeTimeSpan(),
+	}
+	wantArtifacts := ArtifactsInfo{
+		ArtifactManifest: "manifest",
+		NumArtifacts:     1,
+	}
+
+	b.Status = wantBuildStatus
+	b.stepStatus = wantStepStatus
+	b.imageDigests = imageDigests
+	b.stepDigests = wantBuildStepImages
+	b.Timing = wantTiming
+	b.artifacts = wantArtifacts
+
+	s := b.Summary()
+	if s.Status != wantBuildStatus {
+		t.Errorf("got Status = %s, want %v", s.Status, wantBuildStatus)
+	}
+	if !reflect.DeepEqual(s.StepStatus, wantStepStatus) {
+		t.Errorf("got StepStatus = %+v, want %+v", s.StepStatus, wantStepStatus)
+	}
+	if !reflect.DeepEqual(s.BuiltImages, wantBuiltImages) {
+		t.Errorf("got BuiltImages = %+v, want %+v", s.BuiltImages, wantBuiltImages)
+	}
+	if !reflect.DeepEqual(s.BuildStepImages, wantBuildStepImages) {
+		t.Errorf("got BuildStepImages = %+v, want %+v", s.BuildStepImages, wantBuildStepImages)
+	}
+	if !reflect.DeepEqual(s.Timing, wantTiming) {
+		t.Errorf("got Timing = %+v, want Timing = %+v", s.Timing, wantTiming)
+	}
+	if !reflect.DeepEqual(s.Artifacts, wantArtifacts) {
+		t.Errorf("got Artifacts = %+v, want %+v", s.Artifacts, wantArtifacts)
+	}
 }
 
 func TestFindStatus(t *testing.T) {
@@ -1659,7 +2027,7 @@ func TestErrorCollection(t *testing.T) {
 		"got an http status: 300: it's a mystery to me",
 		"got another http status: 300: it's a double mystery",
 	}
-	b := New(nil, cb.Build{}, nil, nopBuildLogger{}, nopEventLogger{}, "", true, false, false)
+	b := New(nil, pb.Build{}, nil, nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
 	for _, o := range outputs {
 		b.detectPushFailure(o)
 	}
@@ -1680,15 +2048,16 @@ func TestErrorCollection(t *testing.T) {
 
 func TestEntrypoint(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
 	testCases := []struct {
 		name         string
-		buildRequest cb.Build
+		buildRequest pb.Build
 		wantErr      error
 		wantCommands []string
 	}{{
 		name: "TestWithoutEntrypoint",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/my-project/my-builder",
 				Env:  []string{"FOO=bar", "BAZ=buz"},
 				Args: []string{"a", "b", "c"},
@@ -1703,8 +2072,8 @@ func TestEntrypoint(t *testing.T) {
 		},
 	}, {
 		name: "TestWithEntrypoint",
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name:       "gcr.io/my-project/my-builder",
 				Env:        []string{"FOO=bar", "BAZ=buz"},
 				Args:       []string{"a", "b", "c"},
@@ -1727,10 +2096,10 @@ func TestEntrypoint(t *testing.T) {
 			stepArgs <- strings.Join(args, " ")
 			return nil
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", true, false, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
 		errorFromFunction := make(chan error)
 		go func() {
-			errorFromFunction <- b.runBuildSteps()
+			errorFromFunction <- b.runBuildSteps(ctx)
 		}()
 
 		for idx := range tc.buildRequest.Steps {
@@ -1774,6 +2143,7 @@ func TestStripTagDigest(t *testing.T) {
 
 func TestSecrets(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
 	kmsKeyName := "projects/my-project/locations/global/keyRings/my-key-ring/cryptoKeys/my-crypto-key"
 	for _, c := range []struct {
 		name        string
@@ -1791,20 +2161,20 @@ func TestSecrets(t *testing.T) {
 	}, {
 		name:    "KMS returns error",
 		kmsErr:  errors.New("kms failure"),
-		wantErr: fmt.Errorf(`Failed to decrypt "MY_SECRET" using key %q: kms failure`, kmsKeyName),
+		wantErr: fmt.Errorf(`build step 0 "gcr.io/my-project/my-builder" failed: Failed to decrypt "MY_SECRET" using key %q: kms failure`, kmsKeyName),
 	}, {
 		name:      "KMS returns non-base64 response",
 		plaintext: "This is not valid base64!",
 		kmsErr:    nil,
-		wantErr:   fmt.Errorf("Plaintext was not base64-decodeable: illegal base64 data at input byte 4"),
+		wantErr:   fmt.Errorf(`build step 0 "gcr.io/my-project/my-builder" failed: Plaintext was not base64-decodeable: illegal base64 data at input byte 4`),
 	}} {
 		// All tests use the same build request.
-		buildRequest := cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest := pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name:      "gcr.io/my-project/my-builder",
 				SecretEnv: []string{"MY_SECRET"},
 			}},
-			Secrets: []*cb.Secret{{
+			Secrets: []*pb.Secret{{
 				KmsKeyName: kmsKeyName,
 				SecretEnv: map[string][]byte{
 					"MY_SECRET": []byte("this is encrypted"),
@@ -1818,13 +2188,13 @@ func TestSecrets(t *testing.T) {
 			gotCommand = strings.Join(args, " ")
 			return nil
 		}
-		b := New(r, buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", true, false, false)
+		b := New(r, buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
 		b.kms = fakeKMS{
 			plaintext: c.plaintext,
 			err:       c.kmsErr,
 		}
 
-		if err := b.runBuildSteps(); !reflect.DeepEqual(err, c.wantErr) {
+		if err := b.runBuildSteps(ctx); !reflect.DeepEqual(err, c.wantErr) {
 			t.Errorf("%s: Unexpected error\n got %v\nwant %v", c.name, err, c.wantErr)
 		}
 		if !reflect.DeepEqual(gotCommand, c.wantCommand) {
@@ -1849,7 +2219,7 @@ func TestPushDigestScraping(t *testing.T) {
 	cases := []struct {
 		desc     string
 		output   string
-		expected map[string]string
+		expected []imageDigest
 		err      string
 	}{{
 		// When you 'docker push foo', and "foo:x", "foo:y" etc are available, all "foo:*" images are pushed (rather than just :latest).
@@ -1899,10 +2269,10 @@ e8829d5bbd2c: Layer already exists
 638903ee8579: Layer already exists
 latest: digest: sha256:22c754d23e8461f6992e900290f4a146fda90eaf89b0cbdbdfd3aaa503dad4f6 size: 1571
 `,
-		expected: map[string]string{
-			"1.12.6": "sha256:22c754d23e8461f6992e900290f4a146fda90eaf89b0cbdbdfd3aaa503dad4f6",
-			"1.9.1":  "sha256:16c183bac00b282e420fbc6d3f3bf56f9ae18d85c36c4f8850c951ea49ca5dc1",
-			"latest": "sha256:22c754d23e8461f6992e900290f4a146fda90eaf89b0cbdbdfd3aaa503dad4f6",
+		expected: []imageDigest{
+			{"1.12.6", "sha256:22c754d23e8461f6992e900290f4a146fda90eaf89b0cbdbdfd3aaa503dad4f6"},
+			{"1.9.1", "sha256:16c183bac00b282e420fbc6d3f3bf56f9ae18d85c36c4f8850c951ea49ca5dc1"},
+			{"latest", "sha256:22c754d23e8461f6992e900290f4a146fda90eaf89b0cbdbdfd3aaa503dad4f6"},
 		},
 	}, {
 		desc: "failed push",
@@ -1935,88 +2305,156 @@ unauthorized: authentication required
 		if len(got) != len(c.expected) {
 			t.Errorf("%s: wrong number of results; want %d, got %d", c.desc, len(c.expected), len(got))
 		}
-		for i, d := range c.expected {
-			if gd, ok := got[i]; !ok || gd != d {
-				t.Errorf("%s: did not get expected %s:%s", c.desc, i, d)
-			}
+		if !reflect.DeepEqual(got, c.expected) {
+			t.Errorf("%s: got\n%s\nwant\n%s", c.desc, got, c.expected)
 		}
 	}
 }
 
-func TestDigestResolution(t *testing.T) {
-	var b *Build
-
+func TestResolveDigestsForImage(t *testing.T) {
 	cases := []struct {
-		desc     string
-		image    string
-		digests  map[string]string
-		expected map[string]string
+		desc, image       string
+		digests, expected []imageDigest
 	}{{
-		desc:  "listed untagged, pushed latest",
-		image: "foo",
-		digests: map[string]string{
-			"latest": "123",
-		},
-		expected: map[string]string{
-			"foo":        "123",
-			"foo:latest": "123",
+		desc:    "listed untagged, pushed latest",
+		image:   "foo",
+		digests: []imageDigest{{"latest", "123"}},
+		expected: []imageDigest{
+			{"foo", "123"},
+			{"foo:latest", "123"},
 		},
 	}, {
-		desc:  "listed latest, pushed latest",
-		image: "foo:latest",
-		digests: map[string]string{
-			"latest": "123",
-		},
-		expected: map[string]string{
-			"foo":        "123",
-			"foo:latest": "123",
+		desc:    "listed latest, pushed latest",
+		image:   "foo:latest",
+		digests: []imageDigest{{"latest", "123"}},
+		expected: []imageDigest{
+			{"foo", "123"},
+			{"foo:latest", "123"},
 		},
 	}, {
 		desc:  "listed untagged, pushed x and y",
 		image: "foo",
-		digests: map[string]string{
-			"x": "123",
-			"y": "456",
+		digests: []imageDigest{
+			{"x", "123"},
+			{"y", "456"},
 		},
-		expected: map[string]string{
-			"foo:x": "123",
-			"foo:y": "456",
+		expected: []imageDigest{
+			{"foo:x", "123"},
+			{"foo:y", "456"},
 		},
 	}, {
-		desc:  "listed x, pushed x",
-		image: "foo:x",
-		digests: map[string]string{
-			"x": "123",
-		},
-		expected: map[string]string{
-			"foo:x": "123",
-		},
+		desc:     "listed x, pushed x",
+		image:    "foo:x",
+		digests:  []imageDigest{{"x", "123"}},
+		expected: []imageDigest{{"foo:x", "123"}},
 	}}
 	for _, c := range cases {
-		got := b.resolveDigestsForImage(c.image, c.digests)
+		got := resolveDigestsForImage(c.image, c.digests)
 		if len(got) != len(c.expected) {
 			t.Errorf("%s: wrong number of results; want %d, got %d", c.desc, len(c.expected), len(got))
 		}
-		for i, d := range c.expected {
-			if gd, ok := got[i]; !ok || gd != d {
-				t.Errorf("%s: did not get expected %s:%s", c.desc, i, d)
-			}
+		if !reflect.DeepEqual(got, c.expected) {
+			t.Errorf("%s: got\n%s\nwant\n%s", c.desc, got, c.expected)
 		}
+	}
+}
+
+func TestTimeout(t *testing.T) {
+	ctx := context.Background()
+	request := pb.Build{
+		Steps: []*pb.BuildStep{{
+			Name: "gcr.io/step-zero",
+		}, {
+			Name:    "gcr.io/step-one",
+			Args:    []string{"sleep", "5000"}, // mockRunner will sleep this many ms.
+			WaitFor: []string{"-"},
+		}, {
+			Name: "gcr.io/step-two",
+		}},
+		Timeout: &durpb.Duration{Seconds: 1}, // Build should time out.
+	}
+	r := newMockRunner(t, "timeout")
+	r.dockerRunHandler = func([]string, io.Writer, io.Writer) error { return nil }
+	b := New(r, request, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, true, false)
+	b.Start(ctx)
+	<-b.Done
+
+	want := FullStatus{BuildStatus: StatusTimeout, StepStatus: []pb.Build_Status{pb.Build_SUCCESS, pb.Build_WORKING, pb.Build_QUEUED}}
+	got := b.GetStatus()
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("want %#v, got %#v", want, got)
+	}
+}
+
+func TestCancel(t *testing.T) {
+	ctx := context.Background()
+	request := pb.Build{
+		Steps: []*pb.BuildStep{{
+			Name: "gcr.io/step-zero",
+		}, {
+			Name:    "gcr.io/step-one",
+			Args:    []string{"sleep", "30000"}, // mockRunner will sleep this many ms.
+			WaitFor: []string{"-"},
+		}, {
+			Name: "gcr.io/step-two",
+		}},
+	}
+	r := newMockRunner(t, "cancel")
+	r.dockerRunHandler = func([]string, io.Writer, io.Writer) error { return nil }
+	b := New(r, request, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, true, false)
+	fullStatus := b.GetStatus()
+	if fullStatus.BuildStatus != "" {
+		t.Errorf("Build has status before Start(): %v", fullStatus)
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	go b.Start(ctx)
+
+	// Wait for build to get started.
+	const tries = 10
+	const delay = time.Second
+	for i := 0; i < tries; i++ {
+		fullStatus = b.GetStatus()
+		if fullStatus.BuildStatus != "" {
+			cancel()
+			break
+		}
+		time.Sleep(delay)
+	}
+	if fullStatus.BuildStatus == "" {
+		t.Errorf("Build didn't start after %v.", tries*delay)
+	}
+	if got := ctx.Err(); got != context.Canceled {
+		t.Errorf("Context not cancelled: want %q, got %q.", context.Canceled, got)
+	}
+
+	select {
+	case <-b.Done:
+		// Happy case.
+	case <-time.After(time.Second):
+		t.Errorf("b.Start() didn't finish, b.Done never unblocked.")
+	}
+
+	want := FullStatus{BuildStatus: StatusCancelled, StepStatus: []pb.Build_Status{pb.Build_SUCCESS, pb.Build_WORKING, pb.Build_QUEUED}}
+	got := b.GetStatus()
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("want %#v, got %#v", want, got)
 	}
 }
 
 func TestStart(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
 	for _, tc := range []struct {
 		name         string
 		push         bool
-		buildRequest cb.Build
+		buildRequest pb.Build
 		wantCommands []string
 	}{{
 		name: "Build and push",
 		push: true,
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/my-project/my-builder",
 				Args: []string{"a"},
 			}},
@@ -2035,8 +2473,8 @@ func TestStart(t *testing.T) {
 	}, {
 		name: "Build without pushing images",
 		push: false,
-		buildRequest: cb.Build{
-			Steps: []*cb.BuildStep{{
+		buildRequest: pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/my-project/my-builder",
 				Args: []string{"a"},
 			}},
@@ -2057,12 +2495,12 @@ func TestStart(t *testing.T) {
 			r.localImages["gcr.io/build"] = true
 			return nil
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", true, tc.push, false)
-		b.Start()
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, tc.push, false)
+		b.Start(ctx)
 		<-b.Done
 
-		if got, want := b.GetStatus(), StatusDone; got != want {
-			t.Errorf("Unexpected status. got %q, want %q", got, want)
+		if got, want := b.GetStatus().BuildStatus, StatusDone; got != want {
+			t.Errorf("%s: unexpected status. got %q, want %q", tc.name, got, want)
 		}
 
 		got := strings.Join(r.commands, "\n")
@@ -2077,24 +2515,25 @@ func TestStart(t *testing.T) {
 // updating Docker access tokens.
 func TestUpdateDockerAccessToken(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
 	r := newMockRunner(t, "TestUpdateDockerAccessToken")
 	r.dockerRunHandler = func(args []string, _, _ io.Writer) error { return nil }
-	b := New(r, cb.Build{}, nil, nil, nil, "", false, false, false)
+	b := New(r, pb.Build{}, nil, nil, nil, "", afero.NewMemMapFs(), false, false, false)
 
 	// If UpdateDockerAccessToken is called before SetDockerAccessToken, we
 	// should get an error.
-	if err := b.UpdateDockerAccessToken("INVALID"); err == nil {
+	if err := b.UpdateDockerAccessToken(ctx, "INVALID"); err == nil {
 		t.Errorf("Expected error when calling UpdateDockerAccessToken first, got none: %v", err)
 	}
 
-	if err := b.SetDockerAccessToken("FIRST"); err != nil {
+	if err := b.SetDockerAccessToken(ctx, "FIRST"); err != nil {
 		t.Errorf("SetDockerAccessToken: %v", err)
 	}
 	if got, want := b.prevGCRAuth, base64.StdEncoding.EncodeToString([]byte("oauth2accesstoken:FIRST")); got != want {
 		t.Errorf("After SetDockerAccessToken, GCR auth is %q, want %q", got, want)
 	}
 
-	if err := b.UpdateDockerAccessToken("SECOND"); err != nil {
+	if err := b.UpdateDockerAccessToken(ctx, "SECOND"); err != nil {
 		t.Errorf("UpdateDockerAccessToken: %v", err)
 	}
 	if got, want := b.prevGCRAuth, base64.StdEncoding.EncodeToString([]byte("oauth2accesstoken:SECOND")); got != want {
@@ -2137,6 +2576,88 @@ EOF`,
 	}
 }
 
+func TestWorkdir(t *testing.T) {
+	for _, c := range []struct {
+		rsDir, stepDir, want string
+	}{
+		{"", "", "/workspace"},
+		{"", "relstep", "/workspace/relstep"},
+		{"relrs", "relstep", "/workspace/relrs/relstep"},
+		{"", "/absstep", "/absstep"},
+		{"relrs", "/absstep", "/absstep"}, // repoSource.dir is ignored.
+		{"..", "", "/"},
+		{"..", "..", "/"},
+		{"a", "../../", "/"},
+		{"a/b/", "../../", "/workspace"},
+		{"a/b/c", "../../", "/workspace/a"},
+	} {
+		got := workdir(c.rsDir, c.stepDir)
+		if got != c.want {
+			t.Errorf("workdir(%q, %q); got %q, want %q", c.rsDir, c.stepDir, got, c.want)
+		}
+	}
+}
+
+func TestBuildOutput(t *testing.T) {
+	r := newMockRunner(t, "desc")
+	r.dockerRunHandler = func([]string, io.Writer, io.Writer) error { return nil }
+
+	for _, c := range []struct {
+		contents    string // JSON file contents, if omitted no file is written.
+		wantDigests []imageDigest
+	}{{
+		// Single image.
+		contents:    `{"image":"image","digest":"sha256:deadbeef"}`,
+		wantDigests: []imageDigest{{"image", "sha256:deadbeef"}},
+	}, {
+		// Multiple images.
+		contents: `{"image":"image","digest":"sha256:deadbeef"}
+{"image":"image2","digest":"sha256:faceb00kcafe"}`,
+		wantDigests: []imageDigest{{"image", "sha256:deadbeef"}, {"image2", "sha256:faceb00kcafe"}},
+	}, {
+		// Invalid JSON, no outputs but no error.
+		contents:    "utter garbage",
+		wantDigests: nil,
+	}, {
+		// No file, no outputs but no error.
+		contents:    "",
+		wantDigests: nil,
+	}, {
+		// One valid image, then invalid JSON.
+		contents: `{"image":"image","digest":"sha256:deadbeef"}
+utter garbage`,
+		wantDigests: []imageDigest{{"image", "sha256:deadbeef"}},
+	}, {
+		// Invalid JSON stops reading the file.
+		contents: `utter garbage
+{"image":"image","digest":"sha256:deadbeef"}`,
+		wantDigests: nil,
+	}} {
+		fs := afero.NewMemMapFs()
+		b := New(r, commonBuildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", fs, true, false, false)
+		b.enableStepOutputs = true
+
+		if c.contents != "" {
+			tmp := afero.GetTempDir(fs, "")
+			if err := b.fs.MkdirAll(tmp, os.FileMode(os.O_CREATE)); err != nil {
+				t.Errorf("MkDirAll(%q): %v", afero.GetTempDir(fs, ""), err)
+			}
+			p := path.Join(tmp, dockerImageOutputFile)
+			if err := afero.WriteFile(fs, p, []byte(c.contents), os.FileMode(os.O_CREATE)); err != nil {
+				t.Fatalf("WriteFile(%q -> %q): %v", c.contents, p, err)
+			}
+		}
+
+		if err := b.runStep(context.Background(), 0); err != nil {
+			t.Errorf("runStep failed: %v", err)
+		}
+
+		if !reflect.DeepEqual(b.imageDigests, c.wantDigests) {
+			t.Errorf("Collected image digests %v, want %v", b.imageDigests, c.wantDigests)
+		}
+	}
+}
+
 type nopBuildLogger struct{}
 
 func (nopBuildLogger) WriteMainEntry(string)                  { return }
@@ -2145,5 +2666,35 @@ func (nopBuildLogger) MakeWriter(string, int, bool) io.Writer { return ioutil.Di
 
 type nopEventLogger struct{}
 
-func (nopEventLogger) StartStep(context.Context, int) error        { return nil }
-func (nopEventLogger) FinishStep(context.Context, int, bool) error { return nil }
+func (nopEventLogger) StartStep(context.Context, int, time.Time) error        { return nil }
+func (nopEventLogger) FinishStep(context.Context, int, bool, time.Time) error { return nil }
+
+// Test coverage to confirm that we don't have the data race fixed in cl/190142977.
+func TestDataRace(t *testing.T) {
+	build := pb.Build{
+		Steps:  []*pb.BuildStep{{Name: "gcr.io/step-zero", Args: []string{"sleep", "1"}}},
+		Images: []string{"one", "two", "three", "four", "five"},
+	}
+	r := newMockRunner(t, "race")
+	r.dockerRunHandler = func([]string, io.Writer, io.Writer) error { return nil }
+	b := New(r, build, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
+	ctx := context.Background()
+
+	go b.Start(ctx) // updates b.Timing.BuildTotal
+
+	// Set up goroutines to tickle potential race conditions...
+	starter := make(chan struct{})
+	go func() {
+		<-starter
+		b.pushImages(ctx)
+	}()
+	go func() {
+		<-starter
+		// Logging b.Summary() causes its return value to be read, provoking a race
+		// with it being written by b.pushImages().
+		t.Logf("Summary is %v", b.Summary())
+	}()
+
+	close(starter)
+	<-b.Done // Wait for build to complete.
+}

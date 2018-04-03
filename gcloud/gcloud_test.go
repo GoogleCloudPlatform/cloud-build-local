@@ -15,6 +15,7 @@
 package gcloud
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -114,7 +115,7 @@ func startsWith(arr []string, parts ...string) bool {
 	return true
 }
 
-func (r *mockRunner) Run(args []string, in io.Reader, out, err io.Writer, _ string) error {
+func (r *mockRunner) Run(ctx context.Context, args []string, in io.Reader, out, err io.Writer, _ string) error {
 	r.mu.Lock()
 	r.commands = append(r.commands, strings.Join(args, " "))
 	r.mu.Unlock()
@@ -143,9 +144,10 @@ func (r *mockRunner) Clean() error {
 }
 
 func TestAccessToken(t *testing.T) {
+	ctx := context.Background()
 	// Happy case.
 	r := &mockRunner{configHelper: validConfig}
-	token, err := AccessToken(r)
+	token, err := AccessToken(ctx, r)
 	if err != nil {
 		t.Errorf("AccessToken failed: %v", err)
 	}
@@ -191,7 +193,7 @@ func TestAccessToken(t *testing.T) {
 		want: errTokenExpired,
 	}} {
 		r.configHelper = tc.json
-		token, err = AccessToken(r)
+		token, err = AccessToken(ctx, r)
 		if err.Error() != tc.want.Error() {
 			t.Errorf("%s: got %v; want %v", tc.desc, err, tc.want)
 		}
@@ -203,7 +205,8 @@ func TestAccessToken(t *testing.T) {
 
 func TestProjectInfo(t *testing.T) {
 	r := &mockRunner{projectID: projectID}
-	projectInfo, err := ProjectInfo(r)
+	ctx := context.Background()
+	projectInfo, err := ProjectInfo(ctx, r)
 	if err != nil {
 		t.Errorf("ProjectInfo failed: %v", err)
 	}
@@ -224,13 +227,14 @@ func TestProjectInfo(t *testing.T) {
 
 func TestProjectInfoError(t *testing.T) {
 	r := &mockRunner{}
-	_, err := ProjectInfo(r)
+	ctx := context.Background()
+	_, err := ProjectInfo(ctx, r)
 	if err == nil {
 		t.Errorf("ProjectInfo should fail when no projectId set in gcloud")
 	}
 
 	r.projectID = "some-other-project"
-	_, err = ProjectInfo(r)
+	_, err = ProjectInfo(ctx, r)
 	if err == nil {
 		t.Errorf("ProjectInfo should fail when no projectNum available from gcloud")
 	}

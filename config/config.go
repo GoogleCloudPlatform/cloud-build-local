@@ -27,11 +27,11 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	cb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
+	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 )
 
 // Load loads a config file and transforms it to a build proto.
-func Load(path string) (*cb.Build, error) {
+func Load(path string) (*pb.Build, error) {
 	configContent, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to read config file: %v", err)
@@ -76,7 +76,7 @@ func fix(in interface{}) interface{} {
 	}
 }
 
-func unmarshalBuildTemplate(content []byte) (*cb.Build, error) {
+func unmarshalBuildTemplate(content []byte) (*pb.Build, error) {
 	var m map[string]interface{}
 	if err := yaml.Unmarshal(content, &m); err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func unmarshalBuildTemplate(content []byte) (*cb.Build, error) {
 	// This returns an error if the JSON includes unknown fields. The error will
 	// reference the *first* field it finds that isn't in the proto, not an
 	// exhaustive list of all unknown fields.
-	var b cb.Build
+	var b pb.Build
 	if err := jsonpb.Unmarshal(bytes.NewReader(jb), &b); err != nil {
 		if err.Error() == "json: cannot unmarshal string into Go value of type []json.RawMessage" {
 			return &b, errors.New("repeated string fields containing one element must be specified like ['foo'], not 'foo'")

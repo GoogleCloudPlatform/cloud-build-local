@@ -16,6 +16,7 @@
 package volume
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -47,18 +48,18 @@ func New(name string, r runner.Runner) *Volume {
 
 // Setup creates a docker volume and a helper container that can be used to
 // copy data to the volume.
-func (v *Volume) Setup() error {
+func (v *Volume) Setup(ctx context.Context) error {
 	cmd := []string{"docker", "volume", "create", "--name", v.name}
-	return v.runner.Run(cmd, nil, nil, nil, "")
+	return v.runner.Run(ctx, cmd, nil, nil, nil, "")
 }
 
-func (v *Volume) getHelperContainer() (string, error) {
+func (v *Volume) getHelperContainer(ctx context.Context) (string, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if !v.createdHelper {
 		volume := fmt.Sprintf("%s:%s", v.name, workspaceDir)
 		cmd := []string{"docker", "run", "-v", volume, "--name", v.helper, "busybox"}
-		if err := v.runner.Run(cmd, nil, nil, nil, ""); err != nil {
+		if err := v.runner.Run(ctx, cmd, nil, nil, nil, ""); err != nil {
 			return "", err
 		}
 		v.createdHelper = true
@@ -67,48 +68,48 @@ func (v *Volume) getHelperContainer() (string, error) {
 }
 
 // Copy copies files from a directory dir to the docker volume.
-func (v *Volume) Copy(dir string) error {
-	helper, err := v.getHelperContainer()
+func (v *Volume) Copy(ctx context.Context, dir string) error {
+	helper, err := v.getHelperContainer(ctx)
 	if err != nil {
 		return err
 	}
 
 	helperVol := fmt.Sprintf("%s:%s", helper, workspaceDir)
 	cmd := []string{"docker", "cp", dir, helperVol}
-	return v.runner.Run(cmd, nil, nil, nil, "")
+	return v.runner.Run(ctx, cmd, nil, nil, nil, "")
 }
 
 // Export copies files from a the docker volume to a directory.
-func (v *Volume) Export(dir string) error {
-	helper, err := v.getHelperContainer()
+func (v *Volume) Export(ctx context.Context, dir string) error {
+	helper, err := v.getHelperContainer(ctx)
 	if err != nil {
 		return err
 	}
 
 	helperVol := fmt.Sprintf("%s:%s", helper, workspaceDir)
 	cmd := []string{"docker", "cp", helperVol, dir}
-	return v.runner.Run(cmd, nil, nil, nil, "")
+	return v.runner.Run(ctx, cmd, nil, nil, nil, "")
 }
 
 // Close cleans up the helper container and the docker volume.
-func (v *Volume) Close() error {
+func (v *Volume) Close(ctx context.Context) error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
 	if v.createdHelper {
-		if err := v.deleteHelper(); err != nil {
+		if err := v.deleteHelper(ctx); err != nil {
 			return err
 		}
 	}
-	return v.deleteVolume()
+	return v.deleteVolume(ctx)
 }
 
-func (v *Volume) deleteHelper() error {
+func (v *Volume) deleteHelper(ctx context.Context) error {
 	cmd := []string{"docker", "rm", v.helper}
-	return v.runner.Run(cmd, nil, nil, nil, "")
+	return v.runner.Run(ctx, cmd, nil, nil, nil, "")
 }
 
-func (v *Volume) deleteVolume() error {
+func (v *Volume) deleteVolume(ctx context.Context) error {
 	cmd := []string{"docker", "volume", "rm", v.name}
-	return v.runner.Run(cmd, nil, nil, nil, "")
+	return v.runner.Run(ctx, cmd, nil, nil, nil, "")
 }

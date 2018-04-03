@@ -24,7 +24,8 @@ import (
 	"strings"
 	"time"
 
-	cb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
+	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
+	"github.com/golang/protobuf/ptypes"
 	"github.com/GoogleCloudPlatform/container-builder-local/subst"
 	"github.com/docker/distribution/reference"
 )
@@ -32,6 +33,8 @@ import (
 const (
 	// StartStep is a build step WaitFor dependency that is always satisfied.
 	StartStep = "-"
+	// MaxTimeout is the maximum allowable timeout for a build or build step.
+	MaxTimeout = 24 * time.Hour
 
 	maxNumSteps       = 100  // max number of steps.
 	maxStepNameLength = 1000 // max length of step name.
@@ -44,11 +47,11 @@ const (
 	maxNumImages = 100  // max number of images.
 	// MaxImageLength is the max length of image value. Used in other packages.
 	MaxImageLength      = 1000
-	maxNumSubstitutions = 100   // max number of user-defined substitutions.
-	maxSubstKeyLength   = 100   // max length of a substitution key.
-	maxSubstValueLength = 4000  // max length of a substitution value.
-	maxNumSecretEnvs    = 100   // max number of unique secret env values.
-	maxTimeoutSeconds   = 86400 // max timeout in seconds
+	maxNumSubstitutions = 100  // max number of user-defined substitutions.
+	maxSubstKeyLength   = 100  // max length of a substitution key.
+	maxSubstValueLength = 4000 // max length of a substitution value.
+	maxNumSecretEnvs    = 100  // max number of unique secret env values.
+	maxArtifactsPaths   = 100  // max number of artifacts paths that can be specified.
 
 	// Name of the permission required to use a key to decrypt data.
 	// Documented at https://cloud.google.com/kms/docs/reference/permissions-and-roles
@@ -89,13 +92,23 @@ var (
 
 // CheckBuild returns no error if build is valid,
 // otherwise a descriptive canonical error.
-func CheckBuild(b *cb.Build) error {
+func CheckBuild(b *pb.Build) error {
 	if b == nil {
 		return errors.New("no build field was provided")
 	}
 
-	if b.Timeout != nil && b.Timeout.Seconds > maxTimeoutSeconds {
-		return fmt.Errorf("timeout exceeds the timeout limit of %v", maxTimeoutSeconds*time.Second)
+	var buildTimeout time.Duration
+	if b.Timeout != nil {
+		var err error
+		if buildTimeout, err = ptypes.Duration(b.Timeout); err != nil {
+			return fmt.Errorf("invalid timeout value: %v", err)
+		}
+		if buildTimeout > MaxTimeout {
+			return fmt.Errorf("timeout exceeds the timeout limit of %v", MaxTimeout)
+		}
+		if buildTimeout < 0 {
+			return errors.New("invalid timeout: timeout must be >=0")
+		}
 	}
 
 	if err := CheckSubstitutionsLoose(b.Substitutions); err != nil {
@@ -106,7 +119,7 @@ func CheckBuild(b *cb.Build) error {
 		return fmt.Errorf("invalid .artifacts field: %v", err)
 	}
 
-	if err := CheckBuildSteps(b.Steps); err != nil {
+	if err := CheckBuildSteps(b.Steps, buildTimeout); err != nil {
 		return fmt.Errorf("invalid .steps field: %v", err)
 	}
 
@@ -115,7 +128,7 @@ func CheckBuild(b *cb.Build) error {
 	} else if len(missingSubs) > 0 {
 		// If the user doesn't specifically allow loose substitutions, the warnings
 		// are returned as an error.
-		if b.GetOptions().GetSubstitutionOption() != cb.BuildOptions_ALLOW_LOOSE {
+		if b.GetOptions().GetSubstitutionOption() != pb.BuildOptions_ALLOW_LOOSE {
 			return fmt.Errorf(strings.Join(missingSubs, ";"))
 		}
 	}
@@ -128,7 +141,7 @@ func CheckBuild(b *cb.Build) error {
 
 // CheckBuildAfterSubstitutions returns no error if build is valid,
 // otherwise a descriptive canonical error.
-func CheckBuildAfterSubstitutions(b *cb.Build) error {
+func CheckBuildAfterSubstitutions(b *pb.Build) error {
 	if err := checkBuildStepNames(b.Steps); err != nil {
 		return err
 	}
@@ -189,7 +202,7 @@ func CheckSubstitutionsLoose(substitutions map[string]string) error {
 // CheckSubstitutionTemplate checks that all the substitution variables are used
 // and all the variables found in the template are used too. It may returns an
 // error and a list of string warnings.
-func CheckSubstitutionTemplate(images, tags []string, steps []*cb.BuildStep, substitutions map[string]string) ([]string, error) {
+func CheckSubstitutionTemplate(images, tags []string, steps []*pb.BuildStep, substitutions map[string]string) ([]string, error) {
 	warnings := []string{}
 
 	// substitutionsUsed is used to check that all the substitution variables
@@ -261,13 +274,13 @@ func CheckSubstitutionTemplate(images, tags []string, steps []*cb.BuildStep, sub
 
 // CheckArtifacts checks the number of images, and images' length are under
 // limits. Also copies top-level images to the .artifacts.images sub-field.
-func CheckArtifacts(b *cb.Build) error {
+func CheckArtifacts(b *pb.Build) error {
 	if len(b.Images) > 0 {
 		if len(b.GetArtifacts().GetImages()) > 0 && !reflect.DeepEqual(b.GetArtifacts().GetImages(), b.Images) {
 			return errors.New("cannot specify different .images and .artifacts.images")
 		}
 		if b.Artifacts == nil {
-			b.Artifacts = &cb.Artifacts{}
+			b.Artifacts = &pb.Artifacts{}
 		}
 		// Copy .images to .artifacts.images.
 		b.Artifacts.Images = b.Images
@@ -283,8 +296,41 @@ func CheckArtifacts(b *cb.Build) error {
 		}
 	}
 
+	// Validate .artifacts.objects.
+	if b.Artifacts != nil && b.Artifacts.Objects != nil {
+		gcsURL := b.Artifacts.Objects.Location
+		if len(gcsURL) == 0 {
+			return errors.New(".artifacts.location field is empty")
+		}
+		if !strings.HasPrefix(gcsURL, "gs://") {
+			return fmt.Errorf("invalid .artifacts.location value %q; Google Cloud Storage URLs must begin with 'gs://'", gcsURL)
+		}
+		if !strings.HasSuffix(gcsURL, "/") {
+			// Suffixing the destination bucket URL with a "/" guarantees that the URL will be treated as a directory.
+			// For details, see https://cloud.google.com/storage/docs/gsutil/addlhelp/HowSubdirectoriesWork.
+			b.Artifacts.Objects.Location = gcsURL + "/"
+		}
+
+		if len(b.Artifacts.Objects.Paths) == 0 {
+			return errors.New(".artifacts.paths field empty")
+		}
+		if numPaths := len(b.Artifacts.Objects.Paths); numPaths > maxArtifactsPaths {
+			return fmt.Errorf(".artifacts.paths field has length %d, but cannot specify more than %d", numPaths, maxArtifactsPaths)
+		}
+		pathExists := map[string]bool{}
+		duplicates := []string{}
+		for _, p := range b.Artifacts.Objects.Paths {
+			if _, ok := pathExists[p]; ok {
+				duplicates = append(duplicates, p)
+			}
+			pathExists[p] = true
+		}
+		if len(duplicates) > 0 {
+			return fmt.Errorf(".artifacts.paths field has duplicate paths; remove duplicates [%s]", strings.Join(duplicates, ", "))
+		}
+	}
+
 	
-	// clients rely only on .artifacts.images.
 	if len(b.GetArtifacts().GetImages()) > 0 {
 		b.Images = b.GetArtifacts().GetImages()
 	}
@@ -293,7 +339,10 @@ func CheckArtifacts(b *cb.Build) error {
 }
 
 // CheckBuildSteps checks the number of steps, and their content.
-func CheckBuildSteps(steps []*cb.BuildStep) error {
+func CheckBuildSteps(steps []*pb.BuildStep, buildTimeout time.Duration) error {
+	if buildTimeout == 0 {
+		buildTimeout = MaxTimeout
+	}
 	// Check that steps are provided and valid.
 	if len(steps) == 0 {
 		return errors.New("no build steps are specified")
@@ -336,13 +385,6 @@ func CheckBuildSteps(steps []*cb.BuildStep) error {
 
 		if len(s.Dir) > maxDirLength {
 			return fmt.Errorf("build step %d dir too long (max: %d)", i, maxDirLength)
-		}
-		d := path.Clean(s.Dir)
-		if path.IsAbs(d) {
-			return errors.New("dir must be a relative path")
-		}
-		if strings.HasPrefix(d, "..") {
-			return errors.New("dir cannot refer to the parent directory")
 		}
 		for _, dependency := range s.WaitFor {
 			if ok := knownSteps[dependency]; !ok {
@@ -404,6 +446,18 @@ func CheckBuildSteps(steps []*cb.BuildStep) error {
 			stepPaths[p] = true
 			volumesUsed[volName]++
 		}
+
+		if s.Timeout != nil {
+			if timeout, err := ptypes.Duration(s.Timeout); err != nil {
+				return fmt.Errorf("invalid .timeout in build step #%d: %v", i, err)
+			} else if timeout > MaxTimeout {
+				return fmt.Errorf("invalid .timeout in build step #%d: build step timeout %v exceeds the timeout limit of %v", i, timeout, MaxTimeout)
+			} else if timeout > buildTimeout {
+				return fmt.Errorf("invalid .timeout in build step #%d: build step timeout %v must be <= build timeout %v", i, timeout, buildTimeout)
+			} else if timeout < 0 {
+				return fmt.Errorf("invalid .timeout in build step #%d: build step timeout must be >0", i)
+			}
+		}
 	}
 
 	// Check that all volumes are referenced by at least two steps.
@@ -416,7 +470,7 @@ func CheckBuildSteps(steps []*cb.BuildStep) error {
 	return nil
 }
 
-func checkSecrets(b *cb.Build) error {
+func checkSecrets(b *pb.Build) error {
 	// Collect set of all used secret_envs. Also make sure a step doesn't use the
 	// same secret_env twice.
 	usedSecretEnvs := map[string]struct{}{}
@@ -509,11 +563,11 @@ func checkImageTags(imageTags []string) error {
 }
 
 // checkBuildStepNames validates the build step names.
-func checkBuildStepNames(steps []*cb.BuildStep) error {
+func checkBuildStepNames(steps []*pb.BuildStep) error {
 	for _, step := range steps {
 		name := step.Name
 		if !validImageTagRE.MatchString(name) {
-			return fmt.Errorf("invalid build step name %q: must match format %q", name, validImageTagRE)
+			return fmt.Errorf("invalid build step name %q", name)
 		}
 	}
 	return nil
@@ -523,7 +577,7 @@ func checkBuildStepNames(steps []*cb.BuildStep) error {
 func checkImageNames(images []string) error {
 	for _, image := range images {
 		if !validImageTagRE.MatchString(image) {
-			return fmt.Errorf("invalid image %q: must match format %q", image, validImageTagRE)
+			return fmt.Errorf("invalid image %q", image)
 		}
 	}
 	return nil
