@@ -604,6 +604,10 @@ type DatasetListDatasets struct {
 	// organize and group your datasets.
 	Labels map[string]string `json:"labels,omitempty"`
 
+	// Location: [Experimental] The geographic location where the data
+	// resides.
+	Location string `json:"location,omitempty"`
+
 	// ForceSendFields is a list of field names (e.g. "DatasetReference") to
 	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
@@ -656,6 +660,42 @@ type DatasetReference struct {
 
 func (s *DatasetReference) MarshalJSON() ([]byte, error) {
 	type NoMethod DatasetReference
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+type DestinationTableProperties struct {
+	// Description: [Optional] The description for the destination table.
+	// This will only be used if the destination table is newly created. If
+	// the table already exists and a value different than the current
+	// description is provided, the job will fail.
+	Description string `json:"description,omitempty"`
+
+	// FriendlyName: [Optional] The friendly name for the destination table.
+	// This will only be used if the destination table is newly created. If
+	// the table already exists and a value different than the current
+	// friendly name is provided, the job will fail.
+	FriendlyName string `json:"friendlyName,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Description") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Description") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *DestinationTableProperties) MarshalJSON() ([]byte, error) {
+	type NoMethod DestinationTableProperties
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -728,6 +768,9 @@ func (s *ErrorProto) MarshalJSON() ([]byte, error) {
 }
 
 type ExplainQueryStage struct {
+	// CompletedParallelInputs: Number of parallel input segments completed.
+	CompletedParallelInputs int64 `json:"completedParallelInputs,omitempty,string"`
+
 	// ComputeMsAvg: Milliseconds the average shard spent on CPU-bound
 	// tasks.
 	ComputeMsAvg int64 `json:"computeMsAvg,omitempty,string"`
@@ -744,11 +787,20 @@ type ExplainQueryStage struct {
 	// CPU-bound tasks.
 	ComputeRatioMax float64 `json:"computeRatioMax,omitempty"`
 
+	// EndMs: Stage end time in milliseconds.
+	EndMs int64 `json:"endMs,omitempty,string"`
+
 	// Id: Unique ID for stage within plan.
 	Id int64 `json:"id,omitempty,string"`
 
+	// InputStages: IDs for stages that are inputs to this stage.
+	InputStages googleapi.Int64s `json:"inputStages,omitempty"`
+
 	// Name: Human-readable name for stage.
 	Name string `json:"name,omitempty"`
+
+	// ParallelInputs: Number of parallel input segments to be processed.
+	ParallelInputs int64 `json:"parallelInputs,omitempty,string"`
 
 	// ReadMsAvg: Milliseconds the average shard spent reading input.
 	ReadMsAvg int64 `json:"readMsAvg,omitempty,string"`
@@ -776,6 +828,9 @@ type ExplainQueryStage struct {
 	// ShuffleOutputBytesSpilled: Total number of bytes written to shuffle
 	// and spilled to disk.
 	ShuffleOutputBytesSpilled int64 `json:"shuffleOutputBytesSpilled,omitempty,string"`
+
+	// StartMs: Stage start time in milliseconds.
+	StartMs int64 `json:"startMs,omitempty,string"`
 
 	// Status: Current status for the stage.
 	Status string `json:"status,omitempty"`
@@ -814,20 +869,22 @@ type ExplainQueryStage struct {
 	// writing output.
 	WriteRatioMax float64 `json:"writeRatioMax,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "ComputeMsAvg") to
-	// unconditionally include in API requests. By default, fields with
-	// empty values are omitted from API requests. However, any non-pointer,
-	// non-interface field appearing in ForceSendFields will be sent to the
-	// server regardless of whether the field is empty or not. This may be
-	// used to include empty fields in Patch requests.
+	// ForceSendFields is a list of field names (e.g.
+	// "CompletedParallelInputs") to unconditionally include in API
+	// requests. By default, fields with empty values are omitted from API
+	// requests. However, any non-pointer, non-interface field appearing in
+	// ForceSendFields will be sent to the server regardless of whether the
+	// field is empty or not. This may be used to include empty fields in
+	// Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "ComputeMsAvg") to include
-	// in API requests with the JSON null value. By default, fields with
-	// empty values are omitted from API requests. However, any field with
-	// an empty value appearing in NullFields will be sent to the server as
-	// null. It is an error if a field in this list has a non-empty value.
-	// This may be used to include null fields in Patch requests.
+	// NullFields is a list of field names (e.g. "CompletedParallelInputs")
+	// to include in API requests with the JSON null value. By default,
+	// fields with empty values are omitted from API requests. However, any
+	// field with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
 	NullFields []string `json:"-"`
 }
 
@@ -1248,11 +1305,15 @@ type JobConfiguration struct {
 	// Extract: [Pick one] Configures an extract job.
 	Extract *JobConfigurationExtract `json:"extract,omitempty"`
 
-	// Labels: [Experimental] The labels associated with this job. You can
-	// use these to organize and group your jobs. Label keys and values can
-	// be no longer than 63 characters, can only contain lowercase letters,
-	// numeric characters, underscores and dashes. International characters
-	// are allowed. Label values are optional. Label keys must start with a
+	// JobTimeoutMs: [Optional] Job timeout in milliseconds. If this time
+	// limit is exceeded, BigQuery may attempt to terminate the job.
+	JobTimeoutMs int64 `json:"jobTimeoutMs,omitempty,string"`
+
+	// Labels: The labels associated with this job. You can use these to
+	// organize and group your jobs. Label keys and values can be no longer
+	// than 63 characters, can only contain lowercase letters, numeric
+	// characters, underscores and dashes. International characters are
+	// allowed. Label values are optional. Label keys must start with a
 	// letter and each label in the list must have a different key.
 	Labels map[string]string `json:"labels,omitempty"`
 
@@ -1287,8 +1348,9 @@ func (s *JobConfiguration) MarshalJSON() ([]byte, error) {
 
 type JobConfigurationExtract struct {
 	// Compression: [Optional] The compression type to use for exported
-	// files. Possible values include GZIP and NONE. The default value is
-	// NONE.
+	// files. Possible values include GZIP, DEFLATE, SNAPPY, and NONE. The
+	// default value is NONE. DEFLATE and SNAPPY are only supported for
+	// Avro.
 	Compression string `json:"compression,omitempty"`
 
 	// DestinationFormat: [Optional] The exported file format. Possible
@@ -1369,13 +1431,17 @@ type JobConfigurationLoad struct {
 	// one atomic update upon job completion.
 	CreateDisposition string `json:"createDisposition,omitempty"`
 
-	// DestinationEncryptionConfiguration: [Experimental] Custom encryption
-	// configuration (e.g., Cloud KMS keys).
+	// DestinationEncryptionConfiguration: Custom encryption configuration
+	// (e.g., Cloud KMS keys).
 	DestinationEncryptionConfiguration *EncryptionConfiguration `json:"destinationEncryptionConfiguration,omitempty"`
 
 	// DestinationTable: [Required] The destination table to load the data
 	// into.
 	DestinationTable *TableReference `json:"destinationTable,omitempty"`
+
+	// DestinationTableProperties: [Experimental] [Optional] Properties with
+	// which to create the destination table if it is new.
+	DestinationTableProperties *DestinationTableProperties `json:"destinationTableProperties,omitempty"`
 
 	// Encoding: [Optional] The character encoding of the data. The
 	// supported values are UTF-8 or ISO-8859-1. The default value is UTF-8.
@@ -1472,7 +1538,8 @@ type JobConfigurationLoad struct {
 	// SourceFormat: [Optional] The format of the data files. For CSV files,
 	// specify "CSV". For datastore backups, specify "DATASTORE_BACKUP". For
 	// newline-delimited JSON, specify "NEWLINE_DELIMITED_JSON". For Avro,
-	// specify "AVRO". The default value is CSV.
+	// specify "AVRO". For parquet, specify "PARQUET". For orc, specify
+	// "ORC". The default value is CSV.
 	SourceFormat string `json:"sourceFormat,omitempty"`
 
 	// SourceUris: [Required] The fully-qualified URIs that point to your
@@ -1548,8 +1615,8 @@ type JobConfigurationQuery struct {
 	// unqualified table names in the query.
 	DefaultDataset *DatasetReference `json:"defaultDataset,omitempty"`
 
-	// DestinationEncryptionConfiguration: [Experimental] Custom encryption
-	// configuration (e.g., Cloud KMS keys).
+	// DestinationEncryptionConfiguration: Custom encryption configuration
+	// (e.g., Cloud KMS keys).
 	DestinationEncryptionConfiguration *EncryptionConfiguration `json:"destinationEncryptionConfiguration,omitempty"`
 
 	// DestinationTable: [Optional] Describes the table where the query
@@ -1689,8 +1756,8 @@ type JobConfigurationTableCopy struct {
 	// one atomic update upon job completion.
 	CreateDisposition string `json:"createDisposition,omitempty"`
 
-	// DestinationEncryptionConfiguration: [Experimental] Custom encryption
-	// configuration (e.g., Cloud KMS keys).
+	// DestinationEncryptionConfiguration: Custom encryption configuration
+	// (e.g., Cloud KMS keys).
 	DestinationEncryptionConfiguration *EncryptionConfiguration `json:"destinationEncryptionConfiguration,omitempty"`
 
 	// DestinationTable: [Required] The destination table
@@ -1840,6 +1907,10 @@ type JobReference struct {
 	// maximum length is 1,024 characters.
 	JobId string `json:"jobId,omitempty"`
 
+	// Location: [Experimental] The geographic location of the job. Required
+	// except for US and EU.
+	Location string `json:"location,omitempty"`
+
 	// ProjectId: [Required] The ID of the project containing this job.
 	ProjectId string `json:"projectId,omitempty"`
 
@@ -1867,6 +1938,10 @@ func (s *JobReference) MarshalJSON() ([]byte, error) {
 }
 
 type JobStatistics struct {
+	// CompletionRatio: [Experimental] [Output-only] Job progress (0.0 ->
+	// 1.0) for LOAD and EXTRACT jobs.
+	CompletionRatio float64 `json:"completionRatio,omitempty"`
+
 	// CreationTime: [Output-only] Creation time of this job, in
 	// milliseconds since the epoch. This field will be present on all jobs.
 	CreationTime int64 `json:"creationTime,omitempty,string"`
@@ -1894,7 +1969,7 @@ type JobStatistics struct {
 	// processed in the query statistics instead.
 	TotalBytesProcessed int64 `json:"totalBytesProcessed,omitempty,string"`
 
-	// ForceSendFields is a list of field names (e.g. "CreationTime") to
+	// ForceSendFields is a list of field names (e.g. "CompletionRatio") to
 	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
 	// non-interface field appearing in ForceSendFields will be sent to the
@@ -1902,12 +1977,13 @@ type JobStatistics struct {
 	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "CreationTime") to include
-	// in API requests with the JSON null value. By default, fields with
-	// empty values are omitted from API requests. However, any field with
-	// an empty value appearing in NullFields will be sent to the server as
-	// null. It is an error if a field in this list has a non-empty value.
-	// This may be used to include null fields in Patch requests.
+	// NullFields is a list of field names (e.g. "CompletionRatio") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
 	NullFields []string `json:"-"`
 }
 
@@ -1915,6 +1991,20 @@ func (s *JobStatistics) MarshalJSON() ([]byte, error) {
 	type NoMethod JobStatistics
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+func (s *JobStatistics) UnmarshalJSON(data []byte) error {
+	type NoMethod JobStatistics
+	var s1 struct {
+		CompletionRatio gensupport.JSONFloat64 `json:"completionRatio"`
+		*NoMethod
+	}
+	s1.NoMethod = (*NoMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.CompletionRatio = float64(s1.CompletionRatio)
+	return nil
 }
 
 type JobStatistics2 struct {
@@ -1940,6 +2030,10 @@ type JobStatistics2 struct {
 	// Present only for CREATE/DROP TABLE/VIEW queries.
 	DdlTargetTable *TableReference `json:"ddlTargetTable,omitempty"`
 
+	// EstimatedBytesProcessed: [Output-only] The original estimate of bytes
+	// processed for the job.
+	EstimatedBytesProcessed int64 `json:"estimatedBytesProcessed,omitempty,string"`
+
 	// NumDmlAffectedRows: [Output-only] The number of rows affected by a
 	// DML statement. Present only for DML statements INSERT, UPDATE or
 	// DELETE.
@@ -1948,24 +2042,35 @@ type JobStatistics2 struct {
 	// QueryPlan: [Output-only] Describes execution plan for the query.
 	QueryPlan []*ExplainQueryStage `json:"queryPlan,omitempty"`
 
-	// ReferencedTables: [Output-only, Experimental] Referenced tables for
-	// the job. Queries that reference more than 50 tables will not have a
-	// complete list.
+	// ReferencedTables: [Output-only] Referenced tables for the job.
+	// Queries that reference more than 50 tables will not have a complete
+	// list.
 	ReferencedTables []*TableReference `json:"referencedTables,omitempty"`
 
-	// Schema: [Output-only, Experimental] The schema of the results.
-	// Present only for successful dry run of non-legacy SQL queries.
+	// Schema: [Output-only] The schema of the results. Present only for
+	// successful dry run of non-legacy SQL queries.
 	Schema *TableSchema `json:"schema,omitempty"`
 
 	// StatementType: [Output-only, Experimental] The type of query
-	// statement, if valid.
+	// statement, if valid. Possible values (new values might be added in
+	// the future): "SELECT": SELECT query. "INSERT": INSERT query; see
+	// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-manipulation-language "UPDATE": UPDATE query; see https://cloud.google.com/bigquery/docs/reference/standard-sql/data-manipulation-language "DELETE": DELETE query; see https://cloud.google.com/bigquery/docs/reference/standard-sql/data-manipulation-language "CREATE_TABLE": CREATE [OR REPLACE] TABLE without AS SELECT. "CREATE_TABLE_AS_SELECT": CREATE [OR REPLACE] TABLE ... AS SELECT ... "DROP_TABLE": DROP TABLE query. "CREATE_VIEW": CREATE [OR REPLACE] VIEW ... AS SELECT ... "DROP_VIEW": DROP VIEW
+	// query.
 	StatementType string `json:"statementType,omitempty"`
+
+	// Timeline: [Output-only] [Experimental] Describes a timeline of job
+	// execution.
+	Timeline []*QueryTimelineSample `json:"timeline,omitempty"`
 
 	// TotalBytesBilled: [Output-only] Total bytes billed for the job.
 	TotalBytesBilled int64 `json:"totalBytesBilled,omitempty,string"`
 
 	// TotalBytesProcessed: [Output-only] Total bytes processed for the job.
 	TotalBytesProcessed int64 `json:"totalBytesProcessed,omitempty,string"`
+
+	// TotalPartitionsProcessed: [Output-only] Total number of partitions
+	// processed from all partitioned tables referenced in the job.
+	TotalPartitionsProcessed int64 `json:"totalPartitionsProcessed,omitempty,string"`
 
 	// TotalSlotMs: [Output-only] Slot-milliseconds for the job.
 	TotalSlotMs int64 `json:"totalSlotMs,omitempty,string"`
@@ -2378,6 +2483,10 @@ type QueryRequest struct {
 	// Kind: The resource type of the request.
 	Kind string `json:"kind,omitempty"`
 
+	// Location: [Experimental] The geographic location where the job should
+	// run. Required except for US and EU.
+	Location string `json:"location,omitempty"`
+
 	// MaxResults: [Optional] The maximum number of rows of data to return
 	// per page of results. Setting this flag to a small value such as 1000
 	// and then paging through results might improve reliability when the
@@ -2532,6 +2641,48 @@ func (s *QueryResponse) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+type QueryTimelineSample struct {
+	// ActiveUnits: Total number of units currently being processed by
+	// workers. This does not correspond directly to slot usage. This is the
+	// largest value observed since the last sample.
+	ActiveUnits int64 `json:"activeUnits,omitempty,string"`
+
+	// CompletedUnits: Total parallel units of work completed by this query.
+	CompletedUnits int64 `json:"completedUnits,omitempty,string"`
+
+	// ElapsedMs: Milliseconds elapsed since the start of query execution.
+	ElapsedMs int64 `json:"elapsedMs,omitempty,string"`
+
+	// PendingUnits: Total parallel units of work remaining for the active
+	// stages.
+	PendingUnits int64 `json:"pendingUnits,omitempty,string"`
+
+	// TotalSlotMs: Cumulative slot-ms consumed by the query.
+	TotalSlotMs int64 `json:"totalSlotMs,omitempty,string"`
+
+	// ForceSendFields is a list of field names (e.g. "ActiveUnits") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "ActiveUnits") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *QueryTimelineSample) MarshalJSON() ([]byte, error) {
+	type NoMethod QueryTimelineSample
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 type Streamingbuffer struct {
 	// EstimatedBytes: [Output-only] A lower-bound estimate of the number of
 	// bytes currently in the streaming buffer.
@@ -2578,8 +2729,8 @@ type Table struct {
 	// Description: [Optional] A user-friendly description of this table.
 	Description string `json:"description,omitempty"`
 
-	// EncryptionConfiguration: [Experimental] Custom encryption
-	// configuration (e.g., Cloud KMS keys).
+	// EncryptionConfiguration: Custom encryption configuration (e.g., Cloud
+	// KMS keys).
 	EncryptionConfiguration *EncryptionConfiguration `json:"encryptionConfiguration,omitempty"`
 
 	// Etag: [Output-only] A hash of this resource.
@@ -2588,7 +2739,9 @@ type Table struct {
 	// ExpirationTime: [Optional] The time when this table expires, in
 	// milliseconds since the epoch. If not present, the table will persist
 	// indefinitely. Expired tables will be deleted and their storage
-	// reclaimed.
+	// reclaimed. The defaultTableExpirationMs property of the encapsulating
+	// dataset can be used to set a default expirationTime on newly created
+	// tables.
 	ExpirationTime int64 `json:"expirationTime,omitempty,string"`
 
 	// ExternalDataConfiguration: [Optional] Describes the data format,
@@ -2606,13 +2759,12 @@ type Table struct {
 	// Kind: [Output-only] The type of the resource.
 	Kind string `json:"kind,omitempty"`
 
-	// Labels: [Experimental] The labels associated with this table. You can
-	// use these to organize and group your tables. Label keys and values
-	// can be no longer than 63 characters, can only contain lowercase
-	// letters, numeric characters, underscores and dashes. International
-	// characters are allowed. Label values are optional. Label keys must
-	// start with a letter and each label in the list must have a different
-	// key.
+	// Labels: The labels associated with this table. You can use these to
+	// organize and group your tables. Label keys and values can be no
+	// longer than 63 characters, can only contain lowercase letters,
+	// numeric characters, underscores and dashes. International characters
+	// are allowed. Label values are optional. Label keys must start with a
+	// letter and each label in the list must have a different key.
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// LastModifiedTime: [Output-only] The time when this table was last
@@ -3023,8 +3175,8 @@ type TableListTables struct {
 	// Kind: The resource type.
 	Kind string `json:"kind,omitempty"`
 
-	// Labels: [Experimental] The labels associated with this table. You can
-	// use these to organize and group your tables.
+	// Labels: The labels associated with this table. You can use these to
+	// organize and group your tables.
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// TableReference: A reference uniquely identifying the table.
@@ -3191,6 +3343,11 @@ type TimePartitioning struct {
 	// by this field. The field must be a top-level TIMESTAMP or DATE field.
 	// Its mode must be NULLABLE or REQUIRED.
 	Field string `json:"field,omitempty"`
+
+	// RequirePartitionFilter: [Experimental] [Optional] If set to true,
+	// queries over this table require a partition filter that can be used
+	// for partition elimination to be specified.
+	RequirePartitionFilter bool `json:"requirePartitionFilter,omitempty"`
 
 	// Type: [Required] The only type supported is DAY, which will generate
 	// one partition per day.
@@ -4224,6 +4381,13 @@ func (r *JobsService) Cancel(projectId string, jobId string) *JobsCancelCall {
 	return c
 }
 
+// Location sets the optional parameter "location": [Experimental] The
+// geographic location of the job. Required except for US and EU.
+func (c *JobsCancelCall) Location(location string) *JobsCancelCall {
+	c.urlParams_.Set("location", location)
+	return c
+}
+
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -4320,6 +4484,11 @@ func (c *JobsCancelCall) Do(opts ...googleapi.CallOption) (*JobCancelResponse, e
 	//       "required": true,
 	//       "type": "string"
 	//     },
+	//     "location": {
+	//       "description": "[Experimental] The geographic location of the job. Required except for US and EU.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
 	//     "projectId": {
 	//       "description": "[Required] Project ID of the job to cancel",
 	//       "location": "path",
@@ -4358,6 +4527,13 @@ func (r *JobsService) Get(projectId string, jobId string) *JobsGetCall {
 	c := &JobsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.projectId = projectId
 	c.jobId = jobId
+	return c
+}
+
+// Location sets the optional parameter "location": [Experimental] The
+// geographic location of the job. Required except for US and EU.
+func (c *JobsGetCall) Location(location string) *JobsGetCall {
+	c.urlParams_.Set("location", location)
 	return c
 }
 
@@ -4470,6 +4646,11 @@ func (c *JobsGetCall) Do(opts ...googleapi.CallOption) (*Job, error) {
 	//       "required": true,
 	//       "type": "string"
 	//     },
+	//     "location": {
+	//       "description": "[Experimental] The geographic location of the job. Required except for US and EU.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
 	//     "projectId": {
 	//       "description": "[Required] Project ID of the requested job",
 	//       "location": "path",
@@ -4507,6 +4688,14 @@ func (r *JobsService) GetQueryResults(projectId string, jobId string) *JobsGetQu
 	c := &JobsGetQueryResultsCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.projectId = projectId
 	c.jobId = jobId
+	return c
+}
+
+// Location sets the optional parameter "location": [Experimental] The
+// geographic location where the job should run. Required except for US
+// and EU.
+func (c *JobsGetQueryResultsCall) Location(location string) *JobsGetQueryResultsCall {
+	c.urlParams_.Set("location", location)
 	return c
 }
 
@@ -4647,6 +4836,11 @@ func (c *JobsGetQueryResultsCall) Do(opts ...googleapi.CallOption) (*GetQueryRes
 	//       "description": "[Required] Job ID of the query job",
 	//       "location": "path",
 	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "location": {
+	//       "description": "[Experimental] The geographic location where the job should run. Required except for US and EU.",
+	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "maxResults": {
@@ -4820,11 +5014,12 @@ func (c *JobsInsertCall) doRequest(alt string) (*http.Response, error) {
 		body = new(bytes.Buffer)
 		reqHeaders.Set("Content-Type", "application/json")
 	}
-	body, cleanup := c.mediaInfo_.UploadRequest(reqHeaders, body)
+	body, getBody, cleanup := c.mediaInfo_.UploadRequest(reqHeaders, body)
 	defer cleanup()
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
 	req.Header = reqHeaders
+	gensupport.SetGetBody(req, getBody)
 	googleapi.Expand(req.URL, map[string]string{
 		"projectId": c.projectId,
 	})
@@ -4963,10 +5158,26 @@ func (c *JobsListCall) AllUsers(allUsers bool) *JobsListCall {
 	return c
 }
 
+// MaxCreationTime sets the optional parameter "maxCreationTime": Max
+// value for job creation time, in milliseconds since the POSIX epoch.
+// If set, only jobs created before or at this timestamp are returned
+func (c *JobsListCall) MaxCreationTime(maxCreationTime uint64) *JobsListCall {
+	c.urlParams_.Set("maxCreationTime", fmt.Sprint(maxCreationTime))
+	return c
+}
+
 // MaxResults sets the optional parameter "maxResults": Maximum number
 // of results to return
 func (c *JobsListCall) MaxResults(maxResults int64) *JobsListCall {
 	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
+	return c
+}
+
+// MinCreationTime sets the optional parameter "minCreationTime": Min
+// value for job creation time, in milliseconds since the POSIX epoch.
+// If set, only jobs created after or at this timestamp are returned
+func (c *JobsListCall) MinCreationTime(minCreationTime uint64) *JobsListCall {
+	c.urlParams_.Set("minCreationTime", fmt.Sprint(minCreationTime))
 	return c
 }
 
@@ -5106,11 +5317,23 @@ func (c *JobsListCall) Do(opts ...googleapi.CallOption) (*JobList, error) {
 	//       "location": "query",
 	//       "type": "boolean"
 	//     },
+	//     "maxCreationTime": {
+	//       "description": "Max value for job creation time, in milliseconds since the POSIX epoch. If set, only jobs created before or at this timestamp are returned",
+	//       "format": "uint64",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
 	//     "maxResults": {
 	//       "description": "Maximum number of results to return",
 	//       "format": "uint32",
 	//       "location": "query",
 	//       "type": "integer"
+	//     },
+	//     "minCreationTime": {
+	//       "description": "Min value for job creation time, in milliseconds since the POSIX epoch. If set, only jobs created after or at this timestamp are returned",
+	//       "format": "uint64",
+	//       "location": "query",
+	//       "type": "string"
 	//     },
 	//     "pageToken": {
 	//       "description": "Page token, returned by a previous call, to request the next page of results",

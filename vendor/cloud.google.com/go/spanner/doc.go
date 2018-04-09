@@ -192,7 +192,7 @@ For Cloud Spanner columns that may contain NULL, use one of the NullXXX types,
 like NullString:
 
     var ns spanner.NullString
-    if err =: row.Column(0, &ns); err != nil {
+    if err := row.Column(0, &ns); err != nil {
         // TODO: Handle error.
     }
     if ns.Valid {
@@ -301,6 +301,12 @@ mutations, which will all be executed at the end of the transaction:
         // again.
         return nil
     })
+
+Tracing
+
+This client has been instrumented to use OpenCensus tracing (http://opencensus.io).
+To enable tracing, see "Enabling Tracing for a Program" at
+https://godoc.org/go.opencensus.io/trace. OpenCensus tracing requires Go 1.8 or higher.
 
 Authentication
 

@@ -12,7 +12,7 @@ gcloud compute instances create $instance_name \
   --image-family=ubuntu-1404-lts \
   --image-project=ubuntu-os-cloud \
   --machine-type=n1-standard-2 \
-  --scopes default,userinfo-email,useraccounts-ro,cloud-platform \
+  --scopes default,userinfo-email,cloud-platform \
   --metadata-from-file startup-script=integration_tests/gce_startup_script.sh \
   --metadata zone=us-central1-f,gcs_path=$GCS_PATH,gcs_logs_path=$GCS_LOGS_PATH || exit
 

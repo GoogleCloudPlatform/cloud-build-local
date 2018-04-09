@@ -47,13 +47,13 @@ func (b *WriteBatch) add(ws []*pb.Write, err error) *WriteBatch {
 // Create adds a Create operation to the batch.
 // See DocumentRef.Create for details.
 func (b *WriteBatch) Create(dr *DocumentRef, data interface{}) *WriteBatch {
-	return b.add(dr.newReplaceWrites(data, nil, exists(false)))
+	return b.add(dr.newCreateWrites(data))
 }
 
 // Set adds a Set operation to the batch.
 // See DocumentRef.Set for details.
 func (b *WriteBatch) Set(dr *DocumentRef, data interface{}, opts ...SetOption) *WriteBatch {
-	return b.add(dr.newReplaceWrites(data, opts, nil))
+	return b.add(dr.newSetWrites(data, opts))
 }
 
 // Delete adds a Delete operation to the batch.
@@ -62,21 +62,9 @@ func (b *WriteBatch) Delete(dr *DocumentRef, opts ...Precondition) *WriteBatch {
 	return b.add(dr.newDeleteWrites(opts))
 }
 
-// UpdateMap adds an UpdateMap operation to the batch.
-// See DocumentRef.UpdateMap for details.
-func (b *WriteBatch) UpdateMap(dr *DocumentRef, data map[string]interface{}, opts ...Precondition) *WriteBatch {
-	return b.add(dr.newUpdateMapWrites(data, opts))
-}
-
-// UpdateStruct adds an UpdateStruct operation to the batch.
-// See DocumentRef.UpdateStruct for details.
-func (b *WriteBatch) UpdateStruct(dr *DocumentRef, fieldPaths []string, data interface{}, opts ...Precondition) *WriteBatch {
-	return b.add(dr.newUpdateStructWrites(fieldPaths, data, opts))
-}
-
-// UpdatePaths adds an UpdatePaths operation to the batch.
-// See DocumentRef.UpdatePaths for details.
-func (b *WriteBatch) UpdatePaths(dr *DocumentRef, data []FieldPathUpdate, opts ...Precondition) *WriteBatch {
+// Update adds an Update operation to the batch.
+// See DocumentRef.Update for details.
+func (b *WriteBatch) Update(dr *DocumentRef, data []Update, opts ...Precondition) *WriteBatch {
 	return b.add(dr.newUpdatePathWrites(data, opts))
 }
 

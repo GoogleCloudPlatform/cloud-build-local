@@ -18,9 +18,10 @@ package firestore
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
+	"math"
 	"path"
 	"path/filepath"
 	"strings"
@@ -43,7 +44,6 @@ func TestCrossLanguageTests(t *testing.T) {
 	n := 0
 	for _, fi := range fis {
 		if strings.HasSuffix(fi.Name(), ".textproto") {
-			// TODO(jba): use  sub-tests.
 			runTestFromFile(t, filepath.Join(dir, fi.Name()))
 			n++
 		}
@@ -54,7 +54,7 @@ func TestCrossLanguageTests(t *testing.T) {
 func runTestFromFile(t *testing.T, filename string) {
 	bytes, err := ioutil.ReadFile(filename)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("%s: %v", filename, err)
 	}
 	var test pb.Test
 	if err := proto.UnmarshalText(string(bytes), &test); err != nil {
@@ -65,22 +65,34 @@ func runTestFromFile(t *testing.T, filename string) {
 }
 
 func runTest(t *testing.T, msg string, test *pb.Test) {
-	check := func(gotErr error, wantErr bool) {
+	check := func(gotErr error, wantErr bool) bool {
 		if wantErr && gotErr == nil {
 			t.Errorf("%s: got nil, want error", msg)
+			return false
 		} else if !wantErr && gotErr != nil {
 			t.Errorf("%s: %v", msg, gotErr)
+			return false
 		}
+		return true
 	}
 
 	ctx := context.Background()
 	c, srv := newMock(t)
-
 	switch tt := test.Test.(type) {
 	case *pb.Test_Get:
-		srv.addRPC(tt.Get.Request, &fspb.Document{
-			CreateTime: &ts.Timestamp{},
-			UpdateTime: &ts.Timestamp{},
+		req := &fspb.BatchGetDocumentsRequest{
+			Database:  c.path(),
+			Documents: []string{tt.Get.DocRefPath},
+		}
+		srv.addRPC(req, []interface{}{
+			&fspb.BatchGetDocumentsResponse{
+				Result: &fspb.BatchGetDocumentsResponse_Found{&fspb.Document{
+					Name:       tt.Get.DocRefPath,
+					CreateTime: &ts.Timestamp{},
+					UpdateTime: &ts.Timestamp{},
+				}},
+				ReadTime: &ts.Timestamp{},
+			},
 		})
 		ref := docRefFromPath(tt.Get.DocRefPath, c)
 		_, err := ref.Get(ctx)
@@ -94,51 +106,50 @@ func runTest(t *testing.T, msg string, test *pb.Test) {
 	case *pb.Test_Create:
 		srv.addRPC(tt.Create.Request, commitResponseForSet)
 		ref := docRefFromPath(tt.Create.DocRefPath, c)
-		data := convertData(tt.Create.JsonData)
-		_, err := ref.Create(ctx, data)
+		data, err := convertData(tt.Create.JsonData)
+		if err != nil {
+			t.Errorf("%s: %v", msg, err)
+			return
+		}
+		_, err = ref.Create(ctx, data)
 		check(err, tt.Create.IsError)
 
 	case *pb.Test_Set:
 		srv.addRPC(tt.Set.Request, commitResponseForSet)
 		ref := docRefFromPath(tt.Set.DocRefPath, c)
-		data := convertData(tt.Set.JsonData)
+		data, err := convertData(tt.Set.JsonData)
+		if err != nil {
+			t.Errorf("%s: %v", msg, err)
+			return
+		}
 		var opts []SetOption
 		if tt.Set.Option != nil {
 			opts = []SetOption{convertSetOption(tt.Set.Option)}
 		}
-		_, err := ref.Set(ctx, data, opts...)
+		_, err = ref.Set(ctx, data, opts...)
 		check(err, tt.Set.IsError)
 
 	case *pb.Test_Update:
-		srv.addRPC(tt.Update.Request, commitResponseForSet)
-		ref := docRefFromPath(tt.Update.DocRefPath, c)
-		data := convertData(tt.Update.JsonData)
-		preconds := convertPrecondition(t, tt.Update.Precondition)
-		_, err := ref.UpdateMap(ctx, data, preconds...)
-		if tt.Update.IsError && err == nil {
-			t.Errorf("%s: got nil, want error", msg)
-		} else if !tt.Update.IsError && err != nil {
-			t.Errorf("%s: %v", msg, err)
-		}
+		// Ignore Update test because we only support UpdatePaths.
+		// Not to worry, every Update test has a corresponding UpdatePaths test.
 
 	case *pb.Test_UpdatePaths:
 		srv.addRPC(tt.UpdatePaths.Request, commitResponseForSet)
 		ref := docRefFromPath(tt.UpdatePaths.DocRefPath, c)
 		preconds := convertPrecondition(t, tt.UpdatePaths.Precondition)
 		paths := convertFieldPaths(tt.UpdatePaths.FieldPaths)
-		var fpus []FieldPathUpdate
+		var ups []Update
 		for i, path := range paths {
-			jsonValue := tt.UpdatePaths.JsonValues[i]
-			var val interface{}
-			if err := json.Unmarshal([]byte(jsonValue), &val); err != nil {
-				t.Fatalf("%s: %q: %v", msg, jsonValue, err)
+			val, err := convertJSONValue(tt.UpdatePaths.JsonValues[i])
+			if err != nil {
+				t.Fatalf("%s: %v", msg, err)
 			}
-			fpus = append(fpus, FieldPathUpdate{
-				Path:  path,
-				Value: convertTestValue(val),
+			ups = append(ups, Update{
+				FieldPath: path,
+				Value:     val,
 			})
 		}
-		_, err := ref.UpdatePaths(ctx, fpus, preconds...)
+		_, err := ref.Update(ctx, ups, preconds...)
 		check(err, tt.UpdatePaths.IsError)
 
 	case *pb.Test_Delete:
@@ -147,6 +158,15 @@ func runTest(t *testing.T, msg string, test *pb.Test) {
 		preconds := convertPrecondition(t, tt.Delete.Precondition)
 		_, err := ref.Delete(ctx, preconds...)
 		check(err, tt.Delete.IsError)
+
+	case *pb.Test_Query:
+		q := convertQuery(t, tt.Query)
+		got, err := q.toProto()
+		if check(err, tt.Query.IsError) && err == nil {
+			if want := tt.Query.Query; !proto.Equal(got, want) {
+				t.Errorf("%s\ngot:  %s\nwant: %s", msg, proto.MarshalTextString(got), proto.MarshalTextString(want))
+			}
+		}
 
 	default:
 		t.Fatalf("unknown test type %T", tt)
@@ -161,12 +181,20 @@ func docRefFromPath(p string, c *Client) *DocumentRef {
 	}
 }
 
-func convertData(jsonData string) map[string]interface{} {
+func convertJSONValue(jv string) (interface{}, error) {
+	var val interface{}
+	if err := json.Unmarshal([]byte(jv), &val); err != nil {
+		return nil, err
+	}
+	return convertTestValue(val), nil
+}
+
+func convertData(jsonData string) (map[string]interface{}, error) {
 	var m map[string]interface{}
 	if err := json.Unmarshal([]byte(jsonData), &m); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	return convertTestMap(m)
+	return convertTestMap(m), nil
 }
 
 func convertTestMap(m map[string]interface{}) map[string]interface{} {
@@ -184,6 +212,8 @@ func convertTestValue(v interface{}) interface{} {
 			return ServerTimestamp
 		case "Delete":
 			return Delete
+		case "NaN":
+			return math.NaN()
 		default:
 			return v
 		}
@@ -237,4 +267,91 @@ func convertPrecondition(t *testing.T, fp *fspb.Precondition) []Precondition {
 		t.Fatalf("unknown precondition type %T", fp)
 	}
 	return []Precondition{pc}
+}
+
+func convertQuery(t *testing.T, qt *pb.QueryTest) Query {
+	parts := strings.Split(qt.CollPath, "/")
+	q := Query{
+		parentPath:   strings.Join(parts[:len(parts)-2], "/"),
+		collectionID: parts[len(parts)-1],
+	}
+	for _, c := range qt.Clauses {
+		switch c := c.Clause.(type) {
+		case *pb.Clause_Select:
+			q = q.SelectPaths(convertFieldPaths(c.Select.Fields)...)
+		case *pb.Clause_OrderBy:
+			var dir Direction
+			switch c.OrderBy.Direction {
+			case "asc":
+				dir = Asc
+			case "desc":
+				dir = Desc
+			default:
+				t.Fatalf("bad direction: %q", c.OrderBy.Direction)
+			}
+			q = q.OrderByPath(FieldPath(c.OrderBy.Path.Field), dir)
+		case *pb.Clause_Where:
+			val, err := convertJSONValue(c.Where.JsonValue)
+			if err != nil {
+				t.Fatal(err)
+			}
+			q = q.WherePath(FieldPath(c.Where.Path.Field), c.Where.Op, val)
+		case *pb.Clause_Offset:
+			q = q.Offset(int(c.Offset))
+		case *pb.Clause_Limit:
+			q = q.Limit(int(c.Limit))
+		case *pb.Clause_StartAt:
+			q = q.StartAt(convertCursor(t, c.StartAt)...)
+		case *pb.Clause_StartAfter:
+			q = q.StartAfter(convertCursor(t, c.StartAfter)...)
+		case *pb.Clause_EndAt:
+			q = q.EndAt(convertCursor(t, c.EndAt)...)
+		case *pb.Clause_EndBefore:
+			q = q.EndBefore(convertCursor(t, c.EndBefore)...)
+		default:
+			t.Fatalf("bad clause type %T", c)
+		}
+	}
+	return q
+}
+
+// Returns args to a cursor method (StartAt, etc.).
+func convertCursor(t *testing.T, c *pb.Cursor) []interface{} {
+	if c.DocSnapshot != nil {
+		ds, err := convertDocSnapshot(c.DocSnapshot)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return []interface{}{ds}
+	}
+	var vals []interface{}
+	for _, jv := range c.JsonValues {
+		v, err := convertJSONValue(jv)
+		if err != nil {
+			t.Fatal(err)
+		}
+		vals = append(vals, v)
+	}
+	return vals
+}
+
+func convertDocSnapshot(ds *pb.DocSnapshot) (*DocumentSnapshot, error) {
+	data, err := convertData(ds.JsonData)
+	if err != nil {
+		return nil, err
+	}
+	doc, transformPaths, err := toProtoDocument(data)
+	if err != nil {
+		return nil, err
+	}
+	if len(transformPaths) > 0 {
+		return nil, errors.New("saw transform paths in DocSnapshot")
+	}
+	return &DocumentSnapshot{
+		Ref: &DocumentRef{
+			Path:   ds.Path,
+			Parent: &CollectionRef{Path: path.Dir(ds.Path)},
+		},
+		proto: doc,
+	}, nil
 }
