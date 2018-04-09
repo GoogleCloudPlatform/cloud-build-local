@@ -3,7 +3,7 @@
 
 steps:
 # Run unit tests in all subdirectories (except those excluded by the grep).
-- name: 'gcr.io/cloud-builders/go:wheezy'
+- name: 'gcr.io/cloud-builders/go:debian'
   entrypoint: 'bash'
   args:
   - '-c'
@@ -11,7 +11,7 @@ steps:
     find . -type d -maxdepth 1 | grep -Ev "vendor|.git|gopath|integration_tests" | xargs /builder/bin/go.bash test
 
 # Binary creation.
-- name: 'gcr.io/cloud-builders/go:wheezy'
+- name: 'gcr.io/cloud-builders/go:debian'
   args: ['build', '-o', 'container-builder-local', 'github.com/GoogleCloudPlatform/container-builder-local']
 
 # Copy the integration test files to GCS and
