@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/internal/testutil"
+	"google.golang.org/grpc/status"
 
 	tspb "github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/google/go-cmp/cmp"
@@ -60,8 +61,18 @@ func TestStreamingPullMultipleFetches(t *testing.T) {
 	testStreamingPullIteration(t, client, server, testMessages)
 }
 
+func newTestSubscription(t *testing.T, client *Client, name string) *Subscription {
+	topic := client.Topic("t")
+	sub, err := client.CreateSubscription(context.Background(), name,
+		SubscriptionConfig{Topic: topic})
+	if err != nil {
+		t.Fatalf("CreateSubscription: %v", err)
+	}
+	return sub
+}
+
 func testStreamingPullIteration(t *testing.T, client *Client, server *fakeServer, msgs []*pb.ReceivedMessage) {
-	sub := client.Subscription("s")
+	sub := newTestSubscription(t, client, "s")
 	gotMsgs, err := pullN(context.Background(), sub, len(msgs), func(_ context.Context, m *Message) {
 		id, err := strconv.Atoi(m.ackID)
 		if err != nil {
@@ -92,7 +103,7 @@ func testStreamingPullIteration(t *testing.T, client *Client, server *fakeServer
 			t.Errorf("%d: no message for ackID %q", i, want.ackID)
 			continue
 		}
-		if !testutil.Equal(got, want, cmp.AllowUnexported(Message{}), cmpopts.IgnoreTypes(func(string, bool) {})) {
+		if !testutil.Equal(got, want, cmp.AllowUnexported(Message{}), cmpopts.IgnoreTypes(time.Time{}, func(string, bool, time.Time) {})) {
 			t.Errorf("%d: got\n%#v\nwant\n%#v", i, got, want)
 		}
 	}
@@ -117,8 +128,8 @@ func TestStreamingPullError(t *testing.T) {
 	// acked.
 	client, server := newFake(t)
 	server.addStreamingPullMessages(testMessages[:1])
-	server.addStreamingPullError(grpc.Errorf(codes.Unknown, ""))
-	sub := client.Subscription("s")
+	server.addStreamingPullError(status.Errorf(codes.Unknown, ""))
+	sub := newTestSubscription(t, client, "s")
 	// Use only one goroutine, since the fake server is configured to
 	// return only one error.
 	sub.ReceiveSettings.NumGoroutines = 1
@@ -146,7 +157,7 @@ func TestStreamingPullCancel(t *testing.T) {
 	// return and all messages have been acked.
 	client, server := newFake(t)
 	server.addStreamingPullMessages(testMessages)
-	sub := client.Subscription("s")
+	sub := newTestSubscription(t, client, "s")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	var n int32
 	err := sub.Receive(ctx, func(ctx2 context.Context, m *Message) {
@@ -170,8 +181,8 @@ func TestStreamingPullRetry(t *testing.T) {
 	server.addStreamingPullError(io.EOF)
 	server.addStreamingPullError(io.EOF)
 	server.addStreamingPullMessages(testMessages[1:2])
-	server.addStreamingPullError(grpc.Errorf(codes.Unavailable, ""))
-	server.addStreamingPullError(grpc.Errorf(codes.Unavailable, ""))
+	server.addStreamingPullError(status.Errorf(codes.Unavailable, ""))
+	server.addStreamingPullError(status.Errorf(codes.Unavailable, ""))
 	server.addStreamingPullMessages(testMessages[2:])
 
 	testStreamingPullIteration(t, client, server, testMessages)
@@ -181,7 +192,7 @@ func TestStreamingPullOneActive(t *testing.T) {
 	// Only one call to Pull can be active at a time.
 	client, srv := newFake(t)
 	srv.addStreamingPullMessages(testMessages[:1])
-	sub := client.Subscription("s")
+	sub := newTestSubscription(t, client, "s")
 	ctx, cancel := context.WithCancel(context.Background())
 	err := sub.Receive(ctx, func(ctx context.Context, m *Message) {
 		m.Ack()
@@ -211,7 +222,7 @@ func TestStreamingPullConcurrent(t *testing.T) {
 	for i := 0; i < nMessages; i += 2 {
 		server.addStreamingPullMessages([]*pb.ReceivedMessage{newMsg(i), newMsg(i + 1)})
 	}
-	sub := client.Subscription("s")
+	sub := newTestSubscription(t, client, "s")
 	ctx, _ := context.WithTimeout(context.Background(), time.Second)
 	gotMsgs, err := pullN(ctx, sub, nMessages, func(ctx context.Context, m *Message) {
 		m.Ack()
@@ -235,7 +246,7 @@ func TestStreamingPullFlowControl(t *testing.T) {
 	// Callback invocations should not occur if flow control limits are exceeded.
 	client, server := newFake(t)
 	server.addStreamingPullMessages(testMessages)
-	sub := client.Subscription("s")
+	sub := newTestSubscription(t, client, "s")
 	sub.ReceiveSettings.MaxOutstandingMessages = 2
 	ctx, cancel := context.WithCancel(context.Background())
 	activec := make(chan int)

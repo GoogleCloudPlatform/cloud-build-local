@@ -19,13 +19,14 @@ package testutil
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"sync"
 	"testing"
 	"time"
 
 	"golang.org/x/net/context"
+	"google.golang.org/grpc/status"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/empty"
 	proto3 "github.com/golang/protobuf/ptypes/struct"
 	pbt "github.com/golang/protobuf/ptypes/timestamp"
@@ -132,7 +133,7 @@ func (m *MockCloudSpannerClient) CreateSession(c context.Context, r *sppb.Create
 	s := &sppb.Session{}
 	if r.Database != "mockdb" {
 		// Reject other databases
-		return s, grpc.Errorf(codes.NotFound, fmt.Sprintf("database not found: %v", r.Database))
+		return s, status.Errorf(codes.NotFound, fmt.Sprintf("database not found: %v", r.Database))
 	}
 	// Generate & record session name.
 	s.Name = fmt.Sprintf("mockdb-%v", time.Now().UnixNano())
@@ -150,7 +151,7 @@ func (m *MockCloudSpannerClient) GetSession(c context.Context, r *sppb.GetSessio
 	}
 	m.pings = append(m.pings, r.Name)
 	if _, ok := m.sessions[r.Name]; !ok {
-		return nil, grpc.Errorf(codes.NotFound, fmt.Sprintf("Session not found: %v", r.Name))
+		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("Session not found: %v", r.Name))
 	}
 	return &sppb.Session{Name: r.Name}, nil
 }
@@ -165,7 +166,7 @@ func (m *MockCloudSpannerClient) DeleteSession(c context.Context, r *sppb.Delete
 	}
 	if _, ok := m.sessions[r.Name]; !ok {
 		// Session not found.
-		return &empty.Empty{}, grpc.Errorf(codes.NotFound, fmt.Sprintf("Session not found: %v", r.Name))
+		return &empty.Empty{}, status.Errorf(codes.NotFound, fmt.Sprintf("Session not found: %v", r.Name))
 	}
 	// Delete session from in-memory table.
 	delete(m.sessions, r.Name)
@@ -203,7 +204,7 @@ func (m *MockCloudSpannerClient) ExecuteStreamingSql(c context.Context, r *sppb.
 		},
 		ParamTypes: map[string]*sppb.Type{"var1": &sppb.Type{Code: sppb.TypeCode_STRING}},
 	}
-	if !reflect.DeepEqual(r, wantReq) {
+	if !proto.Equal(r, wantReq) {
 		return nil, fmt.Errorf("got query request: %v, want: %v", r, wantReq)
 	}
 	if act.Err != nil {
@@ -254,7 +255,7 @@ func (m *MockCloudSpannerClient) StreamingRead(c context.Context, r *sppb.ReadRe
 	if act.Method == "StreamingIndexRead" {
 		wantReq.Index = "idx1"
 	}
-	if !reflect.DeepEqual(r, wantReq) {
+	if !proto.Equal(r, wantReq) {
 		return nil, fmt.Errorf("got query request: %v, want: %v", r, wantReq)
 	}
 	if act.Err != nil {
@@ -316,6 +317,18 @@ func (m *MockCloudSpannerClient) Rollback(c context.Context, r *sppb.RollbackReq
 		}
 	}
 	return nil, nil
+}
+
+// PartitionQuery is a placeholder for SpannerServer.PartitionQuery.
+func (m *MockCloudSpannerClient) PartitionQuery(ctx context.Context, r *sppb.PartitionQueryRequest, opts ...grpc.CallOption) (*sppb.PartitionResponse, error) {
+	m.ready()
+	return nil, errors.New("Unimplemented")
+}
+
+// PartitionRead is a placeholder for SpannerServer.PartitionRead.
+func (m *MockCloudSpannerClient) PartitionRead(ctx context.Context, r *sppb.PartitionReadRequest, opts ...grpc.CallOption) (*sppb.PartitionResponse, error) {
+	m.ready()
+	return nil, errors.New("Unimplemented")
 }
 
 func (m *MockCloudSpannerClient) expectAction(methods ...string) (Action, error) {

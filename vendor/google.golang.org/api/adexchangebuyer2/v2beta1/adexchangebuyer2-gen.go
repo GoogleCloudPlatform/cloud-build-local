@@ -1065,6 +1065,8 @@ func (s *Correction) MarshalJSON() ([]byte, error) {
 }
 
 // Creative: A creative and its classification data.
+//
+// Next ID: 31
 type Creative struct {
 	// AccountId: The account that this creative belongs to.
 	// Can be used to filter the response of the
@@ -1647,17 +1649,19 @@ type FilterSet struct {
 
 	// CreativeId: The ID of the creative on which to filter; optional. This
 	// field may be set
-	// only for a filter set that accesses buyer-level troubleshooting data,
-	// i.e.
-	// one whose name matches the `bidders/*/accounts/*/filterSets/*`
+	// only for a filter set that accesses account-level troubleshooting
+	// data,
+	// i.e. one whose name matches the
+	// `bidders/*/accounts/*/filterSets/*`
 	// pattern.
 	CreativeId string `json:"creativeId,omitempty"`
 
 	// DealId: The ID of the deal on which to filter; optional. This field
 	// may be set
-	// only for a filter set that accesses buyer-level troubleshooting data,
-	// i.e.
-	// one whose name matches the `bidders/*/accounts/*/filterSets/*`
+	// only for a filter set that accesses account-level troubleshooting
+	// data,
+	// i.e. one whose name matches the
+	// `bidders/*/accounts/*/filterSets/*`
 	// pattern.
 	DealId int64 `json:"dealId,omitempty,string"`
 
@@ -1671,15 +1675,25 @@ type FilterSet struct {
 	//   "APP" - The ad impression appears in an app.
 	Environment string `json:"environment,omitempty"`
 
-	// Format: The format on which to filter; optional.
+	// Formats: The list of formats on which to filter; may be empty. The
+	// filters
+	// represented by multiple formats are ORed together (i.e. if
+	// non-empty,
+	// results must match any one of the formats).
 	//
 	// Possible values:
 	//   "FORMAT_UNSPECIFIED" - A placeholder for an undefined format;
 	// indicates that no format filter
 	// will be applied.
-	//   "DISPLAY" - The ad impression is display format (i.e. an image).
-	//   "VIDEO" - The ad impression is video format.
-	Format string `json:"format,omitempty"`
+	//   "NATIVE_DISPLAY" - The ad impression is a native ad, and display
+	// (i.e. image) format.
+	//   "NATIVE_VIDEO" - The ad impression is a native ad, and video
+	// format.
+	//   "NON_NATIVE_DISPLAY" - The ad impression is not a native ad, and
+	// display (i.e. image) format.
+	//   "NON_NATIVE_VIDEO" - The ad impression is not a native ad, and
+	// video format.
+	Formats []string `json:"formats,omitempty"`
 
 	// Name: A user-defined name of the filter set. Filter set names must be
 	// unique
@@ -1689,7 +1703,7 @@ type FilterSet struct {
 	// troubleshooting
 	// data)
 	// - `bidders/*/accounts/*/filterSets/*` (for accessing
-	// buyer-level
+	// account-level
 	// troubleshooting data)
 	//
 	// This field is required in create operations.
@@ -3329,6 +3343,10 @@ func (s *TimeInterval) MarshalJSON() ([]byte, error) {
 type VideoContent struct {
 	// VideoUrl: The URL to fetch a video ad.
 	VideoUrl string `json:"videoUrl,omitempty"`
+
+	// VideoVastXml: The contents of a VAST document for a video ad.
+	// This document should conform to the VAST 2.0 or 3.0 standard.
+	VideoVastXml string `json:"videoVastXml,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "VideoUrl") to
 	// unconditionally include in API requests. By default, fields with
@@ -5421,7 +5439,7 @@ func (c *AccountsCreativesListCall) PageToken(pageToken string) *AccountsCreativ
 // attributes}
 // <li>disapprovalReason: {a reason
 // from
-// DisapprovalReason
+// DisapprovalReason}
 // </ul>
 // Example: 'accountId=12345 AND (dealsStatus:disapproved
 // AND
@@ -5551,7 +5569,7 @@ func (c *AccountsCreativesListCall) Do(opts ...googleapi.CallOption) (*ListCreat
 	//       "type": "string"
 	//     },
 	//     "query": {
-	//       "description": "An optional query string to filter creatives. If no filter is specified,\nall active creatives will be returned.\nSupported queries are:\n\u003cul\u003e\n\u003cli\u003eaccountId=\u003ci\u003eaccount_id_string\u003c/i\u003e\n\u003cli\u003ecreativeId=\u003ci\u003ecreative_id_string\u003c/i\u003e\n\u003cli\u003edealsStatus: {approved, conditionally_approved, disapproved,\n                   not_checked}\n\u003cli\u003eopenAuctionStatus: {approved, conditionally_approved, disapproved,\n                          not_checked}\n\u003cli\u003eattribute: {a numeric attribute from the list of attributes}\n\u003cli\u003edisapprovalReason: {a reason from\nDisapprovalReason\n\u003c/ul\u003e\nExample: 'accountId=12345 AND (dealsStatus:disapproved AND\ndisapprovalReason:unacceptable_content) OR attribute:47'",
+	//       "description": "An optional query string to filter creatives. If no filter is specified,\nall active creatives will be returned.\nSupported queries are:\n\u003cul\u003e\n\u003cli\u003eaccountId=\u003ci\u003eaccount_id_string\u003c/i\u003e\n\u003cli\u003ecreativeId=\u003ci\u003ecreative_id_string\u003c/i\u003e\n\u003cli\u003edealsStatus: {approved, conditionally_approved, disapproved,\n                   not_checked}\n\u003cli\u003eopenAuctionStatus: {approved, conditionally_approved, disapproved,\n                          not_checked}\n\u003cli\u003eattribute: {a numeric attribute from the list of attributes}\n\u003cli\u003edisapprovalReason: {a reason from\nDisapprovalReason}\n\u003c/ul\u003e\nExample: 'accountId=12345 AND (dealsStatus:disapproved AND\ndisapprovalReason:unacceptable_content) OR attribute:47'",
 	//       "location": "query",
 	//       "type": "string"
 	//     }

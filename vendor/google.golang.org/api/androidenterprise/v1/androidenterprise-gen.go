@@ -762,9 +762,6 @@ func (s *ConfigurationVariables) MarshalJSON() ([]byte, error) {
 
 // Device: A Devices resource represents a mobile device managed by the
 // EMM and belonging to a specific enterprise user.
-//
-// This collection cannot be modified via the API. It is automatically
-// populated as devices are set up to be managed.
 type Device struct {
 	// AndroidId: The Google Play Services Android ID for the device encoded
 	// as a lowercase hex string. For example, "123456789abcdef0".
@@ -789,6 +786,9 @@ type Device struct {
 	// admin, using the Admin Console to enable the privilege) to use
 	// managed Google Play, but the profile is itself not owned by a DPC.
 	ManagementType string `json:"managementType,omitempty"`
+
+	// Policy: The policy enforced on the device.
+	Policy *Policy `json:"policy,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
 	// server.
@@ -1524,6 +1524,41 @@ func (s *LocalizedText) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// MaintenanceWindow: Maintenance window for managed Google Play
+// Accounts. This allows Play store to update the apps on the foreground
+// in the designated window.
+type MaintenanceWindow struct {
+	// DurationMs: Duration of the maintenance window, in milliseconds. The
+	// duration must be between 30 minutes and 24 hours (inclusive).
+	DurationMs int64 `json:"durationMs,omitempty,string"`
+
+	// StartTimeAfterMidnightMs: Start time of the maintenance window, in
+	// milliseconds after midnight on the device. Windows can span midnight.
+	StartTimeAfterMidnightMs int64 `json:"startTimeAfterMidnightMs,omitempty,string"`
+
+	// ForceSendFields is a list of field names (e.g. "DurationMs") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "DurationMs") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *MaintenanceWindow) MarshalJSON() ([]byte, error) {
+	type NoMethod MaintenanceWindow
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // ManagedConfiguration: A managed configuration resource contains the
 // set of managed properties defined by the app developer in the app's
 // managed configurations schema, as well as any configuration variables
@@ -1661,6 +1696,10 @@ type ManagedConfigurationsSettings struct {
 	// Kind: Identifies what kind of resource this is. Value: the fixed
 	// string "androidenterprise#managedConfigurationsSettings".
 	Kind string `json:"kind,omitempty"`
+
+	// LastUpdatedTimestampMillis: The last updated time of the managed
+	// configuration settings in milliseconds since 1970-01-01T00:00:00Z.
+	LastUpdatedTimestampMillis int64 `json:"lastUpdatedTimestampMillis,omitempty,string"`
 
 	// ManagedProperty: The set of managed properties for this
 	// configuration.
@@ -1824,6 +1863,9 @@ type NewDeviceEvent struct {
 	// DeviceId: The Android ID of the device. This field will always be
 	// present.
 	DeviceId string `json:"deviceId,omitempty"`
+
+	// DpcPackageName: Policy app on the device.
+	DpcPackageName string `json:"dpcPackageName,omitempty"`
 
 	// ManagementType: Identifies the extent to which the device is
 	// controlled by an Android EMM in various deployment
@@ -2089,6 +2131,60 @@ func (s *Permission) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// Policy: The device policy for a given managed device.
+type Policy struct {
+	// AutoUpdatePolicy: The auto-update policy for apps installed on the
+	// device. "choiceToTheUser" allows the device's user to configure the
+	// app update policy. "always" enables auto updates. "never" disables
+	// auto updates. "wifiOnly" enables auto updates only when the device is
+	// connected to wifi.
+	AutoUpdatePolicy string `json:"autoUpdatePolicy,omitempty"`
+
+	// MaintenanceWindow: The maintenance window defining when apps running
+	// in the foreground should be updated. This feature is only supported
+	// on fully managed devices.
+	MaintenanceWindow *MaintenanceWindow `json:"maintenanceWindow,omitempty"`
+
+	// ProductAvailabilityPolicy: The availability granted to the device for
+	// the specified products. "all" gives the device access to all
+	// products, regardless of approval status. "allApproved" entitles the
+	// device to access all products that are approved for the enterprise.
+	// "allApproved" and "all" do not enable automatic visibility of "alpha"
+	// or "beta" tracks. "whitelist" grants the device access the products
+	// specified in productPolicy[]. Only products that are approved or
+	// products that were previously approved (products with revoked
+	// approval) by the enterprise can be whitelisted. If no value is
+	// provided, the availability set at the user level is applied by
+	// default.
+	ProductAvailabilityPolicy string `json:"productAvailabilityPolicy,omitempty"`
+
+	// ProductPolicy: The list of product policies.
+	ProductPolicy []*ProductPolicy `json:"productPolicy,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "AutoUpdatePolicy") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "AutoUpdatePolicy") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *Policy) MarshalJSON() ([]byte, error) {
+	type NoMethod Policy
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // Product: A Products resource represents an app in the Google Play
 // store that is available to at least some users in the enterprise.
 // (Some apps are restricted to a single enterprise, and no information
@@ -2105,8 +2201,20 @@ type Product struct {
 	// app developer).
 	AuthorName string `json:"authorName,omitempty"`
 
+	// AvailableCountries: The countries which this app is available in.
+	AvailableCountries []string `json:"availableCountries,omitempty"`
+
 	// AvailableTracks: The tracks that are visible to the enterprise.
 	AvailableTracks []string `json:"availableTracks,omitempty"`
+
+	// Category: The app category (e.g. RACING, SOCIAL, etc.)
+	Category string `json:"category,omitempty"`
+
+	// ContentRating: The content rating for this app.
+	ContentRating string `json:"contentRating,omitempty"`
+
+	// Description: The localized promotional description, if available.
+	Description string `json:"description,omitempty"`
 
 	// DetailsUrl: A link to the (consumer) Google Play details page for the
 	// product.
@@ -2129,6 +2237,17 @@ type Product struct {
 	// string "androidenterprise#product".
 	Kind string `json:"kind,omitempty"`
 
+	// LastUpdatedTimestampMillis: The approximate time (within 7 days) the
+	// app was last published, expressed in milliseconds since epoch.
+	LastUpdatedTimestampMillis int64 `json:"lastUpdatedTimestampMillis,omitempty,string"`
+
+	// MinAndroidSdkVersion: The minimum Android SDK necessary to run the
+	// app.
+	MinAndroidSdkVersion int64 `json:"minAndroidSdkVersion,omitempty"`
+
+	// Permissions: A list of permissions required by the app.
+	Permissions []*ProductPermission `json:"permissions,omitempty"`
+
 	// ProductId: A string of the form app:<package name>. For example,
 	// app:com.google.android.gm represents the Gmail app.
 	ProductId string `json:"productId,omitempty"`
@@ -2139,8 +2258,14 @@ type Product struct {
 	// available to people who own it).
 	ProductPricing string `json:"productPricing,omitempty"`
 
+	// RecentChanges: A description of the recent changes made to the app.
+	RecentChanges string `json:"recentChanges,omitempty"`
+
 	// RequiresContainerApp: Deprecated.
 	RequiresContainerApp bool `json:"requiresContainerApp,omitempty"`
+
+	// ScreenshotUrls: A list of screenshot links representing the app.
+	ScreenshotUrls []string `json:"screenshotUrls,omitempty"`
 
 	// SigningCertificate: The certificate used to sign this product.
 	SigningCertificate *ProductSigningCertificate `json:"signingCertificate,omitempty"`
@@ -2328,6 +2453,53 @@ type ProductPermissions struct {
 
 func (s *ProductPermissions) MarshalJSON() ([]byte, error) {
 	type NoMethod ProductPermissions
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// ProductPolicy: The policy for a product.
+type ProductPolicy struct {
+	// ProductId: The ID of the product. For example,
+	// "app:com.google.android.gm".
+	ProductId string `json:"productId,omitempty"`
+
+	// Tracks: Grants visibility to the specified track(s) of the product to
+	// the device. The track available to the device is based on the
+	// following order of preference: alpha, beta, production. For example,
+	// if an app has a prod version, a beta version and an alpha version and
+	// the enterprise has been granted visibility to both the alpha and beta
+	// tracks, if tracks is {"beta", "production"} then the beta version of
+	// the app is made available to the device. If there are no app versions
+	// in the specified track adding the "alpha" and "beta" values to the
+	// list of tracks will have no effect. Note that the enterprise requires
+	// access to alpha and/or beta tracks before users can be granted
+	// visibility to apps in those tracks.
+	//
+	// The allowed sets are: {} (considered equivalent to {"production"})
+	// {"production"} {"beta", "production"} {"alpha", "beta", "production"}
+	// The order of elements is not relevant. Any other set of tracks will
+	// be rejected with an error.
+	Tracks []string `json:"tracks,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "ProductId") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "ProductId") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ProductPolicy) MarshalJSON() ([]byte, error) {
+	type NoMethod ProductPolicy
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -3691,6 +3863,176 @@ func (c *DevicesListCall) Do(opts ...googleapi.CallOption) (*DevicesListResponse
 
 }
 
+// method id "androidenterprise.devices.patch":
+
+type DevicesPatchCall struct {
+	s            *Service
+	enterpriseId string
+	userId       string
+	deviceId     string
+	device       *Device
+	urlParams_   gensupport.URLParams
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// Patch: Updates the device policy. This method supports patch
+// semantics.
+func (r *DevicesService) Patch(enterpriseId string, userId string, deviceId string, device *Device) *DevicesPatchCall {
+	c := &DevicesPatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.enterpriseId = enterpriseId
+	c.userId = userId
+	c.deviceId = deviceId
+	c.device = device
+	return c
+}
+
+// UpdateMask sets the optional parameter "updateMask": Mask that
+// identifies which fields to update. If not set, all modifiable fields
+// will be modified.
+//
+// When set in a query parameter, this field should be specified as
+// updateMask=<field1>,<field2>,...
+func (c *DevicesPatchCall) UpdateMask(updateMask string) *DevicesPatchCall {
+	c.urlParams_.Set("updateMask", updateMask)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *DevicesPatchCall) Fields(s ...googleapi.Field) *DevicesPatchCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *DevicesPatchCall) Context(ctx context.Context) *DevicesPatchCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *DevicesPatchCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *DevicesPatchCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.device)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "enterprises/{enterpriseId}/users/{userId}/devices/{deviceId}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("PATCH", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"enterpriseId": c.enterpriseId,
+		"userId":       c.userId,
+		"deviceId":     c.deviceId,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "androidenterprise.devices.patch" call.
+// Exactly one of *Device or error will be non-nil. Any non-2xx status
+// code is an error. Response headers are in either
+// *Device.ServerResponse.Header or (if a response was returned at all)
+// in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
+// check whether the returned error was because http.StatusNotModified
+// was returned.
+func (c *DevicesPatchCall) Do(opts ...googleapi.CallOption) (*Device, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Device{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Updates the device policy. This method supports patch semantics.",
+	//   "httpMethod": "PATCH",
+	//   "id": "androidenterprise.devices.patch",
+	//   "parameterOrder": [
+	//     "enterpriseId",
+	//     "userId",
+	//     "deviceId"
+	//   ],
+	//   "parameters": {
+	//     "deviceId": {
+	//       "description": "The ID of the device.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "enterpriseId": {
+	//       "description": "The ID of the enterprise.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "updateMask": {
+	//       "description": "Mask that identifies which fields to update. If not set, all modifiable fields will be modified.\n\nWhen set in a query parameter, this field should be specified as updateMask=\u003cfield1\u003e,\u003cfield2\u003e,...",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "userId": {
+	//       "description": "The ID of the user.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "enterprises/{enterpriseId}/users/{userId}/devices/{deviceId}",
+	//   "request": {
+	//     "$ref": "Device"
+	//   },
+	//   "response": {
+	//     "$ref": "Device"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/androidenterprise"
+	//   ]
+	// }
+
+}
+
 // method id "androidenterprise.devices.setState":
 
 type DevicesSetStateCall struct {
@@ -3841,6 +4183,175 @@ func (c *DevicesSetStateCall) Do(opts ...googleapi.CallOption) (*DeviceState, er
 	//   },
 	//   "response": {
 	//     "$ref": "DeviceState"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/androidenterprise"
+	//   ]
+	// }
+
+}
+
+// method id "androidenterprise.devices.update":
+
+type DevicesUpdateCall struct {
+	s            *Service
+	enterpriseId string
+	userId       string
+	deviceId     string
+	device       *Device
+	urlParams_   gensupport.URLParams
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// Update: Updates the device policy
+func (r *DevicesService) Update(enterpriseId string, userId string, deviceId string, device *Device) *DevicesUpdateCall {
+	c := &DevicesUpdateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.enterpriseId = enterpriseId
+	c.userId = userId
+	c.deviceId = deviceId
+	c.device = device
+	return c
+}
+
+// UpdateMask sets the optional parameter "updateMask": Mask that
+// identifies which fields to update. If not set, all modifiable fields
+// will be modified.
+//
+// When set in a query parameter, this field should be specified as
+// updateMask=<field1>,<field2>,...
+func (c *DevicesUpdateCall) UpdateMask(updateMask string) *DevicesUpdateCall {
+	c.urlParams_.Set("updateMask", updateMask)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *DevicesUpdateCall) Fields(s ...googleapi.Field) *DevicesUpdateCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *DevicesUpdateCall) Context(ctx context.Context) *DevicesUpdateCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *DevicesUpdateCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *DevicesUpdateCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.device)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "enterprises/{enterpriseId}/users/{userId}/devices/{deviceId}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("PUT", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"enterpriseId": c.enterpriseId,
+		"userId":       c.userId,
+		"deviceId":     c.deviceId,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "androidenterprise.devices.update" call.
+// Exactly one of *Device or error will be non-nil. Any non-2xx status
+// code is an error. Response headers are in either
+// *Device.ServerResponse.Header or (if a response was returned at all)
+// in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
+// check whether the returned error was because http.StatusNotModified
+// was returned.
+func (c *DevicesUpdateCall) Do(opts ...googleapi.CallOption) (*Device, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Device{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Updates the device policy",
+	//   "httpMethod": "PUT",
+	//   "id": "androidenterprise.devices.update",
+	//   "parameterOrder": [
+	//     "enterpriseId",
+	//     "userId",
+	//     "deviceId"
+	//   ],
+	//   "parameters": {
+	//     "deviceId": {
+	//       "description": "The ID of the device.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "enterpriseId": {
+	//       "description": "The ID of the enterprise.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "updateMask": {
+	//       "description": "Mask that identifies which fields to update. If not set, all modifiable fields will be modified.\n\nWhen set in a query parameter, this field should be specified as updateMask=\u003cfield1\u003e,\u003cfield2\u003e,...",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "userId": {
+	//       "description": "The ID of the user.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "enterprises/{enterpriseId}/users/{userId}/devices/{deviceId}",
+	//   "request": {
+	//     "$ref": "Device"
+	//   },
+	//   "response": {
+	//     "$ref": "Device"
 	//   },
 	//   "scopes": [
 	//     "https://www.googleapis.com/auth/androidenterprise"

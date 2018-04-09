@@ -20,10 +20,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-
-	"cloud.google.com/go/internal/pretty"
 	"cloud.google.com/go/internal/testutil"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/api/googleapi"
 	raw "google.golang.org/api/storage/v1"
 )
@@ -31,16 +30,27 @@ import (
 func TestBucketAttrsToRawBucket(t *testing.T) {
 	t.Parallel()
 	attrs := &BucketAttrs{
-		Name:              "name",
-		ACL:               []ACLRule{{Entity: "bob@example.com", Role: RoleOwner}},
-		DefaultObjectACL:  []ACLRule{{Entity: AllUsers, Role: RoleReader}},
-		Location:          "loc",
-		StorageClass:      "class",
+		Name:             "name",
+		ACL:              []ACLRule{{Entity: "bob@example.com", Role: RoleOwner}},
+		DefaultObjectACL: []ACLRule{{Entity: AllUsers, Role: RoleReader}},
+		Location:         "loc",
+		StorageClass:     "class",
+		RetentionPolicy: &RetentionPolicy{
+			RetentionPeriod: 3 * time.Second,
+		},
 		VersioningEnabled: false,
 		// should be ignored:
 		MetaGeneration: 39,
 		Created:        time.Now(),
 		Labels:         map[string]string{"label": "value"},
+		CORS: []CORS{
+			{
+				MaxAge:          time.Hour,
+				Methods:         []string{"GET", "POST"},
+				Origins:         []string{"*"},
+				ResponseHeaders: []string{"FOO"},
+			},
+		},
 	}
 	got := attrs.toRawBucket()
 	want := &raw.Bucket{
@@ -53,14 +63,21 @@ func TestBucketAttrsToRawBucket(t *testing.T) {
 		},
 		Location:     "loc",
 		StorageClass: "class",
-		Versioning:   nil, // ignore VersioningEnabled if false
-		Labels:       map[string]string{"label": "value"},
+		RetentionPolicy: &raw.BucketRetentionPolicy{
+			RetentionPeriod: 3,
+		},
+		Versioning: nil, // ignore VersioningEnabled if false
+		Labels:     map[string]string{"label": "value"},
+		Cors: []*raw.BucketCors{
+			{
+				MaxAgeSeconds:  3600,
+				Method:         []string{"GET", "POST"},
+				Origin:         []string{"*"},
+				ResponseHeader: []string{"FOO"},
+			},
+		},
 	}
-	msg, ok, err := pretty.Diff(want, got)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !ok {
+	if msg := testutil.Diff(got, want); msg != "" {
 		t.Error(msg)
 	}
 
@@ -69,11 +86,7 @@ func TestBucketAttrsToRawBucket(t *testing.T) {
 	got = attrs.toRawBucket()
 	want.Versioning = &raw.BucketVersioning{Enabled: true}
 	want.Billing = &raw.BucketBilling{RequesterPays: true}
-	msg, ok, err = pretty.Diff(want, got)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !ok {
+	if msg := testutil.Diff(got, want); msg != "" {
 		t.Error(msg)
 	}
 }
@@ -103,11 +116,7 @@ func TestBucketAttrsToUpdateToRawBucket(t *testing.T) {
 		},
 		NullFields: []string{"Labels.b"},
 	}
-	msg, ok, err := pretty.Diff(want, got)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !ok {
+	if msg := testutil.Diff(got, want); msg != "" {
 		t.Error(msg)
 	}
 
@@ -119,14 +128,10 @@ func TestBucketAttrsToUpdateToRawBucket(t *testing.T) {
 		ForceSendFields: []string{"Labels"},
 		NullFields:      []string{"Labels.b"},
 	}
-	msg, ok, err = pretty.Diff(want, got)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !ok {
+
+	if msg := testutil.Diff(got, want); msg != "" {
 		t.Error(msg)
 	}
-
 }
 
 func TestCallBuilders(t *testing.T) {
@@ -248,6 +253,18 @@ func TestNewBucket(t *testing.T) {
 				},
 			}},
 		},
+		RetentionPolicy: &raw.BucketRetentionPolicy{
+			RetentionPeriod: 3,
+			EffectiveTime:   time.Now().Format(time.RFC3339),
+		},
+		Cors: []*raw.BucketCors{
+			{
+				MaxAgeSeconds:  3600,
+				Method:         []string{"GET", "POST"},
+				Origin:         []string{"*"},
+				ResponseHeader: []string{"FOO"},
+			},
+		},
 		Acl: []*raw.BucketAccessControl{
 			{Bucket: "name", Role: "READER", Email: "joe@example.com", Entity: "allUsers"},
 		},
@@ -278,11 +295,25 @@ func TestNewBucket(t *testing.T) {
 				},
 			},
 		},
+		RetentionPolicy: &RetentionPolicy{
+			RetentionPeriod: 3 * time.Second,
+		},
+		CORS: []CORS{
+			{
+				MaxAge:          time.Hour,
+				Methods:         []string{"GET", "POST"},
+				Origins:         []string{"*"},
+				ResponseHeaders: []string{"FOO"},
+			},
+		},
 		ACL:              []ACLRule{{Entity: "allUsers", Role: RoleReader}},
 		DefaultObjectACL: []ACLRule{},
 	}
-	got := newBucket(rb)
-	if diff := testutil.Diff(got, want); diff != "" {
+	got, err := newBucket(rb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := testutil.Diff(got, want, cmpopts.IgnoreTypes(time.Time{})); diff != "" {
 		t.Errorf("got=-, want=+:\n%s", diff)
 	}
 }

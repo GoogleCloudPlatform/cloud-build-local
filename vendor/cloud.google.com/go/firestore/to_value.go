@@ -18,24 +18,23 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"cloud.google.com/go/internal/fields"
-
-	pb "google.golang.org/genproto/googleapis/firestore/v1beta1"
-
 	"github.com/golang/protobuf/ptypes"
+	ts "github.com/golang/protobuf/ptypes/timestamp"
+	pb "google.golang.org/genproto/googleapis/firestore/v1beta1"
 	"google.golang.org/genproto/googleapis/type/latlng"
 )
 
 var nullValue = &pb.Value{&pb.Value_NullValue{}}
 
 var (
-	typeOfByteSlice   = reflect.TypeOf([]byte{})
-	typeOfGoTime      = reflect.TypeOf(time.Time{})
-	typeOfLatLng      = reflect.TypeOf((*latlng.LatLng)(nil))
-	typeOfDocumentRef = reflect.TypeOf((*DocumentRef)(nil))
+	typeOfByteSlice      = reflect.TypeOf([]byte{})
+	typeOfGoTime         = reflect.TypeOf(time.Time{})
+	typeOfLatLng         = reflect.TypeOf((*latlng.LatLng)(nil))
+	typeOfDocumentRef    = reflect.TypeOf((*DocumentRef)(nil))
+	typeOfProtoTimestamp = reflect.TypeOf((*ts.Timestamp)(nil))
 )
 
 // toProtoValue converts a Go value to a Firestore Value protobuf.
@@ -67,6 +66,12 @@ func toProtoValue(v reflect.Value) (pbv *pb.Value, sawServerTimestamp bool, err 
 			return nil, false, err
 		}
 		return &pb.Value{&pb.Value_TimestampValue{ts}}, false, nil
+	case *ts.Timestamp:
+		if x == nil {
+			// gRPC doesn't like nil oneofs. Use NullValue.
+			return nullValue, false, nil
+		}
+		return &pb.Value{&pb.Value_TimestampValue{x}}, false, nil
 	case *latlng.LatLng:
 		if x == nil {
 			// gRPC doesn't like nil oneofs. Use NullValue.
@@ -222,7 +227,7 @@ type tagOptions struct {
 
 // parseTag interprets firestore struct field tags.
 func parseTag(t reflect.StructTag) (name string, keep bool, other interface{}, err error) {
-	name, keep, opts, err := parseStandardTag("firestore", t)
+	name, keep, opts, err := fields.ParseStandardTag("firestore", t)
 	if err != nil {
 		return "", false, nil, fmt.Errorf("firestore: %v", err)
 	}
@@ -240,31 +245,10 @@ func parseTag(t reflect.StructTag) (name string, keep bool, other interface{}, e
 	return name, keep, tagOpts, nil
 }
 
-// parseStandardTag extracts the sub-tag named by key, then parses it using the
-// de facto standard format introduced in encoding/json:
-//   "-" means "ignore this tag". It must occur by itself. (parseStandardTag returns an error
-//       in this case, whereas encoding/json accepts the "-" even if it is not alone.)
-//   "<name>" provides an alternative name for the field
-//   "<name>,opt1,opt2,..." specifies options after the name.
-// The options are returned as a []string.
-//
-// TODO(jba): move this into the fields package, and use it elsewhere, like bigquery.
-func parseStandardTag(key string, t reflect.StructTag) (name string, keep bool, options []string, err error) {
-	s := t.Get(key)
-	parts := strings.Split(s, ",")
-	if parts[0] == "-" {
-		if len(parts) > 1 {
-			return "", false, nil, errors.New(`"-" field tag with options`)
-		}
-		return "", false, nil, nil
-	}
-	return parts[0], true, parts[1:], nil
-}
-
 // isLeafType determines whether or not a type is a 'leaf type'
 // and should not be recursed into, but considered one field.
 func isLeafType(t reflect.Type) bool {
-	return t == typeOfGoTime || t == typeOfLatLng
+	return t == typeOfGoTime || t == typeOfLatLng || t == typeOfProtoTimestamp
 }
 
 var fieldCache = fields.NewCache(parseTag, nil, isLeafType)

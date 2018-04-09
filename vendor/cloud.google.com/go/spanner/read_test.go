@@ -20,14 +20,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"reflect"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"golang.org/x/net/context"
+	"google.golang.org/grpc/status"
 
-	proto "github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/proto"
 	proto3 "github.com/golang/protobuf/ptypes/struct"
 
 	"cloud.google.com/go/spanner/internal/testutil"
@@ -588,10 +588,10 @@ nextTest:
 			}
 			rows = append(rows, rs...)
 		}
-		if !reflect.DeepEqual(p.ts, test.wantTs) {
+		if !testEqual(p.ts, test.wantTs) {
 			t.Errorf("got transaction(%v), want %v", p.ts, test.wantTs)
 		}
-		if !reflect.DeepEqual(rows, test.wantF) {
+		if !testEqual(rows, test.wantF) {
 			t.Errorf("test %d: rows=\n%v\n; want\n%v\n; p.row:\n%v\n", i, describeRows(rows), describeRows(test.wantF), p.row)
 		}
 		if got := p.done(); got != test.wantD {
@@ -718,7 +718,7 @@ func TestRsdNonblockingStates(t *testing.T) {
 				queueingRetryable, // got foo-02
 				aborted,           // got error
 			},
-			wantErr: grpc.Errorf(codes.Unknown, "I quit"),
+			wantErr: status.Errorf(codes.Unknown, "I quit"),
 		},
 		{
 			// unConnected->queueingRetryable->queueingUnretryable->queueingUnretryable
@@ -786,7 +786,7 @@ func TestRsdNonblockingStates(t *testing.T) {
 				s = append(s, aborted)             // Error happens
 				return s
 			}(),
-			wantErr: grpc.Errorf(codes.Unknown, "Just Abort It"),
+			wantErr: status.Errorf(codes.Unknown, "Just Abort It"),
 		},
 	}
 nextTest:
@@ -840,13 +840,13 @@ nextTest:
 			if stateDone {
 				// Check if resumableStreamDecoder carried out expected
 				// state transitions.
-				if !reflect.DeepEqual(st, test.stateHistory) {
+				if !testEqual(st, test.stateHistory) {
 					t.Errorf("%v: observed state transitions: \n%v\n, want \n%v\n",
 						test.name, st, test.stateHistory)
 				}
 				// Check if resumableStreamDecoder returns expected array of
 				// PartialResultSets.
-				if !reflect.DeepEqual(rs, test.want) {
+				if !testEqual(rs, test.want) {
 					t.Errorf("%v: received PartialResultSets: \n%v\n, want \n%v\n", test.name, rs, test.want)
 				}
 				// Verify that resumableStreamDecoder's internal buffering is also correct.
@@ -858,15 +858,15 @@ nextTest:
 					}
 					q = append(q, item)
 				}
-				if !reflect.DeepEqual(q, test.queue) {
+				if !testEqual(q, test.queue) {
 					t.Errorf("%v: PartialResultSets still queued: \n%v\n, want \n%v\n", test.name, q, test.queue)
 				}
 				// Verify resume token.
-				if test.resumeToken != nil && !reflect.DeepEqual(r.resumeToken, test.resumeToken) {
+				if test.resumeToken != nil && !testEqual(r.resumeToken, test.resumeToken) {
 					t.Errorf("%v: Resume token is %v, want %v\n", test.name, r.resumeToken, test.resumeToken)
 				}
 				// Verify error message.
-				if !reflect.DeepEqual(lastErr, test.wantErr) {
+				if !testEqual(lastErr, test.wantErr) {
 					t.Errorf("%v: got error %v, want %v", test.name, lastErr, test.wantErr)
 				}
 				// Proceed to next test
@@ -902,11 +902,11 @@ func TestRsdBlockingStates(t *testing.T) {
 			// unConnected -> unConnected
 			name: "unConnected -> unConnected",
 			rpc: func(ct context.Context, resumeToken []byte) (streamingReceiver, error) {
-				return nil, grpc.Errorf(codes.Unavailable, "trust me: server is unavailable")
+				return nil, status.Errorf(codes.Unavailable, "trust me: server is unavailable")
 			},
 			sql:          "SELECT * from t_whatever",
 			stateHistory: []resumableStreamDecoderState{unConnected, unConnected, unConnected},
-			wantErr:      grpc.Errorf(codes.Unavailable, "trust me: server is unavailable"),
+			wantErr:      status.Errorf(codes.Unavailable, "trust me: server is unavailable"),
 		},
 		{
 			// unConnected -> queueingRetryable
@@ -1120,25 +1120,25 @@ func TestRsdBlockingStates(t *testing.T) {
 		case <-stateDone: // Note that at this point, receiver is still blocking on r.next().
 			// Check if resumableStreamDecoder carried out expected
 			// state transitions.
-			if !reflect.DeepEqual(st, test.stateHistory) {
+			if !testEqual(st, test.stateHistory) {
 				t.Errorf("%v: observed state transitions: \n%v\n, want \n%v\n",
 					test.name, st, test.stateHistory)
 			}
 			// Check if resumableStreamDecoder returns expected array of
 			// PartialResultSets.
-			if !reflect.DeepEqual(rs, test.want) {
+			if !testEqual(rs, test.want) {
 				t.Errorf("%v: received PartialResultSets: \n%v\n, want \n%v\n", test.name, rs, test.want)
 			}
 			// Verify that resumableStreamDecoder's internal buffering is also correct.
-			if !reflect.DeepEqual(q, test.queue) {
+			if !testEqual(q, test.queue) {
 				t.Errorf("%v: PartialResultSets still queued: \n%v\n, want \n%v\n", test.name, q, test.queue)
 			}
 			// Verify resume token.
-			if test.resumeToken != nil && !reflect.DeepEqual(r.resumeToken, test.resumeToken) {
+			if test.resumeToken != nil && !testEqual(r.resumeToken, test.resumeToken) {
 				t.Errorf("%v: Resume token is %v, want %v\n", test.name, r.resumeToken, test.resumeToken)
 			}
 			// Verify error message.
-			if !reflect.DeepEqual(lastErr, test.wantErr) {
+			if !testEqual(lastErr, test.wantErr) {
 				t.Errorf("%v: got error %v, want %v", test.name, lastErr, test.wantErr)
 			}
 		case <-time.After(1 * time.Second):
@@ -1340,12 +1340,12 @@ func TestResumeToken(t *testing.T) {
 			},
 		},
 	}
-	if !reflect.DeepEqual(rows, want) {
+	if !testEqual(rows, want) {
 		t.Errorf("received rows: \n%v\n; but want\n%v\n", rows, want)
 	}
 	// Inject resumable failure.
 	ms.AddMsg(
-		grpc.Errorf(codes.Unavailable, "mock server unavailable"),
+		status.Errorf(codes.Unavailable, "mock server unavailable"),
 		false,
 	)
 	// Test if client detects the resumable failure and retries.
@@ -1365,7 +1365,7 @@ func TestResumeToken(t *testing.T) {
 			{Kind: &proto3.Value_StringValue{StringValue: valStr(2)}},
 		},
 	})
-	if !reflect.DeepEqual(rows, want) {
+	if !testEqual(rows, want) {
 		t.Errorf("received rows: \n%v\n, want\n%v\n", rows, want)
 	}
 	// Sending 3rd - (maxBuffers+1)th rows without resume tokens, client should buffer them.
@@ -1376,7 +1376,7 @@ func TestResumeToken(t *testing.T) {
 		t.Fatalf("failed to wait for row 3-%v: %v", maxBuffers+1, err)
 	}
 	// Received rows should be unchanged.
-	if !reflect.DeepEqual(rows, want) {
+	if !testEqual(rows, want) {
 		t.Errorf("receive rows: \n%v\n, want\n%v\n", rows, want)
 	}
 	// Send (maxBuffers+2)th row to trigger state change of resumableStreamDecoder:
@@ -1396,13 +1396,13 @@ func TestResumeToken(t *testing.T) {
 			},
 		})
 	}
-	if !reflect.DeepEqual(rows, want) {
+	if !testEqual(rows, want) {
 		t.Errorf("received rows: \n%v\n; want\n%v\n", rows, want)
 	}
 	// Inject resumable error, but since resumableStreamDecoder is already at queueingUnretryable
 	// state, query will just fail.
 	ms.AddMsg(
-		grpc.Errorf(codes.Unavailable, "mock server wants some sleep"),
+		status.Errorf(codes.Unavailable, "mock server wants some sleep"),
 		false,
 	)
 	var gotErr error
@@ -1411,7 +1411,7 @@ func TestResumeToken(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatalf("timeout in waiting for failed query to return.")
 	}
-	if wantErr := toSpannerError(grpc.Errorf(codes.Unavailable, "mock server wants some sleep")); !reflect.DeepEqual(gotErr, wantErr) {
+	if wantErr := toSpannerError(status.Errorf(codes.Unavailable, "mock server wants some sleep")); !testEqual(gotErr, wantErr) {
 		t.Fatalf("stream() returns error: %v, but want error: %v", gotErr, wantErr)
 	}
 
@@ -1455,7 +1455,7 @@ func TestResumeToken(t *testing.T) {
 			},
 		},
 	}
-	if !reflect.DeepEqual(rows, want) {
+	if !testEqual(rows, want) {
 		t.Errorf("received rows: \n%v\n; but want\n%v\n", rows, want)
 	}
 }

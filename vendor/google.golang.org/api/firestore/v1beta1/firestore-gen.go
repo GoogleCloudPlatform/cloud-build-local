@@ -529,7 +529,7 @@ type Document struct {
 	//
 	// A simple field name contains only characters `a` to `z`, `A` to
 	// `Z`,
-	// `0` to `9`, or `_`, and must not start with `0` to `9` or `_`. For
+	// `0` to `9`, or `_`, and must not start with `0` to `9`. For
 	// example,
 	// `foo_bar_17`.
 	//
@@ -569,7 +569,7 @@ type Document struct {
 	// UpdateTime: Output only. The time at which the document was last
 	// changed.
 	//
-	// This value is initally set to the `create_time` then
+	// This value is initially set to the `create_time` then
 	// increases
 	// monotonically with each change to the document. It can also
 	// be
@@ -991,7 +991,8 @@ type FieldTransform struct {
 	//   "SERVER_VALUE_UNSPECIFIED" - Unspecified. This value must not be
 	// used.
 	//   "REQUEST_TIME" - The time at which the server processed the
-	// request.
+	// request, with millisecond
+	// precision.
 	SetToServerValue string `json:"setToServerValue,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "FieldPath") to
@@ -2424,10 +2425,12 @@ type Write struct {
 	// UpdateMask: The fields to update in this write.
 	//
 	// This field can be set only when the operation is `update`.
-	// None of the field paths in the mask may contain a reserved name.
-	// If the document exists on the server and has fields not referenced in
-	// the
-	// mask, they are left unchanged.
+	// If the mask is not set for an `update` and the document exists,
+	// any
+	// existing data will be overwritten.
+	// If the mask is set and the document on the server has fields not
+	// covered by
+	// the mask, they are left unchanged.
 	// Fields referenced in the mask, but not present in the input document,
 	// are
 	// deleted from the document on the server.

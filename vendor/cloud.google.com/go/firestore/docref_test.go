@@ -45,7 +45,15 @@ func TestDocGet(t *testing.T) {
 		UpdateTime: aTimestamp,
 		Fields:     map[string]*pb.Value{"f": intval(1)},
 	}
-	srv.addRPC(&pb.GetDocumentRequest{Name: path}, pdoc)
+	srv.addRPC(&pb.BatchGetDocumentsRequest{
+		Database:  c.path(),
+		Documents: []string{path},
+	}, []interface{}{
+		&pb.BatchGetDocumentsResponse{
+			Result:   &pb.BatchGetDocumentsResponse_Found{pdoc},
+			ReadTime: aTimestamp2,
+		},
+	})
 	ref := c.Collection("C").Doc("a")
 	gotDoc, err := ref.Get(ctx)
 	if err != nil {
@@ -55,6 +63,7 @@ func TestDocGet(t *testing.T) {
 		Ref:        ref,
 		CreateTime: aTime,
 		UpdateTime: aTime,
+		ReadTime:   aTime2,
 		proto:      pdoc,
 		c:          c,
 	}
@@ -62,12 +71,17 @@ func TestDocGet(t *testing.T) {
 		t.Fatalf("\ngot  %+v\nwant %+v", gotDoc, wantDoc)
 	}
 
+	path2 := "projects/projectID/databases/(default)/documents/C/b"
 	srv.addRPC(
-		&pb.GetDocumentRequest{
-			Name: "projects/projectID/databases/(default)/documents/C/b",
-		},
-		grpc.Errorf(codes.NotFound, "not found"),
-	)
+		&pb.BatchGetDocumentsRequest{
+			Database:  c.path(),
+			Documents: []string{path2},
+		}, []interface{}{
+			&pb.BatchGetDocumentsResponse{
+				Result:   &pb.BatchGetDocumentsResponse_Missing{path2},
+				ReadTime: aTimestamp3,
+			},
+		})
 	_, err = c.Collection("C").Doc("b").Get(ctx)
 	if grpc.Code(err) != codes.NotFound {
 		t.Errorf("got %v, want NotFound", err)
@@ -185,143 +199,53 @@ var (
 	testFields = map[string]*pb.Value{"a": intval(1)}
 )
 
-// UpdateMap and UpdatePaths are tested by the cross-language tests.
+// Update is tested by the cross-language tests.
 
-func TestUpdateStruct(t *testing.T) {
-	type update struct{ A int }
-	c, srv := newMock(t)
-	wantReq := &pb.CommitRequest{
-		Database: "projects/projectID/databases/(default)",
-		Writes: []*pb.Write{{
-			Operation: &pb.Write_Update{
-				Update: &pb.Document{
-					Name:   "projects/projectID/databases/(default)/documents/C/d",
-					Fields: map[string]*pb.Value{"A": intval(2)},
-				},
-			},
-			UpdateMask: &pb.DocumentMask{FieldPaths: []string{"A", "b.c"}},
-			CurrentDocument: &pb.Precondition{
-				ConditionType: &pb.Precondition_Exists{true},
-			},
-		}},
-	}
-	srv.addRPC(wantReq, commitResponseForSet)
-	wr, err := c.Collection("C").Doc("d").
-		UpdateStruct(context.Background(), []string{"A", "b.c"}, &update{A: 2})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !testEqual(wr, writeResultForSet) {
-		t.Errorf("got %+v, want %+v", wr, writeResultForSet)
-	}
-}
+func TestFPVsFromData(t *testing.T) {
+	type S struct{ X int }
 
-func TestUpdateStructErrors(t *testing.T) {
-	type update struct{ A int }
-
-	ctx := context.Background()
-	c, _ := newMock(t)
-	doc := c.Collection("C").Doc("d")
 	for _, test := range []struct {
-		desc   string
-		fields []string
-		data   interface{}
+		in   interface{}
+		want []fpv
 	}{
 		{
-			desc: "data is not a struct or *struct",
-			data: map[string]interface{}{"a": 1},
+			in:   nil,
+			want: []fpv{{nil, nil}},
 		},
 		{
-			desc:   "no paths",
-			fields: nil,
-			data:   update{},
+			in:   map[string]interface{}{"a": nil},
+			want: []fpv{{[]string{"a"}, nil}},
 		},
 		{
-			desc:   "empty",
-			fields: []string{""},
-			data:   update{},
+			in:   map[string]interface{}{"a": 1},
+			want: []fpv{{[]string{"a"}, 1}},
 		},
 		{
-			desc:   "empty component",
-			fields: []string{"a.b..c"},
-			data:   update{},
-		},
-		{
-			desc:   "duplicate field",
-			fields: []string{"a", "b", "c", "a"},
-			data:   update{},
-		},
-		{
-			desc:   "invalid character",
-			fields: []string{"a", "b]"},
-			data:   update{},
-		},
-		{
-			desc:   "prefix",
-			fields: []string{"a", "b", "c", "b.c"},
-			data:   update{},
-		},
-	} {
-		_, err := doc.UpdateStruct(ctx, test.fields, test.data)
-		if err == nil {
-			t.Errorf("%s: got nil, want error", test.desc)
-		}
-	}
-}
-
-func TestApplyFieldPaths(t *testing.T) {
-	submap := mapval(map[string]*pb.Value{
-		"b": intval(1),
-		"c": intval(2),
-	})
-	fields := map[string]*pb.Value{
-		"a": submap,
-		"d": intval(3),
-	}
-	for _, test := range []struct {
-		fps  []FieldPath
-		want map[string]*pb.Value
-	}{
-		{nil, nil},
-		{[]FieldPath{[]string{"z"}}, nil},
-		{[]FieldPath{[]string{"a"}}, map[string]*pb.Value{"a": submap}},
-		{[]FieldPath{[]string{"a", "b", "c"}}, nil},
-		{[]FieldPath{[]string{"d"}}, map[string]*pb.Value{"d": intval(3)}},
-		{
-			[]FieldPath{[]string{"d"}, []string{"a", "c"}},
-			map[string]*pb.Value{
-				"a": mapval(map[string]*pb.Value{"c": intval(2)}),
-				"d": intval(3),
+			in: map[string]interface{}{
+				"a": 1,
+				"b": map[string]interface{}{"c": 2},
 			},
+			want: []fpv{{[]string{"a"}, 1}, {[]string{"b", "c"}, 2}},
+		},
+		{
+			in:   map[string]interface{}{"s": &S{X: 3}},
+			want: []fpv{{[]string{"s"}, &S{X: 3}}},
 		},
 	} {
-		got := applyFieldPaths(fields, test.fps, nil)
-		if !testEqual(got, test.want) {
-			t.Errorf("%v:\ngot %v\nwant \n%v", test.fps, got, test.want)
-		}
-	}
-}
-
-func TestFieldPathsFromMap(t *testing.T) {
-	for _, test := range []struct {
-		in   map[string]interface{}
-		want []string
-	}{
-		{nil, nil},
-		{map[string]interface{}{"a": 1}, []string{"a"}},
-		{map[string]interface{}{
-			"a": 1,
-			"b": map[string]interface{}{"c": 2},
-		}, []string{"a", "b.c"}},
-	} {
-		fps := fieldPathsFromMap(reflect.ValueOf(test.in), nil)
-		got := toServiceFieldPaths(fps)
-		sort.Strings(got)
+		var got []fpv
+		fpvsFromData(reflect.ValueOf(test.in), nil, &got)
+		sort.Sort(byFieldPath(got))
 		if !testEqual(got, test.want) {
 			t.Errorf("%+v: got %v, want %v", test.in, got, test.want)
 		}
 	}
 }
+
+type byFieldPath []fpv
+
+func (b byFieldPath) Len() int           { return len(b) }
+func (b byFieldPath) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
+func (b byFieldPath) Less(i, j int) bool { return b[i].fieldPath.less(b[j].fieldPath) }
 
 func commitRequestForSet() *pb.CommitRequest {
 	return &pb.CommitRequest{
@@ -336,5 +260,53 @@ func commitRequestForSet() *pb.CommitRequest {
 				},
 			},
 		},
+	}
+}
+
+func TestUpdateProcess(t *testing.T) {
+	for _, test := range []struct {
+		in      Update
+		want    fpv
+		wantErr bool
+	}{
+		{
+			in:   Update{Path: "a", Value: 1},
+			want: fpv{fieldPath: []string{"a"}, value: 1},
+		},
+		{
+			in:   Update{Path: "c.d", Value: Delete},
+			want: fpv{fieldPath: []string{"c", "d"}, value: Delete},
+		},
+		{
+			in:   Update{FieldPath: []string{"*", "~"}, Value: ServerTimestamp},
+			want: fpv{fieldPath: []string{"*", "~"}, value: ServerTimestamp},
+		},
+		{
+			in:      Update{Path: "*"},
+			wantErr: true, // bad rune in path
+		},
+		{
+			in:      Update{Path: "a", FieldPath: []string{"b"}},
+			wantErr: true, // both Path and FieldPath
+		},
+		{
+			in:      Update{Value: 1},
+			wantErr: true, // neither Path nor FieldPath
+		},
+		{
+			in:      Update{FieldPath: []string{"", "a"}},
+			wantErr: true, // empty FieldPath component
+		},
+	} {
+		got, err := test.in.process()
+		if test.wantErr {
+			if err == nil {
+				t.Errorf("%+v: got nil, want error", test.in)
+			}
+		} else if err != nil {
+			t.Errorf("%+v: got error %v, want nil", test.in, err)
+		} else if !testEqual(got, test.want) {
+			t.Errorf("%+v: got %+v, want %+v", test.in, got, test.want)
+		}
 	}
 }

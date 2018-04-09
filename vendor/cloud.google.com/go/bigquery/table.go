@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"time"
 
+	"cloud.google.com/go/internal/trace"
 	"golang.org/x/net/context"
 
 	"cloud.google.com/go/internal/optional"
@@ -75,6 +76,9 @@ type TableMetadata struct {
 
 	// Information about a table stored outside of BigQuery.
 	ExternalDataConfig *ExternalDataConfig
+
+	// Custom encryption configuration (e.g., Cloud KMS keys).
+	EncryptionConfig *EncryptionConfig
 
 	// All the fields below are read-only.
 
@@ -147,6 +151,11 @@ type TimePartitioning struct {
 	// The amount of time to keep the storage for a partition.
 	// If the duration is empty (0), the data in the partitions do not expire.
 	Expiration time.Duration
+
+	// If empty, the table is partitioned by pseudo column '_PARTITIONTIME'; if set, the
+	// table is partitioned by this field. The field must be a top-level TIMESTAMP or
+	// DATE field. Its mode must be NULLABLE or REQUIRED.
+	Field string
 }
 
 func (p *TimePartitioning) toBQ() *bq.TimePartitioning {
@@ -156,6 +165,7 @@ func (p *TimePartitioning) toBQ() *bq.TimePartitioning {
 	return &bq.TimePartitioning{
 		Type:         "DAY",
 		ExpirationMs: int64(p.Expiration / time.Millisecond),
+		Field:        p.Field,
 	}
 }
 
@@ -165,6 +175,33 @@ func bqToTimePartitioning(q *bq.TimePartitioning) *TimePartitioning {
 	}
 	return &TimePartitioning{
 		Expiration: time.Duration(q.ExpirationMs) * time.Millisecond,
+		Field:      q.Field,
+	}
+}
+
+// EncryptionConfig configures customer-managed encryption on tables.
+type EncryptionConfig struct {
+	// Describes the Cloud KMS encryption key that will be used to protect
+	// destination BigQuery table. The BigQuery Service Account associated with your
+	// project requires access to this encryption key.
+	KMSKeyName string
+}
+
+func (e *EncryptionConfig) toBQ() *bq.EncryptionConfiguration {
+	if e == nil {
+		return nil
+	}
+	return &bq.EncryptionConfiguration{
+		KmsKeyName: e.KMSKeyName,
+	}
+}
+
+func bqToEncryptionConfig(q *bq.EncryptionConfiguration) *EncryptionConfig {
+	if q == nil {
+		return nil
+	}
+	return &EncryptionConfig{
+		KMSKeyName: q.KmsKeyName,
 	}
 }
 
@@ -206,7 +243,10 @@ func (t *Table) implicitTable() bool {
 // Expiration can only be set during table creation.
 // After table creation, a view can be modified only if its table was initially created
 // with a view.
-func (t *Table) Create(ctx context.Context, tm *TableMetadata) error {
+func (t *Table) Create(ctx context.Context, tm *TableMetadata) (err error) {
+	ctx = trace.StartSpan(ctx, "cloud.google.com/go/bigquery.Table.Create")
+	defer func() { trace.EndSpan(ctx, err) }()
+
 	table, err := tm.toBQ()
 	if err != nil {
 		return err
@@ -258,6 +298,7 @@ func (tm *TableMetadata) toBQ() (*bq.Table, error) {
 		edc := tm.ExternalDataConfig.toBQ()
 		t.ExternalDataConfiguration = &edc
 	}
+	t.EncryptionConfiguration = tm.EncryptionConfig.toBQ()
 	if tm.FullID != "" {
 		return nil, errors.New("cannot set FullID on create")
 	}
@@ -286,11 +327,14 @@ func (tm *TableMetadata) toBQ() (*bq.Table, error) {
 }
 
 // Metadata fetches the metadata for the table.
-func (t *Table) Metadata(ctx context.Context) (*TableMetadata, error) {
+func (t *Table) Metadata(ctx context.Context) (md *TableMetadata, err error) {
+	ctx = trace.StartSpan(ctx, "cloud.google.com/go/bigquery.Table.Metadata")
+	defer func() { trace.EndSpan(ctx, err) }()
+
 	req := t.c.bqs.Tables.Get(t.ProjectID, t.DatasetID, t.TableID).Context(ctx)
 	setClientHeader(req.Header())
 	var table *bq.Table
-	err := runWithRetry(ctx, func() (err error) {
+	err = runWithRetry(ctx, func() (err error) {
 		table, err = req.Do()
 		return err
 	})
@@ -313,6 +357,7 @@ func bqToTableMetadata(t *bq.Table) (*TableMetadata, error) {
 		CreationTime:     unixMillisToTime(t.CreationTime),
 		LastModifiedTime: unixMillisToTime(int64(t.LastModifiedTime)),
 		ETag:             t.Etag,
+		EncryptionConfig: bqToEncryptionConfig(t.EncryptionConfiguration),
 	}
 	if t.Schema != nil {
 		md.Schema = bqToSchema(t.Schema)
@@ -340,7 +385,10 @@ func bqToTableMetadata(t *bq.Table) (*TableMetadata, error) {
 }
 
 // Delete deletes the table.
-func (t *Table) Delete(ctx context.Context) error {
+func (t *Table) Delete(ctx context.Context) (err error) {
+	ctx = trace.StartSpan(ctx, "cloud.google.com/go/bigquery.Table.Delete")
+	defer func() { trace.EndSpan(ctx, err) }()
+
 	req := t.c.bqs.Tables.Delete(t.ProjectID, t.DatasetID, t.TableID).Context(ctx)
 	setClientHeader(req.Header())
 	return req.Do()
@@ -356,7 +404,10 @@ func (t *Table) read(ctx context.Context, pf pageFetcher) *RowIterator {
 }
 
 // Update modifies specific Table metadata fields.
-func (t *Table) Update(ctx context.Context, tm TableMetadataToUpdate, etag string) (*TableMetadata, error) {
+func (t *Table) Update(ctx context.Context, tm TableMetadataToUpdate, etag string) (md *TableMetadata, err error) {
+	ctx = trace.StartSpan(ctx, "cloud.google.com/go/bigquery.Table.Update")
+	defer func() { trace.EndSpan(ctx, err) }()
+
 	bqt := tm.toBQ()
 	call := t.c.bqs.Tables.Patch(t.ProjectID, t.DatasetID, t.TableID, bqt).Context(ctx)
 	setClientHeader(call.Header())

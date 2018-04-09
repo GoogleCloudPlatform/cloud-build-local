@@ -1,10 +1,10 @@
-// Copyright 2017, Google LLC All rights reserved.
+// Copyright 2018 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//     https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -45,7 +45,7 @@ func defaultClientOptions() []option.ClientOption {
 
 func defaultCallOptions() *CallOptions {
 	retry := map[[2]string][]gax.CallOption{
-		{"write_sink", "idempotent"}: {
+		{"default", "idempotent"}: {
 			gax.WithRetry(func() gax.Retryer {
 				return gax.OnCodes([]codes.Code{
 					codes.DeadlineExceeded,
@@ -59,8 +59,8 @@ func defaultCallOptions() *CallOptions {
 		},
 	}
 	return &CallOptions{
-		BatchWriteSpans: retry[[2]string{"write_sink", "non_idempotent"}],
-		CreateSpan:      retry[[2]string{"write_sink", "idempotent"}],
+		BatchWriteSpans: retry[[2]string{"default", "non_idempotent"}],
+		CreateSpan:      retry[[2]string{"default", "idempotent"}],
 	}
 }
 
@@ -121,31 +121,8 @@ func (c *Client) setGoogleClientInfo(keyval ...string) {
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// ProjectPath returns the path for the project resource.
-func ProjectPath(project string) string {
-	return "" +
-		"projects/" +
-		project +
-		""
-}
-
-// SpanPath returns the path for the span resource.
-func SpanPath(project, trace, span string) string {
-	return "" +
-		"projects/" +
-		project +
-		"/traces/" +
-		trace +
-		"/spans/" +
-		span +
-		""
-}
-
-// BatchWriteSpans sends new spans to Stackdriver Trace or updates existing traces. If the
-// name of a trace that you send matches that of an existing trace, new spans
-// are added to the existing trace. Attempt to update existing spans results
-// undefined behavior. If the name does not match, a new trace is created
-// with given set of spans.
+// BatchWriteSpans sends new spans to new or existing traces. You cannot update
+// existing spans.
 func (c *Client) BatchWriteSpans(ctx context.Context, req *cloudtracepb.BatchWriteSpansRequest, opts ...gax.CallOption) error {
 	ctx = insertMetadata(ctx, c.xGoogMetadata)
 	opts = append(c.CallOptions.BatchWriteSpans[0:len(c.CallOptions.BatchWriteSpans):len(c.CallOptions.BatchWriteSpans)], opts...)
@@ -157,7 +134,7 @@ func (c *Client) BatchWriteSpans(ctx context.Context, req *cloudtracepb.BatchWri
 	return err
 }
 
-// CreateSpan creates a new Span.
+// CreateSpan creates a new span.
 func (c *Client) CreateSpan(ctx context.Context, req *cloudtracepb.Span, opts ...gax.CallOption) (*cloudtracepb.Span, error) {
 	ctx = insertMetadata(ctx, c.xGoogMetadata)
 	opts = append(c.CallOptions.CreateSpan[0:len(c.CallOptions.CreateSpan):len(c.CallOptions.CreateSpan)], opts...)
