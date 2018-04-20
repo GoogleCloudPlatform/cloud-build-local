@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/afero"
 	computeMetadata "cloud.google.com/go/compute/metadata"
 	"golang.org/x/oauth2"
 	"github.com/google/uuid"
@@ -45,7 +46,7 @@ import (
 
 const (
 	volumeNamePrefix  = "cloudbuild_vol_"
-	gcbDockerVersion  = "17.06.1-ce"
+	gcbDockerVersion  = "17.12.0-ce"
 	metadataImageName = "gcr.io/cloud-builders/metadata"
 )
 
@@ -66,7 +67,9 @@ func exitUsage(msg string) {
 
 func main() {
 	flag.Parse()
+	ctx := context.Background()
 	args := flag.Args()
+	log.SetOutput(os.Stdout)
 
 	if *help {
 		flag.PrintDefaults()
@@ -100,7 +103,7 @@ func main() {
 		exitUsage("Specify a config file")
 	}
 
-	if err := run(source); err != nil {
+	if err := run(ctx, source); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -108,7 +111,7 @@ func main() {
 // run method is used to encapsulate the local builder process, being
 // able to return errors to the main function which will then panic. So the
 // run function can probably run all the defer functions in any case.
-func run(source string) error {
+func run(ctx context.Context, source string) error {
 	// Create a runner.
 	r := &runner.RealRunner{
 		DryRun: *dryRun,
@@ -120,13 +123,13 @@ func run(source string) error {
 	stopchan := make(chan struct{})
 
 	// Clean leftovers from a previous build.
-	if err := common.Clean(r); err != nil {
+	if err := common.Clean(ctx, r); err != nil {
 		return fmt.Errorf("Error cleaning: %v", err)
 	}
 
 	// Check installed docker versions.
 	if !*dryRun {
-		dockerServerVersion, dockerClientVersion, err := dockerVersions(r)
+		dockerServerVersion, dockerClientVersion, err := dockerVersions(ctx, r)
 		if err != nil {
 			return fmt.Errorf("Error getting local docker versions: %v", err)
 		}
@@ -143,19 +146,12 @@ func run(source string) error {
 	if err != nil {
 		return fmt.Errorf("Error loading config file: %v", err)
 	}
-
-	// Parse substitutions.
-	if *substitutions != "" {
-		substMap, err := common.ParseSubstitutionsFlag(*substitutions)
-		if err != nil {
-			return fmt.Errorf("Error parsing substitutions flag: %v", err)
-		}
-		buildConfig.Substitutions = substMap
-	}
+	// When the build is run locally, there will be no build ID. Assign a unique value.
+	buildConfig.Id = "localbuild_" + uuid.New()
 
 	// Get the ProjectId to feed both the build and the metadata server.
 	// This command uses a runner without dryrun to return the real project.
-	projectInfo, err := gcloud.ProjectInfo(&runner.RealRunner{})
+	projectInfo, err := gcloud.ProjectInfo(ctx, &runner.RealRunner{})
 	if err != nil {
 		return fmt.Errorf("Error getting project information from gcloud: %v", err)
 	}
@@ -164,6 +160,22 @@ func run(source string) error {
 	// Validate the build.
 	if err := validate.CheckBuild(buildConfig); err != nil {
 		return fmt.Errorf("Error validating build: %v", err)
+	}
+	// Do not accept built-in substitutions in the build config.
+	if err := validate.CheckSubstitutions(buildConfig.Substitutions); err != nil {
+		return fmt.Errorf("Error validating build's substitutions: %v", err)
+	}
+
+	// Parse substitutions.
+	if *substitutions != "" {
+		substMap, err := common.ParseSubstitutionsFlag(*substitutions)
+		if err != nil {
+			return fmt.Errorf("Error parsing substitutions flag: %v", err)
+		}
+		if err := validate.CheckSubstitutionsLoose(substMap); err != nil {
+			return err
+		}
+		buildConfig.Substitutions = substMap
 	}
 
 	// Apply substitutions.
@@ -180,7 +192,7 @@ func run(source string) error {
 	volumeName := fmt.Sprintf("%s%s", volumeNamePrefix, uuid.New())
 	if !*dryRun {
 		vol := volume.New(volumeName, r)
-		if err := vol.Setup(); err != nil {
+		if err := vol.Setup(ctx); err != nil {
 			return fmt.Errorf("Error creating docker volume: %v", err)
 		}
 		if source != "" {
@@ -190,26 +202,26 @@ func run(source string) error {
 			} else if isDir {
 				source = filepath.Clean(source) + "/."
 			}
-			if err := vol.Copy(source); err != nil {
+			if err := vol.Copy(ctx, source); err != nil {
 				return fmt.Errorf("Error copying source to docker volume: %v", err)
 			}
 		}
-		defer vol.Close()
+		defer vol.Close(ctx)
 		if *writeWorkspace != "" {
-			defer vol.Export(*writeWorkspace)
+			defer vol.Export(ctx, *writeWorkspace)
 		}
 	}
 
-	b := build.New(r, *buildConfig, nil /* TokenSource */, stdoutLogger{}, nopEventLogger{}, volumeName, true, *push, *dryRun)
+	b := build.New(r, *buildConfig, nil /* TokenSource */, stdoutLogger{}, nopEventLogger{}, volumeName, afero.NewOsFs(), true, *push, *dryRun)
 
 	// Do not run the spoofed metadata server on a dryrun.
 	if !*dryRun {
 		// Set initial Docker credentials.
-		tok, err := gcloud.AccessToken(r)
+		tok, err := gcloud.AccessToken(ctx, r)
 		if err != nil {
 			return fmt.Errorf("Error getting access token to set docker credentials: %v", err)
 		}
-		if err := b.SetDockerAccessToken(tok.AccessToken); err != nil {
+		if err := b.SetDockerAccessToken(ctx, tok.AccessToken); err != nil {
 			return fmt.Errorf("Error setting docker credentials: %v", err)
 		}
 		b.TokenSource = oauth2.StaticTokenSource(&oauth2.Token{
@@ -219,22 +231,22 @@ func run(source string) error {
 		// On GCE, do not create a spoofed metadata server, use the existing one.
 		// The cloudbuild network is still needed, with a private subnet.
 		if computeMetadata.OnGCE() {
-			if err := metadata.CreateCloudbuildNetwork(r, "172.22.0.0/16"); err != nil {
+			if err := metadata.CreateCloudbuildNetwork(ctx, r, "172.22.0.0/16"); err != nil {
 				return fmt.Errorf("Error creating network: %v", err)
 			}
-			defer metadata.CleanCloudbuildNetwork(r)
+			defer metadata.CleanCloudbuildNetwork(ctx, r)
 		} else {
-			if err := metadata.StartLocalServer(r, metadataImageName); err != nil {
+			if err := metadata.StartLocalServer(ctx, r, metadataImageName); err != nil {
 				return fmt.Errorf("Failed to start spoofed metadata server: %v", err)
 			}
 			log.Println("Started spoofed metadata server")
 			metadataUpdater := metadata.RealUpdater{Local: true}
-			defer metadataUpdater.Stop(r)
+			defer metadataUpdater.Stop(ctx, r)
 
 			// Feed the project info to the metadata server.
 			metadataUpdater.SetProjectInfo(projectInfo)
 
-			go supplyTokenToMetadata(metadataUpdater, r, stopchan)
+			go supplyTokenToMetadata(ctx, metadataUpdater, r, stopchan)
 		}
 
 		// Write docker credentials for GCR. This writes the initial
@@ -252,13 +264,13 @@ func run(source string) error {
 				select {
 				case <-time.After(refresh):
 					var err error
-					tok, err = gcloud.AccessToken(r)
+					tok, err = gcloud.AccessToken(ctx, r)
 					if err != nil {
 						log.Printf("Error getting access token to update docker credentials: %v\n", err)
 						continue
 					}
 
-					if err := b.UpdateDockerAccessToken(tok.AccessToken); err != nil {
+					if err := b.UpdateDockerAccessToken(ctx, tok.AccessToken); err != nil {
 						log.Printf("Error updating docker credentials: %v", err)
 					}
 
@@ -272,12 +284,12 @@ func run(source string) error {
 		}(tok, stopchan)
 	}
 
-	b.Start()
+	b.Start(ctx)
 	<-b.Done
 
 	close(stopchan)
 
-	if b.GetStatus() == build.StatusError {
+	if b.GetStatus().BuildStatus == build.StatusError {
 		return fmt.Errorf("Build finished with ERROR status")
 	}
 
@@ -288,9 +300,9 @@ func run(source string) error {
 }
 
 // supplyTokenToMetadata gets gcloud token and supply it to the metadata server.
-func supplyTokenToMetadata(metadataUpdater metadata.RealUpdater, r runner.Runner, stopchan <-chan struct{}) {
+func supplyTokenToMetadata(ctx context.Context, metadataUpdater metadata.RealUpdater, r runner.Runner, stopchan <-chan struct{}) {
 	for {
-		tok, err := gcloud.AccessToken(r)
+		tok, err := gcloud.AccessToken(ctx, r)
 		if err != nil {
 			log.Printf("Error getting gcloud token: %v", err)
 			continue
@@ -310,16 +322,16 @@ func supplyTokenToMetadata(metadataUpdater metadata.RealUpdater, r runner.Runner
 }
 
 // dockerVersion gets local server and client docker versions.
-func dockerVersions(r runner.Runner) (string, string, error) {
+func dockerVersions(ctx context.Context, r runner.Runner) (string, string, error) {
 	cmd := []string{"docker", "version", "--format", "{{.Server.Version}}"}
 	var serverb bytes.Buffer
-	if err := r.Run(cmd, nil, &serverb, os.Stderr, ""); err != nil {
+	if err := r.Run(ctx, cmd, nil, &serverb, os.Stderr, ""); err != nil {
 		return "", "", err
 	}
 
 	cmd = []string{"docker", "version", "--format", "{{.Client.Version}}"}
 	var clientb bytes.Buffer
-	if err := r.Run(cmd, nil, &clientb, os.Stderr, ""); err != nil {
+	if err := r.Run(ctx, cmd, nil, &clientb, os.Stderr, ""); err != nil {
 		return "", "", err
 	}
 
@@ -373,5 +385,5 @@ func (pw prefixWriter) Write(b []byte) (int, error) {
 
 type nopEventLogger struct{}
 
-func (nopEventLogger) StartStep(context.Context, int) error        { return nil }
-func (nopEventLogger) FinishStep(context.Context, int, bool) error { return nil }
+func (nopEventLogger) StartStep(context.Context, int, time.Time) error        { return nil }
+func (nopEventLogger) FinishStep(context.Context, int, bool, time.Time) error { return nil }

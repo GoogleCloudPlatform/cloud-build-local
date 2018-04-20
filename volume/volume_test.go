@@ -15,6 +15,7 @@
 package volume
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -39,7 +40,7 @@ func newMockRunner(t *testing.T) *mockRunner {
 	}
 }
 
-func (r *mockRunner) Run(args []string, in io.Reader, out, err io.Writer, _ string) error {
+func (r *mockRunner) Run(ctx context.Context, args []string, in io.Reader, out, err io.Writer, _ string) error {
 	r.mu.Lock()
 	r.commands = append(r.commands, strings.Join(args, " "))
 	r.mu.Unlock()
@@ -59,10 +60,11 @@ func (r *mockRunner) Clean() error {
 }
 
 func TestSetup(t *testing.T) {
+	ctx := context.Background()
 	r := newMockRunner(t)
 	vol := New(volumeName, r)
 
-	if err := vol.Setup(); err != nil {
+	if err := vol.Setup(ctx); err != nil {
 		t.Errorf("Setup failed: %v", err)
 	}
 
@@ -74,10 +76,11 @@ func TestSetup(t *testing.T) {
 }
 
 func TestCopy(t *testing.T) {
+	ctx := context.Background()
 	r := newMockRunner(t)
 	vol := New(volumeName, r)
 
-	if err := vol.Copy("/wherever/you/want"); err != nil {
+	if err := vol.Copy(ctx, "/wherever/you/want"); err != nil {
 		t.Errorf("Copy failed: %v", err)
 	}
 
@@ -90,10 +93,11 @@ docker cp /wherever/you/want gcb-local-vol-helper:/workspace`
 }
 
 func TestExport(t *testing.T) {
+	ctx := context.Background()
 	r := newMockRunner(t)
 	vol := New(volumeName, r)
 
-	if err := vol.Export("/wherever/you/want"); err != nil {
+	if err := vol.Export(ctx, "/wherever/you/want"); err != nil {
 		t.Errorf("Copy failed: %v", err)
 	}
 
@@ -106,13 +110,14 @@ docker cp gcb-local-vol-helper:/workspace /wherever/you/want`
 }
 
 func TestCopyTwice(t *testing.T) {
+	ctx := context.Background()
 	r := newMockRunner(t)
 	vol := New(volumeName, r)
 
-	if err := vol.Copy("/wherever/you/want"); err != nil {
+	if err := vol.Copy(ctx, "/wherever/you/want"); err != nil {
 		t.Errorf("Copy failed: %v", err)
 	}
-	if err := vol.Copy("/wherever/else/you/want"); err != nil {
+	if err := vol.Copy(ctx, "/wherever/else/you/want"); err != nil {
 		t.Errorf("Copy failed: %v", err)
 	}
 
@@ -126,10 +131,11 @@ docker cp /wherever/else/you/want gcb-local-vol-helper:/workspace`
 }
 
 func TestClose(t *testing.T) {
+	ctx := context.Background()
 	r := newMockRunner(t)
 	vol := New(volumeName, r)
 
-	if err := vol.Close(); err != nil {
+	if err := vol.Close(ctx); err != nil {
 		t.Errorf("Close failed: %v", err)
 	}
 
@@ -141,14 +147,15 @@ func TestClose(t *testing.T) {
 }
 
 func TestCloseWithHelper(t *testing.T) {
+	ctx := context.Background()
 	r := newMockRunner(t)
 	vol := New(volumeName, r)
 
-	if err := vol.Copy("/wherever/you/want"); err != nil {
+	if err := vol.Copy(ctx, "/wherever/you/want"); err != nil {
 		t.Errorf("Copy failed: %v", err)
 	}
 
-	if err := vol.Close(); err != nil {
+	if err := vol.Close(ctx); err != nil {
 		t.Errorf("Close failed: %v", err)
 	}
 

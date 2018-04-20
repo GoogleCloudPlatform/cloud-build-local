@@ -2,7 +2,7 @@
 # binaries and copy them to GCS.
 steps:
 # Run unit tests in all subdirectories (except those excluded by the grep).
-- name: 'gcr.io/cloud-builders/go:wheezy'
+- name: 'gcr.io/cloud-builders/go:debian'
   entrypoint: 'bash'
   args:
   - '-c'
@@ -13,7 +13,7 @@ steps:
   args: ['sed', '-i', 's/HEAD/$TAG_NAME/g', 'version.go']
 # Create binaries for each pair of OS/Arch.
 # Create an archive with the latest binaries; that enables a single download url.
-- name: 'gcr.io/cloud-builders/go:wheezy'
+- name: 'gcr.io/cloud-builders/go:debian'
   entrypoint: 'bash'
   args:
   - '-c'
