@@ -14,6 +14,8 @@
 
 package build
 
+import pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
+
 // StartStep is a build step WaitFor dependency that is always satisfied.
 const StartStep = "-"
 
@@ -21,6 +23,8 @@ const StartStep = "-"
 type BuildStatus string
 
 const (
+	// StatusNotStarted - Default status for newly-created builds until they begin.
+	StatusNotStarted = ""
 	// StatusFetchSource - Fetching source.
 	StatusFetchSource BuildStatus = "FETCHSOURCE"
 	// StatusBuild - Executing the build step images on the source.
@@ -29,9 +33,26 @@ const (
 	StatusPush BuildStatus = "PUSH"
 	// StatusDone - Build completed successfully.
 	StatusDone BuildStatus = "DONE"
+	// StatusStepTimeout - A build step has timed out.
+	StatusStepTimeout BuildStatus = "STEP_TIMEOUT"
 	// StatusError - Build failed.
 	StatusError BuildStatus = "ERROR"
+	// StatusTimeout - Build timed out.
+	StatusTimeout BuildStatus = "TIMEOUT"
+	// StatusCancelled - Build was cancelled.
+	StatusCancelled BuildStatus = "CANCELLED"
 )
+
+// FullStatus contains detailed status of the build, including status of each
+// build step.
+type FullStatus struct {
+	// BuildStatus is the overall build status.
+	BuildStatus BuildStatus
+
+	// StepStatus is the status of each individual build step; StepStatus is
+	// listed in the same order as the build steps in the build request.
+	StepStatus []pb.Build_Status
+}
 
 // HashType is a pseudo-enum of valid SourceHashes.
 type HashType string
@@ -56,11 +77,13 @@ type Hash struct {
 
 // BuildSummary is the data returned by the blocking /build/summary endpoint.
 type BuildSummary struct {
-	Status          BuildStatus
+	Status     BuildStatus
+	StepStatus []pb.Build_Status
 	BuiltImages     []BuiltImage
 	BuildStepImages []string // index of build step -> digest, else empty string
 	FileHashes      map[string][]Hash
 	Timing          TimingInfo
+	Artifacts       ArtifactsInfo
 }
 
 // BuiltImage is information about an image that resulted from this build and
