@@ -28,7 +28,7 @@ import (
 
 	"google3/net/proto2/go/proto"
 	"github.com/spf13/afero"
-	"github.com/google/uuid"
+	"github.com/pborman/uuid"
 )
 
 var joinedHeaders = strings.Join(csvHeaders, ",")

@@ -37,7 +37,7 @@ import (
 	"github.com/GoogleCloudPlatform/container-builder-local/runner"
 	"github.com/spf13/afero"
 	"golang.org/x/oauth2"
-	"github.com/google/uuid"
+	"github.com/pborman/uuid"
 
 	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 )

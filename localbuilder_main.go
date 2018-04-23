@@ -31,7 +31,7 @@ import (
 	"github.com/spf13/afero"
 	computeMetadata "cloud.google.com/go/compute/metadata"
 	"golang.org/x/oauth2"
-	"github.com/google/uuid"
+	"github.com/pborman/uuid"
 
 	"github.com/GoogleCloudPlatform/container-builder-local/build"
 	"github.com/GoogleCloudPlatform/container-builder-local/common"

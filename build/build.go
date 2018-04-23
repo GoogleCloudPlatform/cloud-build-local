@@ -42,7 +42,7 @@ import (
 	"github.com/spf13/afero"
 	"google.golang.org/api/cloudkms/v1"
 	"golang.org/x/oauth2"
-	"github.com/google/uuid"
+	"github.com/pborman/uuid"
 )
 
 const (

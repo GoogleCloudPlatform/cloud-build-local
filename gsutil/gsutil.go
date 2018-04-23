@@ -33,7 +33,7 @@ import (
 	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 	"github.com/GoogleCloudPlatform/container-builder-local/runner"
 	"github.com/spf13/afero"
-	"github.com/google/uuid"
+	"github.com/pborman/uuid"
 )
 
 const (
