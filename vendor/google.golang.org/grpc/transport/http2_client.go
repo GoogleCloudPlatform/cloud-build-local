@@ -30,6 +30,8 @@ import (
 	"golang.org/x/net/context"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
+
+	"google.golang.org/grpc/channelz"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
@@ -101,6 +103,8 @@ type http2Client struct {
 	// goAwayReason records the http2.ErrCode and debug data received with the
 	// GoAway frame.
 	goAwayReason GoAwayReason
+
+	channelzID int64 // channelz unique identification number
 }
 
 func dial(ctx context.Context, fn func(context.Context, string) (net.Conn, error), addr string) (net.Conn, error) {
@@ -237,6 +241,9 @@ func newHTTP2Client(connectCtx, ctx context.Context, addr TargetInfo, opts Conne
 			Client: true,
 		}
 		t.statsHandler.HandleConn(t.ctx, connBegin)
+	}
+	if channelz.IsOn() {
+		t.channelzID = channelz.RegisterNormalSocket(t, opts.ChannelzParentID, "")
 	}
 	// Start the reader goroutine for incoming message. Each transport has
 	// a dedicated goroutine which reads HTTP2 frame from network. Then it
@@ -665,6 +672,9 @@ func (t *http2Client) Close() error {
 	t.controlBuf.finish()
 	t.cancel()
 	err := t.conn.Close()
+	if channelz.IsOn() {
+		channelz.RemoveEntry(t.channelzID)
+	}
 	// Notify all active streams.
 	for _, s := range streams {
 		t.closeStream(s, ErrConnClosing, false, http2.ErrCodeNo, nil, nil)
@@ -775,7 +785,7 @@ func (t *http2Client) updateFlowControl(n uint32) {
 		ss: []http2.Setting{
 			{
 				ID:  http2.SettingInitialWindowSize,
-				Val: uint32(n),
+				Val: n,
 			},
 		},
 	})
@@ -785,7 +795,7 @@ func (t *http2Client) handleData(f *http2.DataFrame) {
 	size := f.Header().Length
 	var sendBDPPing bool
 	if t.bdpEst != nil {
-		sendBDPPing = t.bdpEst.add(uint32(size))
+		sendBDPPing = t.bdpEst.add(size)
 	}
 	// Decouple connection's flow control from application's read.
 	// An update on connection's flow control should not depend on
@@ -796,7 +806,7 @@ func (t *http2Client) handleData(f *http2.DataFrame) {
 	// active(fast) streams from starving in presence of slow or
 	// inactive streams.
 	//
-	if w := t.fc.onData(uint32(size)); w > 0 {
+	if w := t.fc.onData(size); w > 0 {
 		t.controlBuf.put(&outgoingWindowUpdate{
 			streamID:  0,
 			increment: w,
@@ -821,12 +831,12 @@ func (t *http2Client) handleData(f *http2.DataFrame) {
 		return
 	}
 	if size > 0 {
-		if err := s.fc.onData(uint32(size)); err != nil {
+		if err := s.fc.onData(size); err != nil {
 			t.closeStream(s, io.EOF, true, http2.ErrCodeFlowControl, status.New(codes.Internal, err.Error()), nil)
 			return
 		}
 		if f.Header().Flags.Has(http2.FlagDataPadded) {
-			if w := s.fc.onRead(uint32(size) - uint32(len(f.Data()))); w > 0 {
+			if w := s.fc.onRead(size - uint32(len(f.Data()))); w > 0 {
 				t.controlBuf.put(&outgoingWindowUpdate{s.id, w})
 			}
 		}
@@ -851,12 +861,11 @@ func (t *http2Client) handleRSTStream(f *http2.RSTStreamFrame) {
 	if !ok {
 		return
 	}
-	code := http2.ErrCode(f.ErrCode)
-	if code == http2.ErrCodeRefusedStream {
+	if f.ErrCode == http2.ErrCodeRefusedStream {
 		// The stream was unprocessed by the server.
 		atomic.StoreUint32(&s.unprocessed, 1)
 	}
-	statusCode, ok := http2ErrConvTab[code]
+	statusCode, ok := http2ErrConvTab[f.ErrCode]
 	if !ok {
 		warningf("transport: http2Client.handleRSTStream found no mapped gRPC status for the received http2 error %v", f.ErrCode)
 		statusCode = codes.Unknown
@@ -1188,3 +1197,10 @@ func (t *http2Client) Error() <-chan struct{} {
 func (t *http2Client) GoAway() <-chan struct{} {
 	return t.goAway
 }
+
+func (t *http2Client) ChannelzMetric() *channelz.SocketInternalMetric {
+	return &channelz.SocketInternalMetric{}
+}
+
+func (t *http2Client) IncrMsgSent() {}
+func (t *http2Client) IncrMsgRecv() {}
