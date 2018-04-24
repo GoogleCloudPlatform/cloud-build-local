@@ -478,7 +478,7 @@ func TestMaxConnectionIdle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Client failed to create RPC request: %v", err)
 	}
-	client.(*http2Client).closeStream(stream, io.EOF, true, http2.ErrCodeCancel, nil, nil)
+	client.(*http2Client).closeStream(stream, io.EOF, true, http2.ErrCodeCancel, nil, nil, false)
 	// wait for server to see that closed stream and max-age logic to send goaway after no new RPCs are mode
 	timeout := time.NewTimer(time.Second * 4)
 	select {
@@ -1640,13 +1640,6 @@ func TestInvalidHeaderField(t *testing.T) {
 	if err != nil {
 		return
 	}
-	opts := Options{
-		Last:  true,
-		Delay: false,
-	}
-	if err := ct.Write(s, nil, expectedRequest, &opts); err != nil && err != io.EOF {
-		t.Fatalf("Failed to write the request: %v", err)
-	}
 	p := make([]byte, http2MaxFrameLen)
 	_, err = s.trReader.(*transportReader).Read(p)
 	if se, ok := err.(StreamError); !ok || se.Code != codes.Internal || !strings.Contains(err.Error(), expectedInvalidHeaderField) {
@@ -1915,7 +1908,7 @@ func (s *httpServer) start(t *testing.T, lis net.Listener) {
 		}
 		// Read preface sent by client.
 		if _, err = io.ReadFull(s.conn, make([]byte, len(http2.ClientPreface))); err != nil {
-			t.Errorf("Error at server-side while reading preface from cleint. Err: %v", err)
+			t.Errorf("Error at server-side while reading preface from client. Err: %v", err)
 			return
 		}
 		reader := bufio.NewReaderSize(s.conn, defaultWriteBufSize)

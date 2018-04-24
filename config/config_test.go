@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	cb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
+	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 )
 
 func TestLoad(t *testing.T) {
@@ -29,7 +29,7 @@ func TestLoad(t *testing.T) {
 	testCases := []struct {
 		desc    string
 		content string
-		want    *cb.Build
+		want    *pb.Build
 		wantErr bool
 	}{{
 		desc: "happy case",
@@ -40,8 +40,8 @@ steps:
   - "foo"
   - "bar"
  `,
-		want: &cb.Build{
-			Steps: []*cb.BuildStep{{
+		want: &pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/my-project/my-builder",
 				Args: []string{"foo", "bar"},
 			}},
@@ -55,8 +55,8 @@ steps:
 
 images: ['gcr.io/$PROJECT_ID/test:latest']
 `,
-		want: &cb.Build{
-			Steps: []*cb.BuildStep{{
+		want: &pb.Build{
+			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/cloud-builders/docker",
 				Args: []string{"build", "-t", "gcr.io/$PROJECT_ID/test:latest", "."},
 			}},
