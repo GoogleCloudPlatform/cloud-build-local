@@ -1,0 +1,6 @@
+steps:
+- name: 'busybox'
+  args: ['echo', '$_MESSAGE', '$PROJECT_ID', '$COMMIT_SHA']
+
+substitutions:
+  _MESSAGE: "hello world"

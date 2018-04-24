@@ -15,6 +15,9 @@
 package metadata
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"reflect"
 	"testing"
 	"time"
 
@@ -37,5 +40,156 @@ func TestOauth2(t *testing.T) {
 	got := tok.Oauth2()
 	if want != *got {
 		t.Errorf("want %v; got %v", want, got)
+	}
+}
+
+func TestGetAddress(t *testing.T) {
+	for _, tc := range []struct {
+		local bool
+		want  string
+	}{
+		{true, localMetadata},
+		{false, "http://" + metadataHostedIP},
+	} {
+		u := RealUpdater{tc.local}
+		if got := u.getAddress(); got != tc.want {
+			t.Errorf("IsLocal==%t: got %q, want %q", tc.local, got, tc.want)
+		}
+	}
+}
+
+func testServer(t *testing.T,
+	tokenStatusCode int, // response to a SetToken
+	scopesStatusCode int, scopesBody string, // response to a getScopes
+	buildStatusCode int, // response to a SetProjectInfo
+) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			switch r.URL.Path {
+			case "/token":
+				w.WriteHeader(tokenStatusCode)
+				return
+
+			case "/oauth2/v3/tokeninfo":
+				w.WriteHeader(scopesStatusCode)
+				w.Write([]byte(scopesBody))
+				return
+
+			case "/build":
+				w.WriteHeader(buildStatusCode)
+				return
+			}
+
+			// Anything else is an invalid request.
+			t.Errorf("Unexpected %q request to %q", r.Method, r.URL)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+	}))
+}
+
+func TestSetToken(t *testing.T) {
+	cases := []struct {
+		tokenStatusCode, scopesStatusCode int
+		scopesBody                        string
+		wantError                         bool
+		name                              string
+	}{
+		{http.StatusOK, http.StatusOK, "{}", false, "happy case"},
+		{http.StatusOK, http.StatusOK, "", true, "no scopes"},
+		{http.StatusBadRequest, http.StatusOK, "{}", true, "bad token request"},
+		{http.StatusOK, http.StatusBadRequest, "{}", true, "bad scopes request"},
+	}
+
+	for _, tc := range cases {
+		wasInfoHost := googleTokenInfoHost
+		wasMetadataIP := metadataHostedIP
+		defer func() {
+			googleTokenInfoHost = wasInfoHost
+			metadataHostedIP = wasMetadataIP
+		}()
+		t.Run(tc.name, func(t *testing.T) {
+			s := testServer(t, tc.tokenStatusCode, tc.scopesStatusCode, tc.scopesBody, 0)
+			defer s.Close()
+			googleTokenInfoHost = s.URL
+			metadataHostedIP = s.URL
+
+			u := RealUpdater{false}
+			got := u.SetToken(&Token{})
+			if got == nil && tc.wantError || got != nil && !tc.wantError {
+				t.Errorf("got %v, wantError==%t", got, tc.wantError)
+			}
+		})
+	}
+}
+
+func TestGetScopes(t *testing.T) {
+	wasInfoHost := googleTokenInfoHost
+	wasMetadataIP := metadataHostedIP
+	defer func() {
+		googleTokenInfoHost = wasInfoHost
+		metadataHostedIP = wasMetadataIP
+	}()
+	cases := []struct {
+		statusCode int
+		body       string
+		wantScopes []string
+		wantError  bool
+		name       string
+	}{
+		{http.StatusOK, "{}", []string{""}, false, "happy case no scopes"},
+		{http.StatusOK, `{"scope": "this"}`, []string{"this"}, false, "happy case one scope"},
+		{http.StatusOK, `{"scope": "this these that those"}`, []string{"this", "these", "that", "those"}, false, "happy case many scopes"},
+		{http.StatusOK, "", nil, true, "empty json"},
+		{http.StatusBadRequest, "{}", nil, true, "bad request"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := testServer(t, 0, tc.statusCode, tc.body, 0)
+			defer s.Close()
+			googleTokenInfoHost = s.URL
+			metadataHostedIP = s.URL
+
+			gotScopes, gotErr := getScopes("token string")
+			if gotErr == nil && tc.wantError || gotErr != nil && !tc.wantError {
+				t.Errorf("got %v, wantError==%t", gotErr, tc.wantError)
+			}
+			if !reflect.DeepEqual(gotScopes, tc.wantScopes) {
+				t.Errorf("got scopes %v, want %v", gotScopes, tc.wantScopes)
+			}
+		})
+	}
+}
+
+func TestProjectInfo(t *testing.T) {
+	wasInfoHost := googleTokenInfoHost
+	wasMetadataIP := metadataHostedIP
+	defer func() {
+		googleTokenInfoHost = wasInfoHost
+		metadataHostedIP = wasMetadataIP
+	}()
+	cases := []struct {
+		statusCode int
+		wantError  bool
+		name       string
+	}{
+		{http.StatusOK, false, "happy case"},
+		{http.StatusBadRequest, true, "bad request"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := testServer(t, 0, 0, "", tc.statusCode)
+			defer s.Close()
+			googleTokenInfoHost = s.URL
+			metadataHostedIP = s.URL
+
+			u := RealUpdater{false}
+			got := u.SetProjectInfo(ProjectInfo{})
+			if got == nil && tc.wantError || got != nil && !tc.wantError {
+				t.Errorf("got %v, wantError==%t", got, tc.wantError)
+			}
+		})
 	}
 }
