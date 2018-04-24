@@ -145,6 +145,10 @@ type ping struct {
 	data [8]byte
 }
 
+type outFlowControlSizeRequest struct {
+	resp chan uint32
+}
+
 type outStreamState int
 
 const (
@@ -175,7 +179,7 @@ func (s *outStream) deleteSelf() {
 }
 
 type outStreamList struct {
-	// Following are sentinal objects that mark the
+	// Following are sentinel objects that mark the
 	// beginning and end of the list. They do not
 	// contain any item lists. All valid objects are
 	// inserted in between them.
@@ -569,6 +573,11 @@ func (l *loopyWriter) pingHandler(p *ping) error {
 
 }
 
+func (l *loopyWriter) outFlowControlSizeRequestHanlder(o *outFlowControlSizeRequest) error {
+	o.resp <- l.sendQuota
+	return nil
+}
+
 func (l *loopyWriter) cleanupStreamHandler(c *cleanupStream) error {
 	c.onWrite()
 	if str, ok := l.estdStreams[c.streamID]; ok {
@@ -633,6 +642,8 @@ func (l *loopyWriter) handle(i interface{}) error {
 		return l.pingHandler(i)
 	case *goAway:
 		return l.goAwayHandler(i)
+	case *outFlowControlSizeRequest:
+		return l.outFlowControlSizeRequestHanlder(i)
 	default:
 		return fmt.Errorf("transport: unknown control message type %T", i)
 	}
