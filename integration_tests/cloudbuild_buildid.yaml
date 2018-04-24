@@ -1,0 +1,7 @@
+steps:
+- name: 'bash'
+  args: ['-c', 'echo $BUILD_ID']
+- name: 'bash'
+  # Verify that local build ID is assigned.
+  args: ['-c', '[[ "$BUILD_ID" == "localbuild_"* ]] && echo success']
+

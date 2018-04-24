@@ -28,6 +28,7 @@ package metadata
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -51,16 +52,20 @@ const (
 	// This subnet captures the fixed metadata IP. This subnet is a reserved link-local subnet.
 	metadataLocalSubnet = "169.254.0.0/16"
 
-	// metadataHostedIP is the IP that the metadata spoofer listens to in the
-	// hosted cloudbuild environment. iptables is used to route tcp connections going to
-	// 169.254.169.254 port 80 to this IP instead.
-	metadataHostedIP = "192.168.10.5"
 	// This subnet captures metadataHostedIP. This subnet is a reserved private subnet.
 	// This is the subnet used to create the cloudbuild docker network in the hosted
 	// container builder environment. All build steps are run connected to the
 	// cloudbuild docker network.
 	metadataHostedSubnet = "192.168.10.0/24"
+
+	// localMetadata is the host:port for metadata when running the local builder.
+	localMetadata = "http://localhost:8082"
 )
+
+// metadataHostedIP is the IP that the metadata spoofer listens to in the
+// hosted cloudbuild environment. iptables is used to route tcp connections
+// going to 169.254.169.254 port 80 to this IP instead.
+var metadataHostedIP = "192.168.10.5" // var for testing
 
 // Updater encapsulates updating the spoofed metadata server.
 type Updater interface {
@@ -99,10 +104,14 @@ type RealUpdater struct {
 }
 
 func (r RealUpdater) getAddress() string {
-	if r.Local {
-		return "localhost:8082"
+	addr := localMetadata
+	if !r.Local {
+		addr = metadataHostedIP
 	}
-	return metadataHostedIP
+	if !strings.HasPrefix(addr, "http") {
+		addr = "http://" + addr
+	}
+	return addr
 }
 
 // SetToken updates the spoofed metadata server's credentials.
@@ -117,9 +126,12 @@ func (r RealUpdater) SetToken(tok *Token) error {
 		return err
 	}
 
-	if resp, err := http.Post("http://"+r.getAddress()+"/token", "application/json", &buf); err != nil {
+	resp, err := http.Post(r.getAddress()+"/token", "application/json", &buf)
+	if err != nil {
 		return err
-	} else if resp.StatusCode != http.StatusOK {
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("Got HTTP %d from spoofed metadata", resp.StatusCode)
 	}
 	return nil
@@ -135,23 +147,33 @@ var googleTokenInfoHost = "https://www.googleapis.com"
 func getScopes(tok string) ([]string, error) {
 	data := url.Values{}
 	data.Set("access_token", tok)
-	resp, err := http.Post(googleTokenInfoHost+"/oauth2/v3/tokeninfo", "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
+
+	const maxTries = 3
+	var err error
+	for i := 0; i < maxTries; i++ {
+		time.Sleep(time.Millisecond * 150 * time.Duration(i))
+		var resp *http.Response
+		if resp, err = http.Post(googleTokenInfoHost+"/oauth2/v3/tokeninfo", "application/x-www-form-urlencoded", strings.NewReader(data.Encode())); err != nil {
+			log.Printf("Error reading scopes on attempt #%d/%d: %v", i+1, maxTries, err)
+			continue
+		}
 		defer resp.Body.Close()
-		all, _ := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("POST failed (%d): %s", resp.StatusCode, string(all))
+		if resp.StatusCode != http.StatusOK {
+			all, _ := ioutil.ReadAll(resp.Body)
+			err = fmt.Errorf("POST failed (%d): %s", resp.StatusCode, string(all))
+			log.Printf("Error reading scopes on attempt #%d/%d: %v", i+1, maxTries, err)
+			continue
+		}
+		r := struct {
+			Scope string `json:"scope"`
+		}{}
+		if err = json.NewDecoder(resp.Body).Decode(&r); err != nil {
+			log.Printf("Error reading scopes on attempt #%d/%d: %v", i+1, maxTries, err)
+			continue
+		}
+		return strings.Split(r.Scope, " "), nil
 	}
-	r := struct {
-		Scope string `json:"scope"`
-	}{}
-	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
-		return nil, err
-	}
-	resp.Body.Close()
-	return strings.Split(r.Scope, " "), nil
+	return nil, err
 }
 
 // SetProjectInfo updates the spoofed metadata server's project information.
@@ -160,7 +182,7 @@ func (r RealUpdater) SetProjectInfo(b ProjectInfo) error {
 	if err := json.NewEncoder(&buf).Encode(b); err != nil {
 		return err
 	}
-	if resp, err := http.Post("http://"+r.getAddress()+"/build", "application/json", &buf); err != nil {
+	if resp, err := http.Post(r.getAddress()+"/build", "application/json", &buf); err != nil {
 		return err
 	} else if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
@@ -177,13 +199,13 @@ func (r RealUpdater) SetProjectInfo(b ProjectInfo) error {
 //
 // The container listens on local port 8082, which is where RealUpdater POSTs
 // to.
-func StartLocalServer(r runner.Runner, metadataImage string) error {
+func StartLocalServer(ctx context.Context, r runner.Runner, metadataImage string) error {
 	// Unlike the hosted container builder service, the user's local machine is
 	// not guaranteed to have the latest version, so we explicitly pull it.
-	if err := r.Run([]string{"docker", "pull", metadataImage}, nil, os.Stdout, os.Stderr, ""); err != nil {
+	if err := r.Run(ctx, []string{"docker", "pull", metadataImage}, nil, os.Stdout, os.Stderr, ""); err != nil {
 		return err
 	}
-	return startServer(r, metadataImage, false, fixedMetadataIP, metadataLocalSubnet)
+	return startServer(ctx, r, metadataImage, false, fixedMetadataIP, metadataLocalSubnet)
 }
 
 // StartCloudServer starts the metadata server container for VMs running as
@@ -194,16 +216,15 @@ func StartLocalServer(r runner.Runner, metadataImage string) error {
 //
 // The container listens on local port 8082, which is where RealUpdater POSTs
 // to.
-func StartCloudServer(r runner.Runner, metadataImage string) error {
-	if err := startServer(r, metadataImage, true, metadataHostedIP, metadataHostedSubnet); err != nil {
+func StartCloudServer(ctx context.Context, r runner.Runner, metadataImage string) error {
+	if err := startServer(ctx, r, metadataImage, true, metadataHostedIP, metadataHostedSubnet); err != nil {
 		return err
 	}
 
 	// In a separate goroutine, attach to the metadata server container so its
-	// logs get printed to the worker's logs and ferried up to the foreman after
-	// the build is done.
+	// logs are properly captured and available for debugging.
 	go func() {
-		if err := r.Run([]string{"docker", "attach", "metadata"}, nil, os.Stdout, os.Stderr, ""); err != nil {
+		if err := r.Run(ctx, []string{"docker", "attach", "metadata"}, nil, os.Stdout, os.Stderr, ""); err != nil {
 			log.Printf("docker attach failed: %v", err)
 		}
 	}()
@@ -213,13 +234,13 @@ func StartCloudServer(r runner.Runner, metadataImage string) error {
 
 // CreateCloudbuildNetwork creates a cloud build network to link the build
 // builds.
-func CreateCloudbuildNetwork(r runner.Runner, subnet string) error {
+func CreateCloudbuildNetwork(ctx context.Context, r runner.Runner, subnet string) error {
 	cmd := []string{"docker", "network", "create", "cloudbuild", "--subnet=" + subnet}
-	return r.Run(cmd, nil, nil, os.Stderr, "")
+	return r.Run(ctx, cmd, nil, nil, os.Stderr, "")
 }
 
-func startServer(r runner.Runner, metadataImage string, iptables bool, ip, subnet string) error {
-	if err := CreateCloudbuildNetwork(r, subnet); err != nil {
+func startServer(ctx context.Context, r runner.Runner, metadataImage string, iptables bool, ip, subnet string) error {
+	if err := CreateCloudbuildNetwork(ctx, r, subnet); err != nil {
 		return fmt.Errorf("Error creating network: %v", err)
 	}
 
@@ -231,13 +252,13 @@ func startServer(r runner.Runner, metadataImage string, iptables bool, ip, subne
 	} else {
 		cmd = []string{"docker", "run", "-d", "--name=metadata", metadataImage}
 	}
-	if err := r.Run(cmd, nil, nil, os.Stderr, ""); err != nil {
+	if err := r.Run(ctx, cmd, nil, nil, os.Stderr, ""); err != nil {
 		return err
 	}
 
 	// Redirect requests to metadata.google.internal and the fixed metadata IP to the metadata container.
 	cmd = []string{"docker", "network", "connect", "--alias=metadata", "--alias=metadata.google.internal", "--ip=" + ip, "cloudbuild", "metadata"}
-	if err := r.Run(cmd, nil, nil, os.Stderr, ""); err != nil {
+	if err := r.Run(ctx, cmd, nil, nil, os.Stderr, ""); err != nil {
 		return fmt.Errorf("Error connecting metadata to network: %v", err)
 	}
 
@@ -252,7 +273,7 @@ func startServer(r runner.Runner, metadataImage string, iptables bool, ip, subne
 			"-j", "DNAT", // This rule does destination NATting,
 			"--to-destination", metadataHostedIP, // to our spoofed metadata container.
 		}
-		if err := r.Run(cmd, nil, os.Stdout, os.Stderr, ""); err != nil {
+		if err := r.Run(ctx, cmd, nil, os.Stdout, os.Stderr, ""); err != nil {
 			return fmt.Errorf("Error updating iptables: %v", err)
 		}
 	}
@@ -261,16 +282,16 @@ func startServer(r runner.Runner, metadataImage string, iptables bool, ip, subne
 }
 
 // CleanCloudbuildNetwork delete the cloudbuild network.
-func CleanCloudbuildNetwork(r runner.Runner) error {
-	return r.Run([]string{"docker", "network", "rm", "cloudbuild"}, nil, nil, os.Stderr, "")
+func CleanCloudbuildNetwork(ctx context.Context, r runner.Runner) error {
+	return r.Run(ctx, []string{"docker", "network", "rm", "cloudbuild"}, nil, nil, os.Stderr, "")
 }
 
 // Stop stops the metadata server container and tears down the docker cloudbuild
 // network used to route traffic to it.
 // Try to clean both the container and the network before returning an error.
-func (RealUpdater) Stop(r runner.Runner) error {
-	errContainer := r.Run([]string{"docker", "rm", "-f", "metadata"}, nil, nil, os.Stderr, "")
-	errNetwork := CleanCloudbuildNetwork(r)
+func (RealUpdater) Stop(ctx context.Context, r runner.Runner) error {
+	errContainer := r.Run(ctx, []string{"docker", "rm", "-f", "metadata"}, nil, nil, os.Stderr, "")
+	errNetwork := CleanCloudbuildNetwork(ctx, r)
 	if errContainer != nil {
 		return errContainer
 	}

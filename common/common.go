@@ -17,6 +17,7 @@ package common
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"math/rand"
@@ -68,12 +69,12 @@ func ParseSubstitutionsFlag(substitutions string) (map[string]string, error) {
 	return substitutionsMap, nil
 }
 
-// Clean removes left over containers, networks, volumes from a
-// previous run of the local builder. This happens when ctrl+c is used during
-// a local build.
+// Clean removes left-over containers, networks, and volumes from a previous
+// run of the local builder. This happens when ctrl+c is used during a local
+// build.
 // Each cleaning is defined by a get command, a warning to print if the get
 // command returns something, and a delete command to apply in that case.
-func Clean(r runner.Runner) error {
+func Clean(ctx context.Context, r runner.Runner) error {
 	items := []struct {
 		getCmd, deleteCmd []string
 		warning           string
@@ -93,7 +94,7 @@ func Clean(r runner.Runner) error {
 
 	for _, item := range items {
 		var output bytes.Buffer
-		if err := r.Run(item.getCmd, nil, &output, os.Stderr, ""); err != nil {
+		if err := r.Run(ctx, item.getCmd, nil, &output, os.Stderr, ""); err != nil {
 			return err
 		}
 
@@ -105,7 +106,7 @@ func Clean(r runner.Runner) error {
 
 		args := strings.Split(str, "\n")
 		deleteCmd := append(item.deleteCmd, args...)
-		if err := r.Run(deleteCmd, nil, nil, os.Stderr, ""); err != nil {
+		if err := r.Run(ctx, deleteCmd, nil, nil, os.Stderr, ""); err != nil {
 			return err
 		}
 	}

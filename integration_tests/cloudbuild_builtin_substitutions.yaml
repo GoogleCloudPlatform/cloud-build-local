@@ -1,0 +1,6 @@
+steps:
+- name: 'busybox'
+  args: ['echo', '$COMMIT_SHA']
+
+substitutions:
+  COMMIT_SHA: "my-sha"
