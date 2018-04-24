@@ -1253,7 +1253,7 @@ func TestPushArtifacts(t *testing.T) {
 				t.Errorf("got b.artifacts.ArtifactManifest = %s, want %s", b.artifacts.ArtifactManifest, tc.wantArtifactsInfo.ArtifactManifest)
 			}
 			if b.artifacts.NumArtifacts != tc.wantArtifactsInfo.NumArtifacts {
-				t.Errorf("got b.artifacts.ArtifactManifest = %s, want %s", b.artifacts.NumArtifacts, tc.wantArtifactsInfo.NumArtifacts)
+				t.Errorf("got b.artifacts.ArtifactManifest = %d, want %d", b.artifacts.NumArtifacts, tc.wantArtifactsInfo.NumArtifacts)
 			}
 		})
 	}
