@@ -26,7 +26,7 @@ import (
 
 	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 
-	"google3/net/proto2/go/proto"
+	"github.com/golang/protobuf/proto"
 	"github.com/spf13/afero"
 	"github.com/pborman/uuid"
 )
