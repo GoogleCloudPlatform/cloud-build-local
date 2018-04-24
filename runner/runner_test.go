@@ -16,6 +16,7 @@ package runner
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -28,16 +29,17 @@ import (
 )
 
 func TestRun(t *testing.T) {
+	ctx := context.Background()
 	r := RealRunner{}
 	in := strings.NewReader("hello\nworld")
 	buf := bytes.Buffer{}
-	if err := r.Run([]string{"cat", "-n"}, in, &buf, nil, "/tmp"); err != nil {
+	if err := r.Run(ctx, []string{"cat", "-n"}, in, &buf, nil, "/tmp"); err != nil {
 		t.Errorf("cat test: run returned error: %v", err)
 	}
 	if got, want := buf.String(), "     1\thello\n     2\tworld"; got != want {
 		t.Errorf("cat test: got %q, want %q", got, want)
 	}
-	gotErr := r.Run([]string{"foobarbaz123459", "hello", "world"}, nil, nil, nil, "/tmp")
+	gotErr := r.Run(ctx, []string{"foobarbaz123459", "hello", "world"}, nil, nil, nil, "/tmp")
 	// Wrap the error so that the class name matches.
 	gotErr = fmt.Errorf("%v", gotErr)
 	wantErr := errors.New("exec: \"foobarbaz123459\": executable file not found in $PATH")
@@ -87,11 +89,12 @@ func TestWriteFile(t *testing.T) {
 }
 
 func TestClean(t *testing.T) {
+	ctx := context.Background()
 	r := RealRunner{}
 
 	// Start a long process.
 	go func() {
-		if err := r.Run([]string{"sleep", "100"}, nil, nil, nil, ""); err == nil {
+		if err := r.Run(ctx, []string{"sleep", "100"}, nil, nil, nil, ""); err == nil {
 			t.Error("run should fail when the process is killed")
 		}
 	}()
@@ -114,4 +117,46 @@ func TestClean(t *testing.T) {
 		t.Errorf("%d processes running after cleaning", len(r.processes))
 	}
 	r.mu.Unlock()
+}
+
+func TestRunTimeout(t *testing.T) {
+	r := RealRunner{}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	got := r.Run(ctx, []string{"sleep", "10"}, nil, nil, nil, "")
+	want := context.DeadlineExceeded
+	if got != want {
+		t.Errorf("want %v, got %v", want, got)
+	}
+}
+
+func TestRunCancel(t *testing.T) {
+	r := RealRunner{}
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var got error
+	started := make(chan struct{})
+	finished := make(chan struct{})
+	go func() {
+		close(started)
+		got = r.Run(ctx, []string{"sleep", "10"}, nil, nil, nil, "")
+		close(finished)
+	}()
+
+	// Give r.Run() a chance to start.
+	<-started
+	time.Sleep(1)
+	cancel()
+
+	select {
+	case <-finished:
+		// Happy case -- context cancel() caused the Run() call to return.
+	case <-time.After(time.Second):
+		t.Errorf("cancel() didn't cause return from Run().")
+	}
+
+	want := context.Canceled
+	if got != want {
+		t.Errorf("want %v, got %v", want, got)
+	}
 }

@@ -15,6 +15,7 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math"
@@ -58,7 +59,7 @@ func startsWith(arr []string, parts ...string) bool {
 	return true
 }
 
-func (r *mockRunner) Run(args []string, in io.Reader, out, err io.Writer, _ string) error {
+func (r *mockRunner) Run(ctx context.Context, args []string, in io.Reader, out, err io.Writer, _ string) error {
 	r.mu.Lock()
 	r.commands = append(r.commands, strings.Join(args, " "))
 	r.mu.Unlock()
@@ -155,8 +156,7 @@ func TestParseSubstitutionsFlag(t *testing.T) {
 
 func TestClean(t *testing.T) {
 	r := newMockRunner(t)
-	err := Clean(r)
-	if err != nil {
+	if err := Clean(context.Background(), r); err != nil {
 		t.Errorf("Clean failed: %v", err)
 	}
 	got := strings.Join(r.commands, "\n")
