@@ -69,7 +69,6 @@ func main() {
 	flag.Parse()
 	ctx := context.Background()
 	args := flag.Args()
-	log.SetOutput(os.Stdout)
 
 	if *help {
 		flag.PrintDefaults()
@@ -103,6 +102,7 @@ func main() {
 		exitUsage("Specify a config file")
 	}
 
+	log.SetOutput(os.Stdout)
 	if err := run(ctx, source); err != nil {
 		log.Fatal(err)
 	}
