@@ -16,6 +16,7 @@
 package runner
 
 import (
+	"context"
 	"io"
 	"io/ioutil"
 	"log"
@@ -26,7 +27,7 @@ import (
 
 // Runner is a mockable interface for running os commands.
 type Runner interface {
-	Run(args []string, in io.Reader, out, err io.Writer, dir string) error
+	Run(ctx context.Context, args []string, in io.Reader, out, err io.Writer, dir string) error
 	MkdirAll(dir string) error
 	WriteFile(path, contents string) error
 	Clean() error
@@ -40,7 +41,7 @@ type RealRunner struct {
 }
 
 // Run runs a command.
-func (r *RealRunner) Run(args []string, in io.Reader, out, err io.Writer, dir string) error {
+func (r *RealRunner) Run(ctx context.Context, args []string, in io.Reader, out, err io.Writer, dir string) error {
 	if r.DryRun {
 		log.Printf("RUNNER - %v", args)
 		return nil
@@ -71,7 +72,23 @@ func (r *RealRunner) Run(args []string, in io.Reader, out, err io.Writer, dir st
 		r.mu.Unlock()
 	}(cmd.Process.Pid)
 
-	return cmd.Wait()
+	errCh := make(chan error)
+	go func() {
+		errCh <- cmd.Wait()
+	}()
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+		// Make an effort to kill the running process, but don't block on it.
+		go func() {
+			if err := cmd.Process.Kill(); err != nil {
+				log.Printf("RUNNER failed to kill running process `%v %v`: %v", cmd.Path, cmd.Args, err)
+			}
+		}()
+		return ctx.Err()
+	}
 }
 
 // MkdirAll calls MkdirAll.
