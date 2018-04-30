@@ -23,8 +23,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
-	"path"
 	"reflect"
 	"regexp"
 	"strings"
@@ -2574,60 +2572,6 @@ func TestWorkdir(t *testing.T) {
 	}
 }
 
-func TestBuildOutput(t *testing.T) {
-	r := newMockRunner(t, "desc")
-	r.dockerRunHandler = func([]string, io.Writer, io.Writer) error { return nil }
-
-	for _, c := range []struct {
-		contents    []string
-		wantOutputs [][]byte
-	}{{
-		// no contents, no outputs.
-		contents:    nil,
-		wantOutputs: nil,
-	}, {
-		// one step with contents.
-		contents:    []string{"foo"},
-		wantOutputs: [][]byte{[]byte("foo")},
-	}, {
-		// no contents in 0th step, contents in 1st.
-		contents:    []string{"", "foo"},
-		wantOutputs: [][]byte{nil, []byte("foo")},
-	}, {
-		// contents in 0th step, no contents in 1st.
-		contents:    []string{"foo", ""},
-		wantOutputs: [][]byte{[]byte("foo"), nil},
-	}} {
-		fs := afero.NewMemMapFs()
-		req := pb.Build{}
-		for i := 0; i < len(c.contents); i++ {
-			req.Steps = append(req.Steps, &pb.BuildStep{Name: "gcr.io/my-project/my-compiler"})
-		}
-		b := New(r, req, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", fs, true, false, false)
-
-		for i, contents := range c.contents {
-			stepOutputDir := afero.GetTempDir(fs, fmt.Sprintf("step-%d", i))
-			if err := b.fs.MkdirAll(stepOutputDir, os.FileMode(os.O_CREATE)); err != nil {
-				t.Errorf("MkDirAll(%q): %v", stepOutputDir, err)
-			}
-
-			if contents != "" {
-				p := path.Join(stepOutputDir, builderOutputFile)
-				if err := afero.WriteFile(fs, p, []byte(contents), os.FileMode(os.O_CREATE)); err != nil {
-					t.Fatalf("WriteFile(%q -> %q): %v", contents, p, err)
-				}
-			}
-
-			if err := b.captureStepOutput(i, stepOutputDir); err != nil {
-				t.Errorf("captureBuildOutputs failed: %v", err)
-			}
-		}
-
-		if !reflect.DeepEqual(b.stepOutputs, c.wantOutputs) {
-			t.Errorf("Collected outputs; got %v, want %v", b.stepOutputs, c.wantOutputs)
-		}
-	}
-}
 
 type nopBuildLogger struct{}
 
