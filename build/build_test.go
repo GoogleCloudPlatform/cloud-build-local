@@ -23,6 +23,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"runtime"
 	"reflect"
 	"regexp"
 	"strings"
@@ -2572,6 +2574,52 @@ func TestWorkdir(t *testing.T) {
 	}
 }
 
+
+func TestOsTempDir(t *testing.T) {
+	defer func() { runtimeGOOS = runtime.GOOS }()
+
+	testCases := []struct {
+		goos        string
+		wantTempDir string
+	}{{
+		goos:        "notarealosbutnotdarwin",
+		wantTempDir: os.TempDir(),
+	}, {
+		goos:        "darwin",
+		wantTempDir: "/tmp",
+	}}
+	for _, tc := range testCases {
+		runtimeGOOS = tc.goos
+		gotTempDir := osTempDir()
+		if gotTempDir != tc.wantTempDir {
+			t.Errorf("%s: got osTempDir() = %q, want %q", tc.goos, gotTempDir, tc.wantTempDir)
+		}
+	}
+}
+
+func TestGetTempDir(t *testing.T) {
+	tmpdir := osTempDir()
+
+	testCases := []struct {
+		name        string
+		subpath     string
+		wantTempDir string
+	}{{
+		name:        "NoSubpath",
+		wantTempDir: tmpdir,
+	}, {
+		name:        "Subpath",
+		subpath:     "iamsubpath",
+		wantTempDir: fmt.Sprintf("%s/iamsubpath/", tmpdir),
+	}}
+	for _, tc := range testCases {
+		gotTempDir := getTempDir(tc.subpath)
+		if gotTempDir != tc.wantTempDir {
+			t.Errorf("%s: got getTempDir() = %q, want %q", tc.name, gotTempDir, tc.wantTempDir)
+		}
+	}
+
+}
 
 type nopBuildLogger struct{}
 
