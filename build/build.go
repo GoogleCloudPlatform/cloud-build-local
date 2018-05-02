@@ -28,6 +28,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -925,6 +926,34 @@ func (b *Build) timeAndRunStep(ctx context.Context, idx int, waitChans []chan st
 	close(done)
 }
 
+// runtimeGOOS is the operating system detected at runtime and is stubbable in testing.
+var runtimeGOOS = runtime.GOOS
+
+// osTempDir returns the default temporary directory for the OS.
+func osTempDir() string {
+	if runtimeGOOS == "darwin" {
+		// The default temporary directory in MacOS lives in the /var path. Docker reserves the /var
+		// path and will deny the build from mounting or using resources in that path. See b/78897068.
+		// Use /tmp instead.
+		return "/tmp"
+	}
+	return os.TempDir()
+}
+
+// getTempDir returns the full tempdir path. If the subpath is empty, the OS temporary directory is returned.
+// Note that this does not create the temporary directory.
+func getTempDir(subpath string) string {
+	if subpath == "" {
+		return osTempDir()
+	}
+
+	fullpath := path.Join(osTempDir(), subpath)
+	if !strings.HasSuffix(fullpath, "/") {
+		fullpath = fullpath + "/"
+	}
+	return fullpath
+}
+
 func (b *Build) runStep(ctx context.Context, idx int) error {
 	step := b.Request.Steps[idx]
 
@@ -1312,7 +1341,7 @@ func (b *Build) pushArtifacts(ctx context.Context) error {
 	flags := gsutil.DockerFlags{
 		Workvol: b.hostWorkspaceDir + ":" + containerWorkspaceDir,
 		Workdir: workdir,
-		Tmpdir:  os.TempDir(),
+		Tmpdir:  osTempDir(),
 	}
 
 	b.mu.Lock()
