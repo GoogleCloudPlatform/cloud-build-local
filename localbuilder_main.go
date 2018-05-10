@@ -157,15 +157,6 @@ func run(ctx context.Context, source string) error {
 	}
 	buildConfig.ProjectId = projectInfo.ProjectID
 
-	// Validate the build.
-	if err := validate.CheckBuild(buildConfig); err != nil {
-		return fmt.Errorf("Error validating build: %v", err)
-	}
-	// Do not accept built-in substitutions in the build config.
-	if err := validate.CheckSubstitutions(buildConfig.Substitutions); err != nil {
-		return fmt.Errorf("Error validating build's substitutions: %v", err)
-	}
-
 	// Parse substitutions.
 	if *substitutions != "" {
 		substMap, err := common.ParseSubstitutionsFlag(*substitutions)
@@ -175,7 +166,21 @@ func run(ctx context.Context, source string) error {
 		if err := validate.CheckSubstitutionsLoose(substMap); err != nil {
 			return err
 		}
-		buildConfig.Substitutions = substMap
+		// Add any flag substitutions to the existing substitution map.
+		// If the substitution is already defined in the template, the
+		// substitutions flag will override the value.
+		for k, v := range substMap {
+			buildConfig.Substitutions[k] = v
+		}
+	}
+
+	// Validate the build.
+	if err := validate.CheckBuild(buildConfig); err != nil {
+		return fmt.Errorf("Error validating build: %v", err)
+	}
+	// Do not accept built-in substitutions in the build config.
+	if err := validate.CheckSubstitutions(buildConfig.Substitutions); err != nil {
+		return fmt.Errorf("Error validating build's substitutions: %v", err)
 	}
 
 	// Apply substitutions.
