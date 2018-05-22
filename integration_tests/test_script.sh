@@ -23,6 +23,7 @@ container-builder-local --config=cloudbuild_substitutions.yaml --substitutions=_
 container-builder-local --config=cloudbuild_substitutions.yaml --substitutions=COMMIT_SHA="my-sha" . || exit
 container-builder-local --config=cloudbuild_substitutions2.yaml --substitutions=_SUBSTITUTE_ME="literally-anything-else" . || exit
 container-builder-local --config=cloudbuild_substitutions2.yaml --substitutions=_MESSAGE="bye world",_SUBSTITUTE_ME="literally-anything-else" . || exit
+container-builder-local --config=cloudbuild_substitutions.yaml --substitutions=_MESSAGE="substitution set in command line only" . || exit
 # Invalid substitutios are expected to exit with an error (hence the `&& exit`).
 container-builder-local --config=cloudbuild_substitutions.yaml --substitutions=PROJECT_ID="my-project" . && exit
 container-builder-local --config=cloudbuild_builtin_substitutions.yaml . && exit
