@@ -123,7 +123,7 @@ func CheckBuild(b *pb.Build) error {
 		return fmt.Errorf("invalid .steps field: %v", err)
 	}
 
-	if missingSubs, err := CheckSubstitutionTemplate(b.Images, b.Tags, b.Steps, b.Substitutions); err != nil {
+	if missingSubs, err := CheckSubstitutionTemplate(b); err != nil {
 		return err
 	} else if len(missingSubs) > 0 {
 		// If the user doesn't specifically allow loose substitutions, the warnings
@@ -200,15 +200,15 @@ func CheckSubstitutionsLoose(substitutions map[string]string) error {
 }
 
 // CheckSubstitutionTemplate checks that all the substitution variables are used
-// and all the variables found in the template are used too. It may returns an
+// and all the variables found in the template are used too. It may return an
 // error and a list of string warnings.
-func CheckSubstitutionTemplate(images, tags []string, steps []*pb.BuildStep, substitutions map[string]string) ([]string, error) {
+func CheckSubstitutionTemplate(b *pb.Build) ([]string, error) {
 	warnings := []string{}
 
 	// substitutionsUsed is used to check that all the substitution variables
 	// are used in the template.
 	substitutionsUsed := make(map[string]bool)
-	for k := range substitutions {
+	for k := range b.Substitutions {
 		substitutionsUsed[k] = false
 	}
 
@@ -218,9 +218,9 @@ func CheckSubstitutionTemplate(images, tags []string, steps []*pb.BuildStep, sub
 			if p.Escape {
 				continue
 			}
-			if _, ok := substitutions[p.Key]; !ok {
+			if _, ok := b.Substitutions[p.Key]; !ok {
 				if validUserSubstKeyRE.MatchString(p.Key) {
-					warnings = append(warnings, fmt.Sprintf("key in the template %q is not matched in the substitution data", p.Key))
+					warnings = append(warnings, fmt.Sprintf("key in the template %q is not matched in the substitution data; substitutions = %+v", p.Key, b.Substitutions))
 					continue
 				}
 				if _, ok := validBuiltInSubstitutions[p.Key]; !ok {
@@ -232,7 +232,7 @@ func CheckSubstitutionTemplate(images, tags []string, steps []*pb.BuildStep, sub
 		return nil
 	}
 
-	for _, step := range steps {
+	for _, step := range b.Steps {
 		if err := checkParameters(step.Name); err != nil {
 			return warnings, err
 		}
@@ -253,14 +253,26 @@ func CheckSubstitutionTemplate(images, tags []string, steps []*pb.BuildStep, sub
 			return warnings, err
 		}
 	}
-	for _, img := range images {
+	for _, img := range b.Images {
 		if err := checkParameters(img); err != nil {
 			return warnings, err
 		}
 	}
-	for _, t := range tags {
+	for _, t := range b.Tags {
 		if err := checkParameters(t); err != nil {
 			return warnings, err
+		}
+	}
+
+	if b.Artifacts != nil && b.Artifacts.GetObjects() != nil {
+		objects := b.Artifacts.Objects
+		if err := checkParameters(objects.Location); err != nil {
+			return warnings, err
+		}
+		for _, p := range objects.Paths {
+			if err := checkParameters(p); err != nil {
+				return warnings, err
+			}
 		}
 	}
 

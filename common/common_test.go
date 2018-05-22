@@ -24,6 +24,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 )
 
 const (
@@ -198,6 +200,80 @@ func TestRefreshDuration(t *testing.T) {
 	}} {
 		got := RefreshDuration(tc.expiration)
 		if got != tc.want {
+			t.Errorf("%s: got %q; want %q", tc.desc, got, tc.want)
+		}
+	}
+}
+
+func TestSubstituteAndValidate(t *testing.T) {
+	for _, tc := range []struct {
+		desc     string
+		build    *pb.Build
+		substMap map[string]string
+		wantErr  bool
+		want     map[string]string
+	}{{
+		desc: "empty substitutions",
+		build: &pb.Build{
+			Steps:         []*pb.BuildStep{{Name: "ubuntu"}},
+			Substitutions: make(map[string]string),
+		},
+		want: make(map[string]string),
+	}, {
+		desc: "substitution set in config file",
+		build: &pb.Build{
+			Steps:         []*pb.BuildStep{{Name: "${_NAME}"}},
+			Substitutions: map[string]string{"_NAME": "foo"},
+		},
+		want: map[string]string{"_NAME": "foo"},
+	}, {
+		desc: "substitution set in command line flag",
+		build: &pb.Build{
+			Steps: []*pb.BuildStep{{Name: "${_NAME}"}},
+		},
+		substMap: map[string]string{"_NAME": "foo"},
+		want:     map[string]string{"_NAME": "foo"},
+	}, {
+		desc: "one substitution overridden in command line",
+		build: &pb.Build{
+			Steps: []*pb.BuildStep{{
+				Name: "${_NAME}${_CITY}",
+				Args: []string{"Arlon", "is", "the", "capital", "of", "the", "world"},
+			}},
+			Substitutions: map[string]string{"_NAME": "foo", "_CITY": "arlon"},
+		},
+		substMap: map[string]string{"_NAME": "bar"},
+		want:     map[string]string{"_NAME": "bar", "_CITY": "arlon"},
+	}, {
+		desc: "do not override built-in substitution in build config",
+		build: &pb.Build{
+			Steps:         []*pb.BuildStep{{Name: "ubuntu"}},
+			Substitutions: map[string]string{"REPO_NAME": "foo"},
+		},
+		wantErr: true,
+	}, {
+		desc: "overridable built-in substitutions",
+		build: &pb.Build{
+			Steps: []*pb.BuildStep{{Name: "${REPO_NAME}${BRANCH_NAME}${TAG_NAME}${REVISION_ID}${COMMIT_SHA}${SHORT_SHA}"}},
+		},
+		substMap: map[string]string{"REPO_NAME": "bar", "BRANCH_NAME": "bar", "TAG_NAME": "bar", "REVISION_ID": "bar", "COMMIT_SHA": "bar", "SHORT_SHA": "bar"},
+		want:     map[string]string{"REPO_NAME": "bar", "BRANCH_NAME": "bar", "TAG_NAME": "bar", "REVISION_ID": "bar", "COMMIT_SHA": "bar", "SHORT_SHA": "bar"},
+	}, {
+		desc: "not overridable built-in substitutions",
+		build: &pb.Build{
+			Steps: []*pb.BuildStep{{Name: "${PROJECT_ID}${BUILD_ID}"}},
+		},
+		substMap: map[string]string{"PROJECT_ID": "foo", "BUILD_ID": "bar"},
+		wantErr:  true,
+	}} {
+		err := SubstituteAndValidate(tc.build, tc.substMap)
+		if err != nil && !tc.wantErr {
+			t.Errorf("Got an unexpected error: %v", err)
+		}
+		if err == nil && tc.wantErr {
+			t.Error("Should have returned an error")
+		}
+		if got := tc.build.Substitutions; err == nil && !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("%s: got %q; want %q", tc.desc, got, tc.want)
 		}
 	}

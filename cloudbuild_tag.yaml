@@ -24,11 +24,13 @@ steps:
         for GOARCH in 386 amd64; do
             # Build binary with the new tag and with 'latest'
             GOOS=$$GOOS GOARCH=$$GOARCH /builder/bin/go.bash build -o container-builder-local_$${GOOS}_$${GOARCH}-$TAG_NAME github.com/GoogleCloudPlatform/container-builder-local
+            GOOS=$$GOOS GOARCH=$$GOARCH /builder/bin/go.bash build -o cloud-build-local_$${GOOS}_$${GOARCH}-$TAG_NAME github.com/GoogleCloudPlatform/container-builder-local
         done
     done
     tar -czvf container-builder-local_latest.tar.gz container-builder-local_*
+    tar -czvf cloud-build-local_latest.tar.gz cloud-build-local_*
 
 artifacts:
   objects:
-    location: 'gs://container-builder-local/'
-    paths: ['container-builder-local_*']
+    location: 'gs://local-builder/'
+    paths: ['container-builder-local_*', 'cloud-build-local_*']

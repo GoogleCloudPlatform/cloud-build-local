@@ -1,0 +1,4 @@
+# The config doesn't have substitution, it is set by the command line.
+steps:
+- name: 'busybox'
+  args: ['echo', '$_MESSAGE']
