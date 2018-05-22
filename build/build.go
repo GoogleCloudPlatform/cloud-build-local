@@ -28,6 +28,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -57,19 +58,6 @@ const (
 	// in the face of gcr.io DNS lookup errors.
 	maxPushRetries = 10
 
-	// builderOutputFile is the name of the file inside each per-step
-	// temporary output directory where builders can write arbitrary output
-	// information.
-	builderOutputFile = "output"
-
-	// stepOutputPath is the path to step output files produced by a step
-	// execution. This is the path that's exposed to builders. It's backed by a
-	// tempdir in the worker.
-	stepOutputPath = "/builder/outputs"
-
-	// maxOutputBytes is the max length of outputs persisted from builder
-	// outputs. Data beyond this length is ignored.
-	maxOutputBytes = 4 * 1024 // 4 KB
 )
 
 var (
@@ -84,7 +72,7 @@ var (
 	digestPullRE = regexp.MustCompile(`^Digest:\s*(sha256:[^\s]+)$`)
 	// RunRm : if true, all `docker run` commands will be passed a `--rm` flag.
 	RunRm = false
-	// timeNow is a function that returns the current time.
+	// timeNow is a function that returns the current time; stubbable for testing.
 	timeNow = time.Now
 )
 
@@ -160,10 +148,6 @@ type Build struct {
 	// filesystem, in tests it's an in-memory filesystem.
 	fs afero.Fs
 
-	// stepOutputs contains builder outputs produced by each step, if any.
-	// It is initialized once using initStepOutputsOnce.
-	stepOutputs         [][]byte
-	initStepOutputsOnce sync.Once
 }
 
 // TimingInfo holds timing information for build execution phases.
@@ -209,7 +193,7 @@ func New(r runner.Runner, b pb.Build, ts oauth2.TokenSource,
 		EventLogger:      eventLogger,
 		Done:             make(chan struct{}),
 		times:            map[BuildStatus]time.Duration{},
-		lastStateStart:   time.Now(),
+		lastStateStart:   timeNow(),
 		GCRErrors:        map[string]int64{},
 		hostWorkspaceDir: hostWorkspaceDir,
 		local:            local,
@@ -376,7 +360,7 @@ func (b *Build) LastStateStart() time.Time {
 func (b *Build) UpdateStatus(status BuildStatus) {
 	b.mu.Lock()
 	b.times[b.status] = time.Since(b.lastStateStart)
-	b.lastStateStart = time.Now()
+	b.lastStateStart = timeNow()
 	b.status = status
 	b.mu.Unlock()
 
@@ -942,6 +926,34 @@ func (b *Build) timeAndRunStep(ctx context.Context, idx int, waitChans []chan st
 	close(done)
 }
 
+// runtimeGOOS is the operating system detected at runtime and is stubbable in testing.
+var runtimeGOOS = runtime.GOOS
+
+// osTempDir returns the default temporary directory for the OS.
+func osTempDir() string {
+	if runtimeGOOS == "darwin" {
+		// The default temporary directory in MacOS lives in the /var path. Docker reserves the /var
+		// path and will deny the build from mounting or using resources in that path. See b/78897068.
+		// Use /tmp instead.
+		return "/tmp"
+	}
+	return os.TempDir()
+}
+
+// getTempDir returns the full tempdir path. If the subpath is empty, the OS temporary directory is returned.
+// Note that this does not create the temporary directory.
+func getTempDir(subpath string) string {
+	if subpath == "" {
+		return osTempDir()
+	}
+
+	fullpath := path.Join(osTempDir(), subpath)
+	if !strings.HasSuffix(fullpath, "/") {
+		fullpath = fullpath + "/"
+	}
+	return fullpath
+}
+
 func (b *Build) runStep(ctx context.Context, idx int) error {
 	step := b.Request.Steps[idx]
 
@@ -971,10 +983,7 @@ func (b *Build) runStep(ctx context.Context, idx int) error {
 		runTarget = stripTagDigest(step.Name) + "@" + digest
 	}
 
-	stepOutputDir := afero.GetTempDir(b.fs, fmt.Sprintf("step-%d", idx))
-	if err := b.fs.MkdirAll(stepOutputDir, os.FileMode(os.O_CREATE)); err != nil {
-		return fmt.Errorf("failed to create temp dir for step outputs: %v", err)
-	}
+	var stepOutputDir string
 
 	args := b.dockerRunArgs(path.Clean(step.Dir), stepOutputDir, idx)
 	for _, env := range step.Env {
@@ -1034,36 +1043,10 @@ func (b *Build) runStep(ctx context.Context, idx int) error {
 	if err := b.Runner.Run(ctx, args, nil, outWriter, errWriter, ""); err != nil {
 		return err
 	}
-	return b.captureStepOutput(idx, stepOutputDir)
-}
 
-func (b *Build) captureStepOutput(idx int, stepOutputDir string) error {
-	fn := path.Join(stepOutputDir, builderOutputFile)
-	if exists, _ := afero.Exists(b.fs, fn); !exists {
-		// Step didn't write an output file.
-		return nil
-	}
-
-	b.initStepOutputsOnce.Do(func() {
-		b.stepOutputs = make([][]byte, len(b.Request.Steps))
-	})
-
-	// Grab any outputs reported by the builder.
-	f, err := b.fs.Open(path.Join(stepOutputDir, builderOutputFile))
-	if err != nil {
-		log.Printf("failed to open step %d output file: %v", idx, err)
-		return err
-	}
-
-	var buf bytes.Buffer
-	if _, err := io.Copy(&buf, io.LimitReader(f, maxOutputBytes)); err != nil {
-		log.Printf("failed to read step %d output file: %v", idx, err)
-		return err
-	}
-
-	b.stepOutputs[idx] = buf.Bytes()
 	return nil
 }
+
 
 func (b *Build) runBuildSteps(ctx context.Context) error {
 	// Create BuildTotal TimeSpan with Start time. End time has zero value.
@@ -1216,10 +1199,6 @@ func (b *Build) dockerRunArgs(stepDir, stepOutputDir string, idx int) []string {
 		// Run in privileged mode per discussion in b/31267381.
 		"--privileged",
 
-		// Mount the step output dir.
-		"--volume", stepOutputDir+":"+stepOutputPath,
-		// Communicate the step output path to the builder via env var.
-		"--env", "BUILDER_OUTPUT="+stepOutputPath,
 	)
 	if !b.local {
 		args = append(args,
@@ -1362,7 +1341,7 @@ func (b *Build) pushArtifacts(ctx context.Context) error {
 	flags := gsutil.DockerFlags{
 		Workvol: b.hostWorkspaceDir + ":" + containerWorkspaceDir,
 		Workdir: workdir,
-		Tmpdir:  os.TempDir(),
+		Tmpdir:  osTempDir(),
 	}
 
 	b.mu.Lock()

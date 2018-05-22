@@ -24,7 +24,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path"
+	"runtime"
 	"reflect"
 	"regexp"
 	"strings"
@@ -1745,12 +1745,14 @@ func TestPushImagesTiming(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, true, false)
 
-			// We record this for the test case where tc.wantFirstPushTimeOnly is true. Since fakeTimeNow increments the second counter after each call,
-			// the first image push start time should start 1 second after pushStart.
+			// We record pushStart for the test case where tc.wantFirstPushTimeOnly
+			// is true. Since fakeTimeNow increments the second counter after each
+			// call, the first image push start time should start 1 second after
+			// pushStart.
 			pushStart := timeNow()
 
-			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, true, false)
 			b.pushImages(ctx)
 			imagePushes := b.Timing.ImagePushes
 			for _, pushTime := range imagePushes {
@@ -2574,59 +2576,51 @@ func TestWorkdir(t *testing.T) {
 	}
 }
 
-func TestBuildOutput(t *testing.T) {
-	r := newMockRunner(t, "desc")
-	r.dockerRunHandler = func([]string, io.Writer, io.Writer) error { return nil }
 
-	for _, c := range []struct {
-		contents    []string
-		wantOutputs [][]byte
+func TestOsTempDir(t *testing.T) {
+	defer func() { runtimeGOOS = runtime.GOOS }()
+
+	testCases := []struct {
+		goos        string
+		wantTempDir string
 	}{{
-		// no contents, no outputs.
-		contents:    nil,
-		wantOutputs: nil,
+		goos:        "notarealosbutnotdarwin",
+		wantTempDir: os.TempDir(),
 	}, {
-		// one step with contents.
-		contents:    []string{"foo"},
-		wantOutputs: [][]byte{[]byte("foo")},
-	}, {
-		// no contents in 0th step, contents in 1st.
-		contents:    []string{"", "foo"},
-		wantOutputs: [][]byte{nil, []byte("foo")},
-	}, {
-		// contents in 0th step, no contents in 1st.
-		contents:    []string{"foo", ""},
-		wantOutputs: [][]byte{[]byte("foo"), nil},
-	}} {
-		fs := afero.NewMemMapFs()
-		req := pb.Build{}
-		for i := 0; i < len(c.contents); i++ {
-			req.Steps = append(req.Steps, &pb.BuildStep{Name: "gcr.io/my-project/my-compiler"})
-		}
-		b := New(r, req, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", fs, true, false, false)
-
-		for i, contents := range c.contents {
-			stepOutputDir := afero.GetTempDir(fs, fmt.Sprintf("step-%d", i))
-			if err := b.fs.MkdirAll(stepOutputDir, os.FileMode(os.O_CREATE)); err != nil {
-				t.Errorf("MkDirAll(%q): %v", stepOutputDir, err)
-			}
-
-			if contents != "" {
-				p := path.Join(stepOutputDir, builderOutputFile)
-				if err := afero.WriteFile(fs, p, []byte(contents), os.FileMode(os.O_CREATE)); err != nil {
-					t.Fatalf("WriteFile(%q -> %q): %v", contents, p, err)
-				}
-			}
-
-			if err := b.captureStepOutput(i, stepOutputDir); err != nil {
-				t.Errorf("captureBuildOutputs failed: %v", err)
-			}
-		}
-
-		if !reflect.DeepEqual(b.stepOutputs, c.wantOutputs) {
-			t.Errorf("Collected outputs; got %v, want %v", b.stepOutputs, c.wantOutputs)
+		goos:        "darwin",
+		wantTempDir: "/tmp",
+	}}
+	for _, tc := range testCases {
+		runtimeGOOS = tc.goos
+		gotTempDir := osTempDir()
+		if gotTempDir != tc.wantTempDir {
+			t.Errorf("%s: got osTempDir() = %q, want %q", tc.goos, gotTempDir, tc.wantTempDir)
 		}
 	}
+}
+
+func TestGetTempDir(t *testing.T) {
+	tmpdir := osTempDir()
+
+	testCases := []struct {
+		name        string
+		subpath     string
+		wantTempDir string
+	}{{
+		name:        "NoSubpath",
+		wantTempDir: tmpdir,
+	}, {
+		name:        "Subpath",
+		subpath:     "iamsubpath",
+		wantTempDir: fmt.Sprintf("%s/iamsubpath/", tmpdir),
+	}}
+	for _, tc := range testCases {
+		gotTempDir := getTempDir(tc.subpath)
+		if gotTempDir != tc.wantTempDir {
+			t.Errorf("%s: got getTempDir() = %q, want %q", tc.name, gotTempDir, tc.wantTempDir)
+		}
+	}
+
 }
 
 type nopBuildLogger struct{}
