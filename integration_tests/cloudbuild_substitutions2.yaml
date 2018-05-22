@@ -1,0 +1,8 @@
+# The value of $_SUBSTITUTE_ME, which is not defined in the template, should be
+# passed in the substitutions flag.
+steps:
+- name: 'busybox'
+  args: ['echo', '$_MESSAGE', '$_SUBSTITUTE_ME']
+
+substitutions:
+  _MESSAGE: "hello world"

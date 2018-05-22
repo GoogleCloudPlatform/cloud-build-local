@@ -72,7 +72,7 @@ var (
 	digestPullRE = regexp.MustCompile(`^Digest:\s*(sha256:[^\s]+)$`)
 	// RunRm : if true, all `docker run` commands will be passed a `--rm` flag.
 	RunRm = false
-	// timeNow is a function that returns the current time.
+	// timeNow is a function that returns the current time; stubbable for testing.
 	timeNow = time.Now
 )
 
@@ -193,7 +193,7 @@ func New(r runner.Runner, b pb.Build, ts oauth2.TokenSource,
 		EventLogger:      eventLogger,
 		Done:             make(chan struct{}),
 		times:            map[BuildStatus]time.Duration{},
-		lastStateStart:   time.Now(),
+		lastStateStart:   timeNow(),
 		GCRErrors:        map[string]int64{},
 		hostWorkspaceDir: hostWorkspaceDir,
 		local:            local,
@@ -360,7 +360,7 @@ func (b *Build) LastStateStart() time.Time {
 func (b *Build) UpdateStatus(status BuildStatus) {
 	b.mu.Lock()
 	b.times[b.status] = time.Since(b.lastStateStart)
-	b.lastStateStart = time.Now()
+	b.lastStateStart = timeNow()
 	b.status = status
 	b.mu.Unlock()
 

@@ -25,7 +25,10 @@ import (
 	"strings"
 	"time"
 
+	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 	"github.com/GoogleCloudPlatform/container-builder-local/runner"
+	"github.com/GoogleCloudPlatform/container-builder-local/subst"
+	"github.com/GoogleCloudPlatform/container-builder-local/validate"
 )
 
 const (
@@ -126,4 +129,44 @@ func RefreshDuration(expiration time.Time) time.Duration {
 	}
 
 	return d
+}
+
+// SubstituteAndValidate merges the substitutions from the build
+// config and the local flag, validates them and the build.
+func SubstituteAndValidate(b *pb.Build, substMap map[string]string) error {
+	if b.Substitutions == nil {
+		b.Substitutions = make(map[string]string)
+	}
+
+	// Do not accept built-in substitutions in the build config.
+	if err := validate.CheckSubstitutions(b.Substitutions); err != nil {
+		return fmt.Errorf("Error validating build's substitutions: %v", err)
+	}
+
+	if err := validate.CheckSubstitutionsLoose(substMap); err != nil {
+		return err
+	}
+	// Add any flag substitutions to the existing substitution map.
+	// If the substitution is already defined in the template, the
+	// substitutions flag will override the value.
+	for k, v := range substMap {
+		b.Substitutions[k] = v
+	}
+
+	// Validate the build.
+	if err := validate.CheckBuild(b); err != nil {
+		return fmt.Errorf("Error validating build: %v", err)
+	}
+
+	// Apply substitutions.
+	if err := subst.SubstituteBuildFields(b); err != nil {
+		return fmt.Errorf("Error applying substitutions: %v", err)
+	}
+
+	// Validate the build after substitutions.
+	if err := validate.CheckBuildAfterSubstitutions(b); err != nil {
+		return fmt.Errorf("Error validating build after substitutions: %v", err)
+	}
+
+	return nil
 }
