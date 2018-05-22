@@ -1745,12 +1745,14 @@ func TestPushImagesTiming(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, true, false)
 
-			// We record this for the test case where tc.wantFirstPushTimeOnly is true. Since fakeTimeNow increments the second counter after each call,
-			// the first image push start time should start 1 second after pushStart.
+			// We record pushStart for the test case where tc.wantFirstPushTimeOnly
+			// is true. Since fakeTimeNow increments the second counter after each
+			// call, the first image push start time should start 1 second after
+			// pushStart.
 			pushStart := timeNow()
 
-			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, true, false)
 			b.pushImages(ctx)
 			imagePushes := b.Timing.ImagePushes
 			for _, pushTime := range imagePushes {
