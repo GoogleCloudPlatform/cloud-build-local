@@ -1,7 +1,7 @@
 # Have new buckets for each test.
 DATE=`date +%Y%m%d-%H%M%S`
-GCS_PATH=gs://container-builder-local-test/$DATE
-GCS_LOGS_PATH=gs://container-builder-local-test-logs/$DATE
+GCS_PATH=gs://local-builder-test/$DATE
+GCS_LOGS_PATH=gs://local-builder-test-logs/$DATE
 gsutil -m copy container-builder-local $GCS_PATH/
 gsutil -m copy ./integration_tests/* $GCS_PATH/
 

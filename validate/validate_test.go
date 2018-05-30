@@ -138,42 +138,67 @@ func TestCheckSubstitutionsLoose(t *testing.T) {
 func TestCheckSubstitutionTemplate(t *testing.T) {
 	for _, c := range []struct {
 		images, tags  []string
+		build         *pb.Build
 		steps         []*pb.BuildStep
+		artifacts     *pb.Artifacts
 		substitutions map[string]string
 		wantErr       bool
 		wantWarnings  int
 	}{{
-		steps: []*pb.BuildStep{{Name: "$_FOO"}},
-		substitutions: map[string]string{
-			"_FOO": "Bar",
+		build: &pb.Build{
+			Steps: []*pb.BuildStep{{Name: "$_FOO"}},
+			Substitutions: map[string]string{
+				"_FOO": "Bar",
+			},
 		},
 		wantWarnings: 0,
 	}, {
-		steps:        []*pb.BuildStep{{Name: "$$FOO"}},
+		build: &pb.Build{
+			Steps: []*pb.BuildStep{{Name: "$$FOO"}},
+		},
 		wantWarnings: 0,
 	}, {
-		steps:         []*pb.BuildStep{{Name: "$_FOO"}},
-		substitutions: map[string]string{}, // missing substitution
-		wantWarnings:  1,
-	}, {
-		steps: []*pb.BuildStep{{Name: "Baz"}}, // missing variable in template
-		substitutions: map[string]string{
-			"_FOO": "Bar",
+		build: &pb.Build{
+			Steps:         []*pb.BuildStep{{Name: "$_FOO"}},
+			Substitutions: map[string]string{}, // missing substitution
 		},
 		wantWarnings: 1,
 	}, {
-		// missing variable in template and missing variable in map
-		steps: []*pb.BuildStep{{Name: "$_BAZ"}},
-		substitutions: map[string]string{
-			"_FOO": "Bar",
+		build: &pb.Build{
+			Steps: []*pb.BuildStep{{Name: "Baz"}}, // missing variable in template
+			Substitutions: map[string]string{
+				"_FOO": "Bar",
+			},
+		},
+		wantWarnings: 1,
+	}, {
+		build: &pb.Build{
+			// missing variable in template and missing variable in map
+			Steps: []*pb.BuildStep{{Name: "$_BAZ"}},
+			Substitutions: map[string]string{
+				"_FOO": "Bar",
+			},
 		},
 		wantWarnings: 2,
 	}, {
-		steps:         []*pb.BuildStep{{Name: "$FOO"}}, // invalid built-in substitution
-		substitutions: map[string]string{},
-		wantErr:       true,
+		build: &pb.Build{
+			Steps:         []*pb.BuildStep{{Name: "$FOO"}}, // invalid built-in substitution
+			Substitutions: map[string]string{},
+		},
+		wantErr: true,
+	}, {
+		build: &pb.Build{
+			Artifacts: &pb.Artifacts{
+				Objects: &pb.Artifacts_ArtifactObjects{
+					Location: "gs://some-bucket/$_FOO",
+					Paths:    []string{"$_FOO"},
+				}},
+			Substitutions: map[string]string{
+				"_FOO": "Bar",
+			},
+		},
 	}} {
-		warnings, err := CheckSubstitutionTemplate(c.images, c.tags, c.steps, c.substitutions)
+		warnings, err := CheckSubstitutionTemplate(c.build)
 		if err == nil && c.wantErr {
 			t.Errorf("CheckSubstitutionTemplate(%v,%v,%v) did not return error", c.images, c.steps, c.substitutions)
 		} else if err != nil && !c.wantErr {
