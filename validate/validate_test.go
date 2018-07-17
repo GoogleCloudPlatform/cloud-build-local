@@ -999,11 +999,11 @@ func TestCheckSecrets(t *testing.T) {
 			Secrets: []*pb.Secret{{
 				KmsKeyName: kmsKeyName,
 				SecretEnv: map[string][]byte{
-					"MY_SECRET": []byte(strings.Repeat("a", 2000)),
+					"MY_SECRET": []byte(strings.Repeat("a", maxSecretSize+1)),
 				},
 			}},
 		},
-		wantErr: errors.New(`secretEnv value for "MY_SECRET" cannot exceed 1KB`),
+		wantErr: errors.New(`secretEnv value for "MY_SECRET" cannot exceed 2048B`),
 	}, {
 		desc: "Happy case: Build with acceptable secret values",
 		b: &pb.Build{
@@ -1122,6 +1122,7 @@ var validNames = []string{
 	"subdomain.gcr.io/works/folder/folder",
 	"gcr.io/works:tag",
 	"gcr.io/works/folder:tag",
+	"gcr.io/works/folder:Tag",
 	"ubuntu",
 	"ubuntu:latest",
 	"gcr.io/cloud-builders/docker@sha256:blah",
@@ -1161,6 +1162,28 @@ func TestCheckImageNames(t *testing.T) {
 	for _, name := range invalidNames {
 		if err := checkImageNames([]string{name}); err == nil {
 			t.Errorf("checkImageNames(%v) did not return error", name)
+		}
+	}
+}
+
+// TestCheckImageNames ensures that there are different error messages
+// for invalid images with uppercase letters, and all other invalid images.
+func TestCheckImageNamesErrorMessage(t *testing.T) {
+	invalidImages := []string{
+		"UBUNTU:latest",  // contains uppercase
+		"ubnutu::latest", // invalid, but all lowercase
+	}
+	wantErr := []error{
+		errors.New(`invalid image name "UBUNTU:latest" contains uppercase letters`),
+		errors.New(`invalid image name "ubnutu::latest"`),
+	}
+	for i, img := range invalidImages {
+		err := checkImageNames([]string{img})
+		if err == nil {
+			t.Fatalf("checkImageNames(%v) did not return error", img)
+		}
+		if err.Error() != wantErr[i].Error() {
+			t.Errorf("got error = %q, want %q", err.Error(), wantErr[i].Error())
 		}
 	}
 }

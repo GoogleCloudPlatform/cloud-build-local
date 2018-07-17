@@ -51,12 +51,9 @@ const (
 	maxSubstKeyLength   = 100  // max length of a substitution key.
 	maxSubstValueLength = 4000 // max length of a substitution value.
 	maxNumSecretEnvs    = 100  // max number of unique secret env values.
+	maxSecretSize       = 2048 // max size of a secret
 	maxArtifactsPaths   = 100  // max number of artifacts paths that can be specified.
-
-	// Name of the permission required to use a key to decrypt data.
-	// Documented at https://cloud.google.com/kms/docs/reference/permissions-and-roles
-	cloudkmsDecryptPermission = "cloudkms.cryptoKeyVersions.useToDecrypt"
-	maxNumTags                = 64 // max length of the list of tags.
+	maxNumTags          = 64   // max length of the list of tags.
 )
 
 var (
@@ -81,7 +78,6 @@ var (
 		"/builder/home":        struct{}{},
 		"/var/run/docker.sock": struct{}{},
 	}
-	validTagRE = regexp.MustCompile(`^(` + reference.TagRegexp.String() + `)$`)
 	// validImageTagRE ensures only proper characters are used in name and tag.
 	validImageTagRE = regexp.MustCompile(`^(` + reference.NameRegexp.String() + `(@sha256:` + reference.TagRegexp.String() + `|:` + reference.TagRegexp.String() + `)?)$`)
 	// validGCRImageRE ensures proper domain and folder level image for gcr.io. More lenient on the actual characters other than folder structure and domain.
@@ -518,7 +514,6 @@ func checkSecrets(b *pb.Build) error {
 			definedSecretEnvs[k] = struct{}{}
 		}
 	}
-
 	// Check that all used secret_envs are defined.
 	for used := range usedSecretEnvs {
 		if _, found := definedSecretEnvs[used]; !found {
@@ -538,8 +533,8 @@ func checkSecrets(b *pb.Build) error {
 	// Check secret_env max size.
 	for _, sec := range b.Secrets {
 		for k, v := range sec.SecretEnv {
-			if len(v) > 1024 {
-				return fmt.Errorf("secretEnv value for %q cannot exceed 1KB", k)
+			if len(v) > maxSecretSize {
+				return fmt.Errorf("secretEnv value for %q cannot exceed %dB", k, maxSecretSize)
 			}
 		}
 	}
@@ -589,7 +584,14 @@ func checkBuildStepNames(steps []*pb.BuildStep) error {
 func checkImageNames(images []string) error {
 	for _, image := range images {
 		if !validImageTagRE.MatchString(image) {
-			return fmt.Errorf("invalid image %q", image)
+			// If the lowercased string matches the validImageTag regex, then uppercase letters are invalidating the string.
+			// Return an informative error message to the user.
+			// Ideally, we could just print out the desired regex or refer to Docker documentation,
+			// but validImageTagRE is terribly long, and there is no Docker documentation to point to.
+			if validImageTagRE.MatchString(strings.ToLower(image)) {
+				return fmt.Errorf("invalid image name %q contains uppercase letters", image)
+			}
+			return fmt.Errorf("invalid image name %q", image)
 		}
 	}
 	return nil

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -29,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/container-builder-local/runner"
 	"github.com/GoogleCloudPlatform/container-builder-local/subst"
 	"github.com/GoogleCloudPlatform/container-builder-local/validate"
+	"golang.org/x/oauth2"
 )
 
 const (
@@ -169,4 +171,23 @@ func SubstituteAndValidate(b *pb.Build, substMap map[string]string) error {
 	}
 
 	return nil
+}
+
+// TokenTransport is a RoundTripper that automatically applies OAuth
+// credentials from the token source.
+//
+// This can be replaced by google.DefaultClient when metadata spoofing works by
+// IP address (b/33233310).
+type TokenTransport struct {
+	Ts oauth2.TokenSource
+}
+
+// RoundTrip executes a single HTTP transaction, obtaining the Response for a given Request.
+func (t *TokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	tok, err := t.Ts.Token()
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+tok.AccessToken)
+	return http.DefaultTransport.RoundTrip(req)
 }

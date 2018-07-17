@@ -477,7 +477,7 @@ func TestFetchBuilder(t *testing.T) {
 	for _, tc := range testCases {
 		r := newMockRunner(t, tc.name)
 		r.remotePullsFail = tc.pullsFail
-		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
 		var gotErr error
 		var gotDigest string
 		wantDigest := ""
@@ -785,7 +785,7 @@ func TestRunBuildSteps(t *testing.T) {
 			r.localImages["gcr.io/build-output-tag-2"] = true
 			return tc.opError
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
 		gotErr := b.runBuildSteps(ctx)
 		if !reflect.DeepEqual(gotErr, tc.wantErr) {
 			t.Errorf("%s: Wanted error %q, but got %q", tc.name, tc.wantErr, gotErr)
@@ -1045,7 +1045,7 @@ func TestBuildStepOrder(t *testing.T) {
 			}
 			return nil
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
 		errorFromFunction := make(chan error)
 		go func() {
 			errorFromFunction <- b.runBuildSteps(ctx)
@@ -1096,7 +1096,7 @@ func TestPushImages(t *testing.T) {
 	}}
 	for _, tc := range testCases {
 		r := newMockRunner(t, tc.name)
-		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, true, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false)
 		r.remotePushesFail = tc.remotePushesFail
 		gotErr := b.pushImages(ctx)
 		if !reflect.DeepEqual(gotErr, tc.wantErr) {
@@ -1235,7 +1235,7 @@ func TestPushArtifacts(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
 
-			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), false, true, false)
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), false, true, false)
 			b.gsutilHelper = tc.gsutilHelper
 
 			err := b.pushArtifacts(ctx)
@@ -1292,7 +1292,7 @@ func TestPushArtifactsTiming(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
-			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, true, false)
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false)
 			b.gsutilHelper = newMockGsutilHelper("gs://some-bucket", 0)
 			if err := b.pushArtifacts(ctx); err != nil {
 				t.Fatalf("b.pushArtifacts() = %v", err)
@@ -1347,7 +1347,7 @@ func TestPushAllTiming(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
-			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, true, false)
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false)
 			b.gsutilHelper = newMockGsutilHelper("gs://some-bucket", 1)
 			if err := b.pushAll(ctx); err != nil {
 				t.Fatal(err)
@@ -1480,7 +1480,7 @@ func TestBuildTiming(t *testing.T) {
 				r.mu.Unlock()
 				return nil
 			}
-			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
 			b.runBuildSteps(ctx)
 
 			buildStepTimes := b.Timing.BuildSteps
@@ -1630,7 +1630,7 @@ func TestBuildTimingOutOfOrder(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
 			r.dockerRunHandler = func([]string, io.Writer, io.Writer) error { return nil }
-			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
 			b.runBuildSteps(ctx)
 
 			buildStepTimes := b.Timing.BuildSteps
@@ -1745,7 +1745,7 @@ func TestPushImagesTiming(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
-			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, true, false)
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false)
 
 			// We record pushStart for the test case where tc.wantFirstPushTimeOnly
 			// is true. Since fakeTimeNow increments the second counter after each
@@ -1819,7 +1819,7 @@ func TestBuildStepConcurrency(t *testing.T) {
 	}
 
 	// Run the build.
-	b := New(r, req, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
+	b := New(r, req, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
 	ret := make(chan error)
 	go func() {
 		ret <- b.runBuildSteps(ctx)
@@ -1858,7 +1858,7 @@ type fakeRunner struct {
 func (f *fakeRunner) Run(ctx context.Context, args []string, _ io.Reader, _, _ io.Writer, _ string) error {
 	// The "+1" is for the name of the container which is appended to the
 	// dockerRunArgs base command.
-	b := New(nil, pb.Build{}, nil, nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
+	b := New(nil, pb.Build{}, nil, nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
 	argCount := len(b.dockerRunArgs("", "", 0)) + 1
 	switch {
 	case !startsWith(args, "docker", "run"):
@@ -1909,7 +1909,7 @@ func dockerRunString(idx int) string {
 }
 
 func dockerRunInStepDir(idx int, stepDir string) string {
-	b := New(nil, pb.Build{}, nil, nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
+	b := New(nil, pb.Build{}, nil, nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
 	dockerRunArg := b.dockerRunArgs(stepDir, fmt.Sprintf("/tmp/step-%d/", idx), idx)
 	return strings.Join(dockerRunArg, " ")
 }
@@ -1927,7 +1927,7 @@ func fakeTimeSpan() *TimeSpan {
 }
 
 func TestSummary(t *testing.T) {
-	b := New(nil, pb.Build{}, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, true, false)
+	b := New(nil, pb.Build{}, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false)
 
 	wantBuildStatus := StatusDone
 	wantStepStatus := []pb.Build_Status{pb.Build_SUCCESS, pb.Build_SUCCESS}
@@ -2005,7 +2005,7 @@ func TestErrorCollection(t *testing.T) {
 		"got an http status: 300: it's a mystery to me",
 		"got another http status: 300: it's a double mystery",
 	}
-	b := New(nil, pb.Build{}, nil, nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
+	b := New(nil, pb.Build{}, nil, nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
 	for _, o := range outputs {
 		b.detectPushFailure(o)
 	}
@@ -2074,7 +2074,7 @@ func TestEntrypoint(t *testing.T) {
 			stepArgs <- strings.Join(args, " ")
 			return nil
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
 		errorFromFunction := make(chan error)
 		go func() {
 			errorFromFunction <- b.runBuildSteps(ctx)
@@ -2166,7 +2166,7 @@ func TestSecrets(t *testing.T) {
 			gotCommand = strings.Join(args, " ")
 			return nil
 		}
-		b := New(r, buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
+		b := New(r, buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
 		b.kms = fakeKMS{
 			plaintext: c.plaintext,
 			err:       c.kmsErr,
@@ -2353,7 +2353,7 @@ func TestTimeout(t *testing.T) {
 	}
 	r := newMockRunner(t, "timeout")
 	r.dockerRunHandler = func([]string, io.Writer, io.Writer) error { return nil }
-	b := New(r, request, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, true, false)
+	b := New(r, request, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false)
 	b.Start(ctx)
 	<-b.Done
 
@@ -2379,7 +2379,7 @@ func TestCancel(t *testing.T) {
 	}
 	r := newMockRunner(t, "cancel")
 	r.dockerRunHandler = func([]string, io.Writer, io.Writer) error { return nil }
-	b := New(r, request, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, true, false)
+	b := New(r, request, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false)
 	fullStatus := b.GetStatus()
 	if fullStatus.BuildStatus != "" {
 		t.Errorf("Build has status before Start(): %v", fullStatus)
@@ -2473,7 +2473,7 @@ func TestStart(t *testing.T) {
 			r.localImages["gcr.io/build"] = true
 			return nil
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, tc.push, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, tc.push, false)
 		b.Start(ctx)
 		<-b.Done
 
@@ -2496,7 +2496,7 @@ func TestUpdateDockerAccessToken(t *testing.T) {
 	ctx := context.Background()
 	r := newMockRunner(t, "TestUpdateDockerAccessToken")
 	r.dockerRunHandler = func(args []string, _, _ io.Writer) error { return nil }
-	b := New(r, pb.Build{}, nil, nil, nil, "", afero.NewMemMapFs(), false, false, false)
+	b := New(r, pb.Build{}, nil, nil, "", afero.NewMemMapFs(), false, false, false)
 
 	// If UpdateDockerAccessToken is called before SetDockerAccessToken, we
 	// should get an error.
@@ -2629,11 +2629,6 @@ func (nopBuildLogger) WriteMainEntry(string)                  { return }
 func (nopBuildLogger) Close() error                           { return nil }
 func (nopBuildLogger) MakeWriter(string, int, bool) io.Writer { return ioutil.Discard }
 
-type nopEventLogger struct{}
-
-func (nopEventLogger) StartStep(context.Context, int, time.Time) error        { return nil }
-func (nopEventLogger) FinishStep(context.Context, int, bool, time.Time) error { return nil }
-
 // Test coverage to confirm that we don't have the data race fixed in cl/190142977.
 func TestDataRace(t *testing.T) {
 	build := pb.Build{
@@ -2642,7 +2637,7 @@ func TestDataRace(t *testing.T) {
 	}
 	r := newMockRunner(t, "race")
 	r.dockerRunHandler = func([]string, io.Writer, io.Writer) error { return nil }
-	b := New(r, build, mockTokenSource(), nopBuildLogger{}, nopEventLogger{}, "", afero.NewMemMapFs(), true, false, false)
+	b := New(r, build, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
 	ctx := context.Background()
 
 	go b.Start(ctx) // updates b.Timing.BuildTotal

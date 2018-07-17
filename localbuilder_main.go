@@ -64,6 +64,13 @@ func exitUsage(msg string) {
 }
 
 func main() {
+	// BEGIN GOOGLE-INTERNAL
+	// This never needs to be mirrored out to GitHub. On GitHub, we're going to
+	// rename the repo and change the name of the built binary.
+	if strings.Contains(os.Args[0], "container-builder") {
+		log.Printf("WARNING: %v is deprecated. Please run `gcloud install cloud-build-local` to install its replacement.", os.Args[0])
+	}
+	// END GOOGLE-INTERNAL
 	flag.Parse()
 	ctx := context.Background()
 	args := flag.Args()
@@ -191,7 +198,7 @@ func run(ctx context.Context, source string) error {
 		}
 	}
 
-	b := build.New(r, *buildConfig, nil /* TokenSource */, stdoutLogger{}, nopEventLogger{}, volumeName, afero.NewOsFs(), true, *push, *dryRun)
+	b := build.New(r, *buildConfig, nil /* TokenSource */, stdoutLogger{}, volumeName, afero.NewOsFs(), true, *push, *dryRun)
 
 	// Do not run the spoofed metadata server on a dryrun.
 	if !*dryRun {
@@ -361,8 +368,3 @@ func (pw prefixWriter) Write(b []byte) (int, error) {
 	}
 	return len(b), nil
 }
-
-type nopEventLogger struct{}
-
-func (nopEventLogger) StartStep(context.Context, int, time.Time) error        { return nil }
-func (nopEventLogger) FinishStep(context.Context, int, bool, time.Time) error { return nil }

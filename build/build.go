@@ -83,13 +83,6 @@ type Logger interface {
 	MakeWriter(prefix string, stepIdx int, stdout bool) io.Writer
 }
 
-// EventLogger encapsulates logging events about build steps
-// starting/finishing.
-type EventLogger interface {
-	StartStep(ctx context.Context, stepIdx int, startTime time.Time) error
-	FinishStep(ctx context.Context, stepIdx int, success bool, endTime time.Time) error
-}
-
 type imageDigest struct {
 	tag, digest string
 }
@@ -102,7 +95,6 @@ type Build struct {
 	HasMultipleSteps bool
 	TokenSource      oauth2.TokenSource
 	Log              Logger
-	EventLogger      EventLogger
 	status           BuildStatus
 	imageDigests     []imageDigest // docker image tag to digest (for built images)
 	stepDigests      []string      // build step index to digest (for build steps)
@@ -183,14 +175,13 @@ type kms interface {
 
 // New constructs a new Build.
 func New(r runner.Runner, b pb.Build, ts oauth2.TokenSource,
-	bl Logger, eventLogger EventLogger, hostWorkspaceDir string, fs afero.Fs, local, push, dryrun bool) *Build {
+	bl Logger, hostWorkspaceDir string, fs afero.Fs, local, push, dryrun bool) *Build {
 	return &Build{
 		Runner:           r,
 		Request:          b,
 		TokenSource:      ts,
 		stepDigests:      make([]string, len(b.Steps)),
 		Log:              bl,
-		EventLogger:      eventLogger,
 		Done:             make(chan struct{}),
 		times:            map[BuildStatus]time.Duration{},
 		lastStateStart:   timeNow(),
@@ -833,7 +824,7 @@ func (b *Build) getKMSClient() (kms, error) {
 	// when spoofing metadata works by IP. Until then, we'll just fetch the token
 	// and pass it to all HTTP requests.
 	svc, err := cloudkms.New(&http.Client{
-		Transport: &tokenTransport{b.TokenSource},
+		Transport: &common.TokenTransport{b.TokenSource},
 	})
 	if err != nil {
 		return nil, err
@@ -883,11 +874,6 @@ func (b *Build) timeAndRunStep(ctx context.Context, idx int, waitChans []chan st
 	b.Timing.BuildSteps[idx] = &TimeSpan{Start: when}
 	b.mu.Unlock()
 
-	if err := b.EventLogger.StartStep(ctx, idx, when); err != nil {
-		log.Printf("Error publishing start-step event: %v", err)
-		
-	}
-
 	err := b.runStep(ctx, idx)
 
 	when = timeNow()
@@ -904,13 +890,6 @@ func (b *Build) timeAndRunStep(ctx context.Context, idx int, waitChans []chan st
 		b.stepStatus[idx] = pb.Build_FAILURE
 	}
 	b.mu.Unlock()
-
-	// We use a background context to send the FinishStep message because ctx may
-	// have been timed out or cancelled.
-	if err := b.EventLogger.FinishStep(context.Background(), idx, err == nil, when); err != nil {
-		log.Printf("Error publishing finish-step event: %v", err)
-		
-	}
 
 	// If another step executing in parallel fails and sends an error, this step
 	// will be blocked from sending an error on the channel.
@@ -1040,11 +1019,8 @@ func (b *Build) runStep(ctx context.Context, idx int) error {
 		}
 	}
 
-	if err := b.Runner.Run(ctx, args, nil, outWriter, errWriter, ""); err != nil {
-		return err
-	}
-
-	return nil
+	buildErr := b.Runner.Run(ctx, args, nil, outWriter, errWriter, "")
+	return buildErr
 }
 
 
@@ -1379,22 +1355,4 @@ func (b *Build) pushArtifacts(ctx context.Context) error {
 	b.artifacts = ArtifactsInfo{ArtifactManifest: artifactManifest, NumArtifacts: numArtifacts}
 
 	return nil
-}
-
-// tokenTransport is a RoundTripper that automatically applies OAuth
-// credentials from the token source.
-//
-// This can be replaced by google.DefaultClient when metadata spoofing works by
-// IP address (b/33233310).
-type tokenTransport struct {
-	ts oauth2.TokenSource
-}
-
-func (t *tokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	tok, err := t.ts.Token()
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+tok.AccessToken)
-	return http.DefaultTransport.RoundTrip(req)
 }
