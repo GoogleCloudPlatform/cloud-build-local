@@ -41,7 +41,7 @@ import (
 
 	"golang.org/x/oauth2"
 
-	"github.com/GoogleCloudPlatform/container-builder-local/runner"
+	"github.com/GoogleCloudPlatform/cloud-build-local/runner"
 )
 
 const (
@@ -53,8 +53,8 @@ const (
 	metadataLocalSubnet = "169.254.0.0/16"
 
 	// This subnet captures metadataHostedIP. This subnet is a reserved private subnet.
-	// This is the subnet used to create the cloudbuild docker network in the hosted
-	// container builder environment. All build steps are run connected to the
+	// This is the subnet used to create the cloudbuild docker network in the
+	// hosted Cloud Build environment. All build steps are run connected to the
 	// cloudbuild docker network.
 	metadataHostedSubnet = "192.168.10.0/24"
 
@@ -193,14 +193,14 @@ func (r RealUpdater) SetProjectInfo(b ProjectInfo) error {
 }
 
 // StartLocalServer starts the metadata server container for VMs running as
-// part of the container builder service.
+// part of the Cloud Build service.
 //
 // This version of Start*Server does not update iptables.
 //
 // The container listens on local port 8082, which is where RealUpdater POSTs
 // to.
 func StartLocalServer(ctx context.Context, r runner.Runner, metadataImage string) error {
-	// Unlike the hosted container builder service, the user's local machine is
+	// Unlike the hosted Cloud Build service, the user's local machine is
 	// not guaranteed to have the latest version, so we explicitly pull it.
 	if err := r.Run(ctx, []string{"docker", "pull", metadataImage}, nil, os.Stdout, os.Stderr, ""); err != nil {
 		return err
@@ -209,7 +209,7 @@ func StartLocalServer(ctx context.Context, r runner.Runner, metadataImage string
 }
 
 // StartCloudServer starts the metadata server container for VMs running as
-// part of the container builder service.
+// part of the Cloud Build service.
 //
 // This version of Start*Server needs to make iptables rules that we don't
 // want (or need) on a user's local machine.

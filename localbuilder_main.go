@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package main runs the gcb local builder.
-package main // import "github.com/GoogleCloudPlatform/container-builder-local"
+package main // import "github.com/GoogleCloudPlatform/cloud-build-local"
 
 import (
 	"bufio"
@@ -33,13 +33,13 @@ import (
 	"golang.org/x/oauth2"
 	"github.com/pborman/uuid"
 
-	"github.com/GoogleCloudPlatform/container-builder-local/build"
-	"github.com/GoogleCloudPlatform/container-builder-local/common"
-	"github.com/GoogleCloudPlatform/container-builder-local/config"
-	"github.com/GoogleCloudPlatform/container-builder-local/gcloud"
-	"github.com/GoogleCloudPlatform/container-builder-local/metadata"
-	"github.com/GoogleCloudPlatform/container-builder-local/runner"
-	"github.com/GoogleCloudPlatform/container-builder-local/volume"
+	"github.com/GoogleCloudPlatform/cloud-build-local/build"
+	"github.com/GoogleCloudPlatform/cloud-build-local/common"
+	"github.com/GoogleCloudPlatform/cloud-build-local/config"
+	"github.com/GoogleCloudPlatform/cloud-build-local/gcloud"
+	"github.com/GoogleCloudPlatform/cloud-build-local/metadata"
+	"github.com/GoogleCloudPlatform/cloud-build-local/runner"
+	"github.com/GoogleCloudPlatform/cloud-build-local/volume"
 )
 
 const (
@@ -64,13 +64,9 @@ func exitUsage(msg string) {
 }
 
 func main() {
-	// BEGIN GOOGLE-INTERNAL
-	// This never needs to be mirrored out to GitHub. On GitHub, we're going to
-	// rename the repo and change the name of the built binary.
 	if strings.Contains(os.Args[0], "container-builder") {
 		log.Printf("WARNING: %v is deprecated. Please run `gcloud install cloud-build-local` to install its replacement.", os.Args[0])
 	}
-	// END GOOGLE-INTERNAL
 	flag.Parse()
 	ctx := context.Background()
 	args := flag.Args()

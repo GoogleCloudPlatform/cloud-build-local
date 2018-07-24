@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"regexp"
 	"strings"
 	"testing"
@@ -32,6 +33,13 @@ import (
 )
 
 var joinedHeaders = strings.Join(csvHeaders, ",")
+
+// noopLogger is a Logger that does nothing.
+type noopLogger struct{}
+
+func (noopLogger) WriteMainEntry(msg string)              {}
+func (noopLogger) Close() error                           { return nil }
+func (noopLogger) MakeWriter(string, int, bool) io.Writer { return ioutil.Discard }
 
 type mockRunner struct {
 	
@@ -123,6 +131,13 @@ func (r *mockRunner) Clean() error {
 
 // gsutil simulates gsutil commands in the mockrunner.
 func (r *mockRunner) gsutil(args []string, in io.Reader, out, err io.Writer) error {
+	if startsWith(args, "-c") {
+		// Parse the gsutil commands from the -c field.
+		cmds := strings.Split(args[1], " ")
+		if cmds[0] == "gsutil" && len(cmds) > 1 {
+			return r.gsutil(cmds[1:], in, out, err)
+		}
+	}
 	if startsWith(args, "ls") {
 		// Simulate 'gsutil ls' command (https://cloud.google.com/storage/docs/gsutil/commands/ls).
 		lastArg := args[len(args)-1]
@@ -173,7 +188,7 @@ func (r *mockRunner) gsutil(args []string, in io.Reader, out, err io.Writer) err
 
 		return nil
 	}
-	if startsWith(args, "cp") {
+	if startsWith(args, "cp") || startsWith(args, "-m", "cp") {
 		// Simulate 'gsutil cp' command (https://cloud.google.com/storage/docs/gsutil/commands/cp).
 		if contains(args, "-L") {
 			// -L option is present when gsutil copies source file to destination bucket.
@@ -192,7 +207,9 @@ func (r *mockRunner) gsutil(args []string, in io.Reader, out, err io.Writer) err
 			// Verify source file to copy exists in our mocked local environment.
 			// We won't do wildcard/regex matching here, so tests should specify a file.
 			src := args[len(args)-2]
-			exists, err := afero.Exists(r.fs, src)
+			// Remove the enclosing single quotes and prefixed "./" that is added to the source.
+			trimmedSrc := strings.TrimPrefix(strings.Replace(src, "'", "", 2), "./")
+			exists, err := afero.Exists(r.fs, trimmedSrc)
 			if err != nil {
 				return err
 			}
@@ -326,7 +343,7 @@ func TestVerifyBucket(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
 
-			gsutilHelper := New(r, afero.NewMemMapFs())
+			gsutilHelper := New(r, afero.NewMemMapFs(), noopLogger{})
 			err := gsutilHelper.VerifyBucket(ctx, tc.bucket)
 			if err == nil && tc.wantErr {
 				t.Errorf("got gsutilHelper.VerifyBucket(%s) = %v, want error", tc.bucket, err)
@@ -401,7 +418,7 @@ func TestUploadArtifacts(t *testing.T) {
 			r := newMockRunner(t, tc.name)
 			r.manifestFile = toManifest(tc.manifestItems...)
 			r.fs = fs
-			gsutilHelper := New(r, fs)
+			gsutilHelper := New(r, fs, noopLogger{})
 
 			for k, v := range tc.objectGenerations {
 				// We add the objectGenerations to the runner objectGenerations map otherwise
@@ -415,7 +432,7 @@ func TestUploadArtifacts(t *testing.T) {
 				}
 			}
 
-			// NB: The destination bucket's existence is checked before any artifacts are uploaded, so it's value here does not matter.
+			// NB: The destination bucket's existence is checked before any artifacts are uploaded, so its value here does not matter.
 			results, err := gsutilHelper.UploadArtifacts(ctx, tc.flags, tc.source, "gs://some-bucket")
 			if tc.wantError {
 				if err == nil {
@@ -433,102 +450,6 @@ func TestUploadArtifacts(t *testing.T) {
 			for i, item := range results {
 				if !proto.Equal(tc.wantResults[i], item) {
 					t.Errorf("got results[%d] = %+v,\nwant %+v", i, item, tc.wantResults[i])
-				}
-			}
-
-			// For gcr.io/cloud-builders/gsutil cp commmands run in a docker container, a "./" must be prefixed to the source URL in order for gsutil wildcarding to work.
-			wantSource := fmt.Sprintf("./%s", tc.source)
-			for _, c := range r.commands {
-				if strings.Contains(c, "cp") && strings.Contains(c, tc.source) && !strings.Contains(c, wantSource) {
-					t.Errorf("got source = %q, only want source %s; all source URLs must be prefixed with %q: args =[%+v]", tc.source, wantSource, "./", c)
-				}
-			}
-		})
-	}
-}
-
-func TestGlob(t *testing.T) {
-	ctx := context.Background()
-	newUUID = func() string { return "someuuid" }
-	defer func() { newUUID = uuid.New }()
-
-	testCases := []struct {
-		name         string
-		flags        DockerFlags
-		src          string // glob string
-		stdout       string // specifies standard output in the mockRunner
-		stderr       string // specifies error output in mockRunner
-		wantFiles    []string
-		wantCommands []string
-		wantError    bool
-	}{{
-		name:      "OneMatchingFile",
-		flags:     DockerFlags{Workvol: "workvol", Workdir: "workdir"},
-		src:       "foo.xml",
-		stdout:    "foo.xml\n",
-		wantFiles: []string{"foo.xml"},
-		wantCommands: []string{
-			"docker run --name cloudbuild_gsutil_" + newUUID() +
-				" --rm --volume workvol --workdir workdir --entrypoint bash ubuntu -c" +
-				" shopt -s globstar; find ./foo.xml -type f",
-		},
-	}, {
-		name:      "MultipleMatchingFiles",
-		flags:     DockerFlags{Workvol: "workvol", Workdir: "workdir"},
-		src:       "*.xml",
-		stdout:    "foo.xml\nbar.xml\n",
-		wantFiles: []string{"foo.xml", "bar.xml"},
-		wantCommands: []string{
-			"docker run --name cloudbuild_gsutil_" + newUUID() +
-				" --rm --volume workvol --workdir workdir --entrypoint bash ubuntu -c" +
-				" shopt -s globstar; find ./*.xml -type f",
-		},
-	}, {
-		name:   "NoMatchingFiles",
-		flags:  DockerFlags{Workvol: "workvol", Workdir: "workdir"},
-		src:    "idonotexist.xml",
-		stderr: "idonotexist.xml: No such file or directory\n",
-		wantCommands: []string{
-			"docker run --name cloudbuild_gsutil_" + newUUID() +
-				" --rm --volume workvol --workdir workdir --entrypoint bash ubuntu -c" +
-				" shopt -s globstar; find ./idonotexist.xml -type f",
-		},
-		wantError: true,
-	}, {
-		name:      "ErrorMissingWorkvol",
-		flags:     DockerFlags{Workdir: "workdir"},
-		wantError: true,
-	}, {
-		name:      "ErrorMissingWorkdir",
-		flags:     DockerFlags{Workvol: "workvol"},
-		wantError: true,
-	}}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			r := newMockRunner(t, tc.name)
-			r.stdout = tc.stdout
-			r.stderr = tc.stderr
-			gsutilHelper := New(r, afero.NewMemMapFs())
-
-			files, err := gsutilHelper.glob(ctx, tc.flags, tc.src)
-			if tc.wantError {
-				if err == nil {
-					t.Errorf("glob(): got err = nil, want error")
-				}
-				return // desired behavior
-			}
-			if err != nil {
-				t.Errorf("glob(): err := %v", err)
-			}
-			if err := checkCommands(r.commands, tc.wantCommands); err != nil {
-				t.Errorf("checkCommands(): err = \n%v", err)
-			}
-			if len(files) != len(tc.wantFiles) {
-				t.Fatalf("got %d files = %+v, want %d files = %+v", len(files), files, len(tc.wantFiles), tc.wantFiles)
-			}
-			for i, f := range files {
-				if f != tc.wantFiles[i] {
-					t.Errorf("got file[%d]  = %q, want %q", i, f, tc.wantFiles[i])
 				}
 			}
 		})
@@ -552,8 +473,8 @@ func TestRunGsutil(t *testing.T) {
 		commands: []string{"ls"},
 		wantCommands: []string{
 			"docker run --name cloudbuild_gsutil_" + newUUID() +
-				" --rm --volume /var/run/docker.sock:/var/run/docker.sock --volume workvol --workdir workdir --network cloudbuild" +
-				" gcr.io/cloud-builders/gsutil ls",
+				" --rm --volume /var/run/docker.sock:/var/run/docker.sock --volume workvol --workdir workdir --network cloudbuild --entrypoint bash" +
+				" gcr.io/cloud-builders/gsutil -c gsutil ls",
 		},
 	}, {
 		name:     "HappyCaseMultiArgs",
@@ -561,8 +482,8 @@ func TestRunGsutil(t *testing.T) {
 		commands: []string{"ls", "gs://bucket-one"},
 		wantCommands: []string{
 			"docker run --name cloudbuild_gsutil_" + newUUID() +
-				" --rm --volume /var/run/docker.sock:/var/run/docker.sock --volume workvol --workdir workdir --network cloudbuild" +
-				" gcr.io/cloud-builders/gsutil ls gs://bucket-one",
+				" --rm --volume /var/run/docker.sock:/var/run/docker.sock --volume workvol --workdir workdir --network cloudbuild --entrypoint bash" +
+				" gcr.io/cloud-builders/gsutil -c gsutil ls gs://bucket-one",
 		},
 	}, {
 		name:     "HappyCaseTmpDir",
@@ -570,9 +491,9 @@ func TestRunGsutil(t *testing.T) {
 		commands: []string{"ls"},
 		wantCommands: []string{
 			"docker run --name cloudbuild_gsutil_" + newUUID() +
-				" --rm --volume /var/run/docker.sock:/var/run/docker.sock --volume workvol --workdir workdir --network cloudbuild" +
+				" --rm --volume /var/run/docker.sock:/var/run/docker.sock --volume workvol --workdir workdir --network cloudbuild --entrypoint bash" +
 				" --volume " + "tmpdir:tmpdir" +
-				" gcr.io/cloud-builders/gsutil ls",
+				" gcr.io/cloud-builders/gsutil -c gsutil ls",
 		},
 	}, {
 		name:      "ErrorMissingWorkvol",
@@ -596,9 +517,9 @@ func TestRunGsutil(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
-			gsutilHelper := New(r, afero.NewMemMapFs())
+			gsutilHelper := New(r, afero.NewMemMapFs(), noopLogger{})
 
-			output, err := gsutilHelper.runGsutil(ctx, tc.flags, tc.commands...)
+			output, err := gsutilHelper.runGsutil(ctx, "", tc.flags, tc.commands...)
 			if tc.wantError {
 				if err == nil {
 					t.Errorf("runGsutil(): got err = nil, want error")
@@ -625,7 +546,7 @@ func TestUploadArtifactsManifest(t *testing.T) {
 	wantManifestPath := "gs://bucket-one/manifest.log"
 
 	r := newMockRunner(t, "TestUploadArtifactsManifest")
-	gsutilHelper := New(r, afero.NewMemMapFs())
+	gsutilHelper := New(r, afero.NewMemMapFs(), noopLogger{})
 	manifestPath, err := gsutilHelper.UploadArtifactsManifest(ctx, flags, manifest, bucket, results)
 	if err != nil {
 		t.Fatalf("UploadArtifactsManifest(): err = %v", err)
@@ -666,13 +587,14 @@ func TestGetGeneration(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
-			gsutilHelper := New(r, afero.NewMemMapFs())
+			gsutilHelper := New(r, afero.NewMemMapFs(), noopLogger{})
 
 			url, err := gsutilHelper.getGeneration(ctx, DockerFlags{Workvol: "workvol", Workdir: "workdir"}, tc.url)
 
 			wantCommands := []string{
 				"docker run --name cloudbuild_gsutil_" + newUUID() +
-					" --rm --volume /var/run/docker.sock:/var/run/docker.sock --volume workvol --workdir workdir --network cloudbuild gcr.io/cloud-builders/gsutil ls -a " + tc.url,
+					" --rm --volume /var/run/docker.sock:/var/run/docker.sock --volume workvol --workdir workdir --network cloudbuild --entrypoint bash" +
+					" gcr.io/cloud-builders/gsutil -c gsutil ls -a " + tc.url,
 			}
 			if err := checkCommands(r.commands, wantCommands); err != nil {
 				t.Errorf("checkCommands(): err = \n%v", err)
@@ -767,7 +689,7 @@ func TestParseGsutilManifest(t *testing.T) {
 				afero.WriteFile(fs, filepath, []byte(tc.manifest), filemode)
 			}
 			r := newMockRunner(t, tc.name)
-			gsutilHelper := New(r, fs)
+			gsutilHelper := New(r, fs, noopLogger{})
 			results, err := gsutilHelper.parseGsutilManifest(filepath)
 
 			if tc.wantError {
@@ -815,7 +737,7 @@ func TestCreateArtifactsManifest(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
 			fs := afero.NewMemMapFs()
-			gsutilHelper := New(r, fs)
+			gsutilHelper := New(r, fs, noopLogger{})
 
 			if err := gsutilHelper.createArtifactsManifest(manifestPath, tc.results); err == nil && tc.wantErr {
 				t.Error("got gsutilHelper.writeArtifactsManifest() = nil, want error")
@@ -829,52 +751,6 @@ func TestCreateArtifactsManifest(t *testing.T) {
 			}
 			if string(gotManifest) != tc.wantManifest {
 				t.Errorf("got manifest = \n%q\n want manifest =\n%q", gotManifest, tc.wantManifest)
-			}
-		})
-	}
-}
-
-func TestAdjustDest(t *testing.T) {
-	testCases := []struct {
-		name     string
-		src      string
-		dest     string
-		wantDest string
-	}{{
-		name:     "NoLeadDir",
-		src:      "test.xml",
-		dest:     "gs://bucket/",
-		wantDest: "gs://bucket/",
-	}, {
-		name:     "LeadDir",
-		src:      "some/path/test.xml",
-		dest:     "gs://bucket/",
-		wantDest: "gs://bucket/some/path/",
-	}, {
-		name:     "LeadDirBucketDir",
-		src:      "/some/path/test.xml",
-		dest:     "gs://bucket/some/path/",
-		wantDest: "gs://bucket/some/path/some/path/",
-	}, {
-		name:     "SlashLeadDir",
-		src:      "/some/path/test.xml",
-		dest:     "gs://bucket/",
-		wantDest: "gs://bucket/some/path/",
-	}, {
-		name:     "DotSlashNoLeadDir",
-		src:      "./test.xml",
-		dest:     "gs://bucket/",
-		wantDest: "gs://bucket/",
-	}, {
-		name:     "DotSlashLeadDir",
-		src:      "./some/path/test.xml",
-		dest:     "gs://bucket/",
-		wantDest: "gs://bucket/some/path/",
-	}}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if gotDest := adjustDest(tc.src, tc.dest); gotDest != tc.wantDest {
-				t.Errorf("got %q, want %q", gotDest, tc.wantDest)
 			}
 		})
 	}

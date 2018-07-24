@@ -33,8 +33,8 @@ import (
 	"time"
 
 	durpb "github.com/golang/protobuf/ptypes/duration"
-	"github.com/GoogleCloudPlatform/container-builder-local/gsutil"
-	"github.com/GoogleCloudPlatform/container-builder-local/runner"
+	"github.com/GoogleCloudPlatform/cloud-build-local/gsutil"
+	"github.com/GoogleCloudPlatform/cloud-build-local/runner"
 	"github.com/spf13/afero"
 	"golang.org/x/oauth2"
 	"github.com/pborman/uuid"
@@ -1139,13 +1139,15 @@ func TestPushImages(t *testing.T) {
 }
 
 type mockGsutilHelper struct {
+	location     string
 	bucket       string
 	numArtifacts int // define num of artifacts to upload
 }
 
-func newMockGsutilHelper(bucket string, numArtifacts int) mockGsutilHelper {
+func newMockGsutilHelper(location string, numArtifacts int) mockGsutilHelper {
 	return mockGsutilHelper{
-		bucket:       strings.TrimSuffix(bucket, "/"), // remove any trailing slash for consistency
+		location:     strings.TrimSuffix(location, "/"), // remove any trailing slash for consistency
+		bucket:       extractGCSBucket(location),
 		numArtifacts: numArtifacts,
 	}
 }
@@ -1163,7 +1165,7 @@ func (g mockGsutilHelper) UploadArtifacts(ctx context.Context, flags gsutil.Dock
 		// NB: We do not care about the actual ArtifactResult contents for build_test, just the number produced.
 		uuid := newUUID() // unique ArtifactResult
 		artifacts = append(artifacts, &pb.ArtifactResult{
-			Location: g.bucket + "/artifact-" + uuid,
+			Location: g.location + "/artifact-" + uuid,
 			FileHash: []*pb.FileHashes{{
 				FileHash: []*pb.Hash{{Type: pb.Hash_MD5, Value: []byte("md5" + uuid)}}},
 			},
@@ -1178,7 +1180,34 @@ func (g mockGsutilHelper) UploadArtifactsManifest(ctx context.Context, flags gsu
 	return strings.Join([]string{b, manifest}, "/"), nil
 }
 
+func TestExtractGCSBucket(t *testing.T) {
+	testCases := []struct {
+		url, wantBucket string
+	}{{
+		url:        "gs://bucket",
+		wantBucket: "gs://bucket",
+	}, {
+		url:        "gs://bucket/",
+		wantBucket: "gs://bucket",
+	}, {
+		url:        "gs://bucket/some/path",
+		wantBucket: "gs://bucket",
+	}, {
+		url:        "gs://bucket/some/path/",
+		wantBucket: "gs://bucket",
+	}, {
+		url:        "",
+		wantBucket: "gs://",
+	}}
+	for _, tc := range testCases {
+		if gotBucket := extractGCSBucket(tc.url); gotBucket != tc.wantBucket {
+			t.Errorf("got %s, want %s", gotBucket, tc.wantBucket)
+		}
+	}
+}
+
 // TestPushArtifacts checks that after artifacts are uploaded, an ArtifactsInfo object is assigned to the build's artifacts field.
+
 func TestPushArtifacts(t *testing.T) {
 	ctx := context.Background()
 	newUUID = func() string { return "someuuid" }
@@ -1193,7 +1222,7 @@ func TestPushArtifacts(t *testing.T) {
 		wantArtifactsInfo ArtifactsInfo
 		wantErr           bool
 	}{{
-		name: "SuccessPushArtifacts",
+		name: "PushArtifacts",
 		buildRequest: pb.Build{
 			Id: buildID,
 			Artifacts: &pb.Artifacts{
@@ -1209,17 +1238,33 @@ func TestPushArtifacts(t *testing.T) {
 			NumArtifacts:     1,
 		},
 	}, {
-		name:         "SuccessNoArtifactsField",
+		name:         "NoArtifactsField",
 		buildRequest: commonBuildRequest,
 		gsutilHelper: newMockGsutilHelper("gs://some-bucket", 0),
 	}, {
-		name: "SuccessNoObjectsField",
+		name: "NoObjectsField",
 		buildRequest: pb.Build{
 			Artifacts: &pb.Artifacts{},
 		},
 		gsutilHelper: newMockGsutilHelper("gs://some-bucket", 0),
 	}, {
-		name: "ErrorBucketDoesNotExist",
+		name: "BucketExistsNewPath",
+		buildRequest: pb.Build{
+			Id: buildID,
+			Artifacts: &pb.Artifacts{
+				Objects: &pb.Artifacts_ArtifactObjects{
+					Location: "gs://some-bucket/longer/path/not/in/existence",
+					Paths:    []string{"artifact.txt"},
+				},
+			},
+		},
+		gsutilHelper: newMockGsutilHelper("gs://some-bucket", 1),
+		wantArtifactsInfo: ArtifactsInfo{
+			ArtifactManifest: "gs://some-bucket/longer/path/not/in/existence/artifacts-" + buildID + ".json",
+			NumArtifacts:     1,
+		},
+	}, {
+		name: "ErrBucketDoesNotExist",
 		buildRequest: pb.Build{
 			Artifacts: &pb.Artifacts{
 				Objects: &pb.Artifacts_ArtifactObjects{

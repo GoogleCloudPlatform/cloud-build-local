@@ -519,6 +519,15 @@ func TestCheckArtifacts(t *testing.T) {
 			},
 		},
 		wantErr: true,
+	}, {
+		// .artifacts.paths has whitespace
+		artifacts: &pb.Artifacts{
+			Objects: &pb.Artifacts_ArtifactObjects{
+				Location: "gs://some-bucket/",
+				Paths:    []string{"twins.xml", "-n twins.xml"},
+			},
+		},
+		wantErr: true,
 	}} {
 		b := &pb.Build{
 			Images:    c.images,

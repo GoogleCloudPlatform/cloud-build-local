@@ -23,10 +23,11 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 	"github.com/golang/protobuf/ptypes"
-	"github.com/GoogleCloudPlatform/container-builder-local/subst"
+	"github.com/GoogleCloudPlatform/cloud-build-local/subst"
 	"github.com/docker/distribution/reference"
 )
 
@@ -328,10 +329,19 @@ func CheckArtifacts(b *pb.Build) error {
 		pathExists := map[string]bool{}
 		duplicates := []string{}
 		for _, p := range b.Artifacts.Objects.Paths {
+			// Count duplicates.
 			if _, ok := pathExists[p]; ok {
 				duplicates = append(duplicates, p)
 			}
 			pathExists[p] = true
+
+			// Paths with whitespace are invalid.
+			
+			for _, ch := range p {
+				if unicode.IsSpace(ch) {
+					return fmt.Errorf(".artifacts.paths %q contains whitespace", p)
+				}
+			}
 		}
 		if len(duplicates) > 0 {
 			return fmt.Errorf(".artifacts.paths field has duplicate paths; remove duplicates [%s]", strings.Join(duplicates, ", "))

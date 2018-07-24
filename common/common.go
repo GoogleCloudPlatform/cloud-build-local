@@ -27,9 +27,9 @@ import (
 	"time"
 
 	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
-	"github.com/GoogleCloudPlatform/container-builder-local/runner"
-	"github.com/GoogleCloudPlatform/container-builder-local/subst"
-	"github.com/GoogleCloudPlatform/container-builder-local/validate"
+	"github.com/GoogleCloudPlatform/cloud-build-local/runner"
+	"github.com/GoogleCloudPlatform/cloud-build-local/subst"
+	"github.com/GoogleCloudPlatform/cloud-build-local/validate"
 	"golang.org/x/oauth2"
 )
 
