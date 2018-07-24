@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/container-builder-local/runner"
+	"github.com/GoogleCloudPlatform/cloud-build-local/runner"
 )
 
 const (

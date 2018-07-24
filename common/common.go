@@ -21,14 +21,16 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
-	"github.com/GoogleCloudPlatform/container-builder-local/runner"
-	"github.com/GoogleCloudPlatform/container-builder-local/subst"
-	"github.com/GoogleCloudPlatform/container-builder-local/validate"
+	"github.com/GoogleCloudPlatform/cloud-build-local/runner"
+	"github.com/GoogleCloudPlatform/cloud-build-local/subst"
+	"github.com/GoogleCloudPlatform/cloud-build-local/validate"
+	"golang.org/x/oauth2"
 )
 
 const (
@@ -169,4 +171,20 @@ func SubstituteAndValidate(b *pb.Build, substMap map[string]string) error {
 	}
 
 	return nil
+}
+
+// TokenTransport is a RoundTripper that automatically applies OAuth
+// credentials from the token source.
+type TokenTransport struct {
+	Ts oauth2.TokenSource
+}
+
+// RoundTrip executes a single HTTP transaction, obtaining the Response for a given Request.
+func (t *TokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	tok, err := t.Ts.Token()
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+tok.AccessToken)
+	return http.DefaultTransport.RoundTrip(req)
 }

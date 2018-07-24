@@ -12,7 +12,7 @@ steps:
 
 # Binary creation.
 - name: 'gcr.io/cloud-builders/go:debian'
-  args: ['build', '-o', 'container-builder-local', 'github.com/GoogleCloudPlatform/container-builder-local']
+  args: ['build', '-o', 'cloud-build-local', 'github.com/GoogleCloudPlatform/cloud-build-local']
 
 # Copy the integration test files to GCS and
 # run integration tests in a VM.

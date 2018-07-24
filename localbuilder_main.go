@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package main runs the gcb local builder.
-package main // import "github.com/GoogleCloudPlatform/container-builder-local"
+package main // import "github.com/GoogleCloudPlatform/cloud-build-local"
 
 import (
 	"bufio"
@@ -33,13 +33,13 @@ import (
 	"golang.org/x/oauth2"
 	"github.com/pborman/uuid"
 
-	"github.com/GoogleCloudPlatform/container-builder-local/build"
-	"github.com/GoogleCloudPlatform/container-builder-local/common"
-	"github.com/GoogleCloudPlatform/container-builder-local/config"
-	"github.com/GoogleCloudPlatform/container-builder-local/gcloud"
-	"github.com/GoogleCloudPlatform/container-builder-local/metadata"
-	"github.com/GoogleCloudPlatform/container-builder-local/runner"
-	"github.com/GoogleCloudPlatform/container-builder-local/volume"
+	"github.com/GoogleCloudPlatform/cloud-build-local/build"
+	"github.com/GoogleCloudPlatform/cloud-build-local/common"
+	"github.com/GoogleCloudPlatform/cloud-build-local/config"
+	"github.com/GoogleCloudPlatform/cloud-build-local/gcloud"
+	"github.com/GoogleCloudPlatform/cloud-build-local/metadata"
+	"github.com/GoogleCloudPlatform/cloud-build-local/runner"
+	"github.com/GoogleCloudPlatform/cloud-build-local/volume"
 )
 
 const (
@@ -64,6 +64,9 @@ func exitUsage(msg string) {
 }
 
 func main() {
+	if strings.Contains(os.Args[0], "container-builder") {
+		log.Printf("WARNING: %v is deprecated. Please run `gcloud install cloud-build-local` to install its replacement.", os.Args[0])
+	}
 	flag.Parse()
 	ctx := context.Background()
 	args := flag.Args()
@@ -191,7 +194,7 @@ func run(ctx context.Context, source string) error {
 		}
 	}
 
-	b := build.New(r, *buildConfig, nil /* TokenSource */, stdoutLogger{}, nopEventLogger{}, volumeName, afero.NewOsFs(), true, *push, *dryRun)
+	b := build.New(r, *buildConfig, nil /* TokenSource */, stdoutLogger{}, volumeName, afero.NewOsFs(), true, *push, *dryRun)
 
 	// Do not run the spoofed metadata server on a dryrun.
 	if !*dryRun {
@@ -361,8 +364,3 @@ func (pw prefixWriter) Write(b []byte) (int, error) {
 	}
 	return len(b), nil
 }
-
-type nopEventLogger struct{}
-
-func (nopEventLogger) StartStep(context.Context, int, time.Time) error        { return nil }
-func (nopEventLogger) FinishStep(context.Context, int, bool, time.Time) error { return nil }

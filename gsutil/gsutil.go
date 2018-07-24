@@ -31,7 +31,8 @@ import (
 	"strings"
 
 	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
-	"github.com/GoogleCloudPlatform/container-builder-local/runner"
+	"github.com/GoogleCloudPlatform/cloud-build-local/logger"
+	"github.com/GoogleCloudPlatform/cloud-build-local/runner"
 	"github.com/spf13/afero"
 	"github.com/pborman/uuid"
 )
@@ -64,11 +65,16 @@ type Helper interface {
 type RealHelper struct {
 	runner runner.Runner
 	fs     afero.Fs
+	logger logger.Logger
 }
 
 // New returns a new RealHelper struct.
-func New(r runner.Runner, fs afero.Fs) RealHelper {
-	return RealHelper{runner: r, fs: fs}
+func New(r runner.Runner, fs afero.Fs, logger logger.Logger) RealHelper {
+	return RealHelper{
+		runner: r,
+		fs:     fs,
+		logger: logger,
+	}
 }
 
 // VerifyBucket returns nil if the bucket exists, otherwise an error.
@@ -108,6 +114,7 @@ func (g RealHelper) UploadArtifacts(ctx context.Context, flags DockerFlags, src,
 
 	// Create a temp file for gsutil manifest. This manifest is used when making calls to "gsutil cp."
 	// The user should not see the gsutil manifest after the upload.
+	
 	f := fmt.Sprintf("manifest_%s.log", newUUID())
 
 	tmpfile, err := afero.TempFile(g.fs, flags.Tmpdir, f)
@@ -117,28 +124,16 @@ func (g RealHelper) UploadArtifacts(ctx context.Context, flags DockerFlags, src,
 	defer tmpfile.Close()
 	gsutilManifest := tmpfile.Name()
 
-	// Find files in the workspace directory that match the glob string.
-	srcFiles, err := g.glob(ctx, flags, src)
-	if err != nil {
-		return nil, fmt.Errorf("error finding matching files for %q: err = %v", src, err)
-	}
-	if len(srcFiles) == 0 {
-		return nil, nil
-	}
-
-	// Copy matching files to the GCS bucket.
-	
-	
-	
-	for _, src := range srcFiles {
-		if output, err := g.runGsutil(ctx, flags, "cp", "-L", gsutilManifest, src, adjustDest(src, dest)); err != nil {
-			log.Printf("gsutil could not copy artifact %q to %q:\n%s", src, dest, output)
-			return nil, err
-		}
+	// Copy matching files to the GCS bucket
+	tag := src // prefixed to logs
+	if output, err := g.runGsutil(ctx, tag, flags, "-m", "cp", "-L", gsutilManifest, src, dest); err != nil {
+		log.Printf("gsutil could not copy artifact %q to %q:\n%s", src, dest, output)
+		return nil, err
 	}
 
 	results, err := g.parseGsutilManifest(gsutilManifest)
 	if err != nil {
+		log.Printf("gsutil could not parse manifest: %v", err)
 		return nil, err
 	}
 
@@ -163,7 +158,7 @@ func (g RealHelper) UploadArtifactsManifest(ctx context.Context, flags DockerFla
 	defer g.fs.Remove(manifestPath)
 
 	// Upload manifest to the GCS bucket.
-	if output, err := g.runGsutil(ctx, flags, "cp", manifestPath, bucket); err != nil {
+	if output, err := g.runGsutil(ctx, "", flags, "cp", manifestPath, bucket); err != nil {
 		log.Printf("gsutil could not copy artifact manifest %q to %q:\n%s", manifestPath, bucket, output)
 		return "", err
 	}
@@ -193,53 +188,7 @@ func (g RealHelper) createArtifactsManifest(manifestPath string, results []*pb.A
 	return nil
 }
 
-// glob searches the workspace directory for source files that match the glob src string, and returns a string array of file paths.
-func (g RealHelper) glob(ctx context.Context, flags DockerFlags, src string) ([]string, error) {
-	
-	if flags.Workvol == "" {
-		return nil, errors.New("flags.Workvol has no value")
-	}
-	if flags.Workdir == "" {
-		return nil, errors.New("flags.Workdir has no value")
-	}
-
-	// Docker run args for gsutil.
-	args := []string{"docker", "run",
-		// Assign container name.
-		"--name", fmt.Sprintf("cloudbuild_gsutil_%s", newUUID()),
-		// Remove the container when it exits.
-		"--rm",
-		// Mount the project workspace,
-		"--volume", flags.Workvol,
-		// Run gsutil from the workspace dir.
-		"--workdir", flags.Workdir,
-		// Set bash entrypoint to enable multiple gsutil commands.
-		"--entrypoint", "bash"}
-
-	args = append(args, "ubuntu")
-	args = append(args, "-c")
-	// Enable globbing and find files that match the glob string. This will include hidden files.
-	// We prefix source with "./" so that wildcarding works. Why does "./" make a difference? No idea. ¯\_(ツ)_/¯
-	// Note that resulting filepath matches will also have "./"	prefixed.
-	
-	args = append(args, fmt.Sprintf("shopt -s globstar; find ./%s -type f", src))
-
-	output, err := g.runAndScrape(ctx, args)
-	if err != nil {
-		if strings.Contains(output, errFileNotFound) {
-			// We can't just return the error because it will say 'exit status 1', which is uninformative.
-			return nil, fmt.Errorf("no files match glob string %q: %v", src, err)
-		}
-		// Note: this error will be uninformative and just say 'exit status 1'.
-		
-		return nil, err
-	}
-
-	// Remove leading and trailing newlines so the split doesn't result in empty string elements.
-	return strings.Split(strings.Trim(output, "\n"), "\n"), nil
-}
-
-func (g RealHelper) runGsutil(ctx context.Context, flags DockerFlags, cmd ...string) (string, error) {
+func (g RealHelper) runGsutil(ctx context.Context, tag string, flags DockerFlags, cmd ...string) (string, error) {
 	if flags.Workvol == "" {
 		return "", errors.New("flags.Workvol has no value")
 	}
@@ -260,17 +209,25 @@ func (g RealHelper) runGsutil(ctx context.Context, flags DockerFlags, cmd ...str
 		// Run gsutil from the workspace dir.
 		"--workdir", flags.Workdir,
 		// Connect to the network for metadata to get credentials.
-		"--network", "cloudbuild"}
+		"--network", "cloudbuild",
+		// Set bash entrypoint.
+		// For reasons currently unknown, a bash entrypoint and a -c parameter is required for wildcarding.
+		// Otherwise, any gsutil arguments with wildcards will not expand. Enclosing the source in single quotes does not help.
+		
+		"--entrypoint", "bash"}
 	if flags.Tmpdir != "" {
 		// Mount the temporary directory.
 		args = append(args, []string{"--volume", fmt.Sprintf("%s:%s", flags.Tmpdir, flags.Tmpdir)}...)
 	}
 	// Add gsutil docker image and commands.
 	args = append(args, "gcr.io/cloud-builders/gsutil")
-	args = append(args, cmd...)
+	args = append(args, "-c")
+	command := "gsutil " + strings.Join(cmd, " ")
+	args = append(args, command)
 
-	// We return the string output from the command run, but it's only intended to be used for debugging and testing.
-	return g.runAndScrape(ctx, args)
+	// If a tag is specified, we should stream the logs. Otherwise, run normally.
+	hasLogging := tag != ""
+	return g.runWithOptionalLogging(ctx, hasLogging, tag, args)
 }
 
 // getGeneration takes a GCS object URL as input and returns the URL with the generation number suffixed.
@@ -281,7 +238,7 @@ func (g RealHelper) getGeneration(ctx context.Context, flags DockerFlags, url st
 
 	// List existing object with generation number information.
 	// See https://cloud.google.com/storage/docs/gsutil/commands/ls.
-	output, err := g.runGsutil(ctx, flags, "ls", "-a", url)
+	output, err := g.runGsutil(ctx, "", flags, "ls", "-a", url)
 	if err != nil {
 		return "", err
 	}
@@ -360,35 +317,17 @@ func (g RealHelper) parseGsutilManifest(manifestPath string) ([]*pb.ArtifactResu
 	return artifacts, nil
 }
 
-// runAndScrape executes the command and returns the output (stdin, stderr), without logging.
-func (g RealHelper) runAndScrape(ctx context.Context, cmd []string) (string, error) {
-	
+
+func (g RealHelper) runWithOptionalLogging(ctx context.Context, hasLogging bool, tag string, cmd []string) (string, error) {
 	var buf bytes.Buffer
 	outWriter := io.Writer(&buf)
 	errWriter := io.Writer(&buf)
+
+	if hasLogging {
+		outWriter = io.MultiWriter(g.logger.MakeWriter(tag, -1, true), &buf)
+		errWriter = io.MultiWriter(g.logger.MakeWriter(tag, -1, false), &buf)
+	}
+
 	err := g.runner.Run(ctx, cmd, nil, outWriter, errWriter, "")
 	return buf.String(), err
-}
-
-// adjustDest takes any leading directory filepath from src and suffixes it to dest.
-//     e.g. adjustDest("/nested/path/test.xml", "gs://some-bucket/dir/") = "gs://some-bucket/dir/nested/path/"
-//
-// Why? The 'gsutil cp' command copies a file from a local directory to a remote GCS bucket. https://cloud.google.com/storage/docs/gsutil/commands/cp
-// The local file and GCS bucket are specified with file paths.
-// Consider the following:
-//			source = "/nested/path/test.xml" # source path
-//      dest   = "gs://some-bucket/dir/" # bucket path
-//         > gsutil cp source dest
-// The resulting GCS object path will be "gs://some-bucket/dir/test.xml". This is problematic when we want to copy multiple source
-// files with the same name that span different directories. The gsutil tool will ignore the source file's leading directory, and
-// will copy all matching files to the same GCS object path. To avoid filename collision and overwriting, we maintain the directory structure
-// by adjusting the bucket path to include the source file's leading directory.
-func adjustDest(src, dest string) string {
-	
-	leadDir := path.Dir(src)
-	if len(leadDir) > 1 {
-		// Note: dest already has trailing slash, and if we do path.Join(), "gs://" will lose a slash.
-		return fmt.Sprintf("%s%s/", dest, strings.TrimPrefix(leadDir, "/"))
-	}
-	return dest
 }

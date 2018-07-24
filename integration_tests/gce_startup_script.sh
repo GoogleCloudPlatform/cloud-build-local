@@ -76,8 +76,8 @@ gsutil -m copy ${gcs_path}/* /root/test-files/
 chmod +x /root/test-files/test_script.sh || exit
 
 # Copy local builder binary to bin.
-chmod +x /root/test-files/container-builder-local || exit
-mv /root/test-files/container-builder-local /usr/local/bin/
+chmod +x /root/test-files/cloud-build-local || exit
+mv /root/test-files/cloud-build-local /usr/local/bin/
 
 # Copy up an empty output.txt as a signal to the runner that the script is starting.
 touch /root/output.txt || exit
