@@ -2,7 +2,7 @@
 DATE=`date +%Y%m%d-%H%M%S`
 GCS_PATH=gs://local-builder-test/$DATE
 GCS_LOGS_PATH=gs://local-builder-test-logs/$DATE
-gsutil -m copy container-builder-local $GCS_PATH/
+gsutil -m copy cloud-build-local $GCS_PATH/
 gsutil -m copy ./integration_tests/* $GCS_PATH/
 
 # Create a VM with startup script.
