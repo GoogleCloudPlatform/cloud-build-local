@@ -175,9 +175,6 @@ func SubstituteAndValidate(b *pb.Build, substMap map[string]string) error {
 
 // TokenTransport is a RoundTripper that automatically applies OAuth
 // credentials from the token source.
-//
-// This can be replaced by google.DefaultClient when metadata spoofing works by
-// IP address (b/33233310).
 type TokenTransport struct {
 	Ts oauth2.TokenSource
 }
