@@ -50,7 +50,7 @@ test workflows.
 
 The latest binaries are available in a GCS bucket.
 
-[Download](https://storage.googleapis.com/cloud-build-local/cloud-build-local_latest.tar.gz)
+[Download](https://storage.googleapis.com/local-builder/cloud-build-local_latest.tar.gz)
 the latest binaries from GCS.
 
 To run a build:
