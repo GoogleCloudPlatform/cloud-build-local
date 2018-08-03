@@ -75,6 +75,10 @@ var (
 	RunRm = false
 	// timeNow is a function that returns the current time; stubbable for testing.
 	timeNow = time.Now
+	// baseDelay is passed to common.Backoff(); it is only modified in build_test.
+	baseDelay = 500 * time.Millisecond
+	// maxDelay is passed to common.Backoff(); it is only modified in build_test.
+	maxDelay = 10 * time.Second
 )
 
 type imageDigest struct {
@@ -522,7 +526,7 @@ func (b *Build) dockerPullWithRetries(ctx context.Context, tag string, outWriter
 	digest, err := b.dockerPull(ctx, tag, outWriter, errWriter)
 	if err != nil {
 		if attempt < maxPushRetries {
-			time.Sleep(common.Backoff(500*time.Millisecond, 10*time.Second, attempt))
+			time.Sleep(common.Backoff(baseDelay, maxDelay, attempt))
 			return b.dockerPullWithRetries(ctx, tag, outWriter, errWriter, attempt+1)
 		}
 		b.Log.WriteMainEntry("ERROR: failed to pull because we ran out of retries.")
@@ -625,7 +629,7 @@ func (b *Build) dockerPushWithRetries(ctx context.Context, tag string, attempt i
 			b.Log.WriteMainEntry("ERROR: " + msg)
 		}
 		if attempt < maxPushRetries {
-			time.Sleep(common.Backoff(500*time.Millisecond, 10*time.Second, attempt))
+			time.Sleep(common.Backoff(baseDelay, maxDelay, attempt))
 			return b.dockerPushWithRetries(ctx, tag, attempt+1)
 		}
 		b.Log.WriteMainEntry("ERROR: failed to push because we ran out of retries.")
@@ -864,20 +868,42 @@ func (b *Build) timeAndRunStep(ctx context.Context, idx int, waitChans []chan st
 
 	b.mu.Lock()
 	b.stepStatus[idx] = pb.Build_WORKING
-	when := timeNow()
-	b.Timing.BuildSteps[idx] = &TimeSpan{Start: when}
+	var timeout time.Duration
+	if stepTimeout := b.Request.Steps[idx].GetTimeout(); stepTimeout != nil {
+		var err error
+		timeout, err = ptypes.Duration(stepTimeout)
+		// We have previously validated this stepTimeout duration, so this err should never happen.
+		if err != nil {
+			err = fmt.Errorf("step %d has invalid timeout %v: %v", idx, stepTimeout, err)
+			log.Printf("Error: %v", err)
+			errors <- err
+			return
+		}
+	}
+	start := timeNow()
+	b.Timing.BuildSteps[idx] = &TimeSpan{Start: start}
 	b.mu.Unlock()
 
-	err := b.runStep(ctx, idx)
+	err := b.runStep(ctx, timeout, idx)
+	end := timeNow()
 
-	when = timeNow()
 	b.mu.Lock()
-	b.Timing.BuildSteps[idx].End = when
+	b.Timing.BuildSteps[idx].End = end
 	switch err {
 	case nil:
 		b.stepStatus[idx] = pb.Build_SUCCESS
 	case context.DeadlineExceeded:
-		b.stepStatus[idx] = pb.Build_TIMEOUT
+		// If the build step has no timeout, we got a DeadlineExceeded because the
+		// overall build timed out. The step's final status is its current WORKING
+		// status.
+		if timeout != 0 {
+			// If the build step has a timeout, then either the step timed out or the
+			// build timed out (or both). If it was a build timeout, don't update the
+			// per-step status.
+			if stepTime := end.Sub(start); stepTime >= timeout {
+				b.stepStatus[idx] = pb.Build_TIMEOUT
+			}
+		}
 	case context.Canceled:
 		b.stepStatus[idx] = pb.Build_CANCELLED
 	default:
@@ -927,7 +953,7 @@ func getTempDir(subpath string) string {
 	return fullpath
 }
 
-func (b *Build) runStep(ctx context.Context, idx int) error {
+func (b *Build) runStep(ctx context.Context, timeout time.Duration, idx int) error {
 	step := b.Request.Steps[idx]
 
 	var stepIdentifier string
@@ -1000,17 +1026,10 @@ func (b *Build) runStep(ctx context.Context, idx int) error {
 	args = append(args, runTarget)
 	args = append(args, step.Args...)
 
-	if stepTimeout := step.GetTimeout(); stepTimeout != nil {
-		timeout, err := ptypes.Duration(stepTimeout)
-		// We have previously validated this stepTimeout duration, so this err should never happen.
-		if err != nil {
-			errWriter.Write([]byte(fmt.Sprintf("ERROR decoding timeout %v: %v", stepTimeout, err)))
-			log.Printf("ERROR: step %d has invalid timeout %v: %v", idx, stepTimeout, err)
-		} else if timeout != 0 {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, timeout)
-			defer cancel()
-		}
+	if timeout != 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
 	}
 
 	buildErr := b.Runner.Run(ctx, args, nil, outWriter, errWriter, "")

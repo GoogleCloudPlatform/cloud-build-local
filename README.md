@@ -73,7 +73,7 @@ See the
 
 ## Support
 
-File issues here on gitHub, email `gcr-contact@google.com`, or join our
+File issues here on gitHub, email `cloud-build-contact@google.com`, or join our
 [Slack channel] if you have general questions about Local Builder or Container
 Builder.
 

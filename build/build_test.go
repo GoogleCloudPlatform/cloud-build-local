@@ -33,6 +33,7 @@ import (
 	"time"
 
 	durpb "github.com/golang/protobuf/ptypes/duration"
+	"github.com/golang/protobuf/ptypes"
 	"github.com/GoogleCloudPlatform/cloud-build-local/gsutil"
 	"github.com/GoogleCloudPlatform/cloud-build-local/runner"
 	"github.com/spf13/afero"
@@ -42,9 +43,13 @@ import (
 	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 )
 
-const (
-	uuidRegex = "([a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[8|9|aA|bB][a-fA-F0-9]{3}-[a-fA-F0-9]{12})"
-)
+const uuidRegex = "([a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[8|9|aA|bB][a-fA-F0-9]{3}-[a-fA-F0-9]{12})"
+
+func init() {
+	// Reduce backoff delays so that unit tests finish quickly.
+	baseDelay = time.Nanosecond
+	maxDelay = time.Millisecond
+}
 
 type mockRunner struct {
 	mu               sync.Mutex
@@ -672,6 +677,14 @@ func TestRunBuildSteps(t *testing.T) {
 	ctx := context.Background()
 	exit1Err := errors.New("exit status 1")
 
+	stepTimeoutBuildRequest := commonBuildRequest
+	stepTimeoutBuildRequest.Steps = []*pb.BuildStep{{
+		Name:    commonBuildRequest.Steps[0].Name,
+		Timeout: ptypes.DurationProto(-1 * time.Nanosecond),
+	}, {
+		Name: commonBuildRequest.Steps[0].Name,
+	}}
+
 	testCases := []struct {
 		name                 string
 		buildRequest         pb.Build
@@ -763,8 +776,14 @@ func TestRunBuildSteps(t *testing.T) {
 			wantErr:        errors.New(`build step 0 "gcr.io/my-project/my-compiler" failed: exit status 1`),
 			wantStepStatus: []pb.Build_Status{pb.Build_FAILURE, pb.Build_QUEUED},
 		}, {
-			name:           "Step Timeout",
+			name:           "Build Timeout",
 			buildRequest:   commonBuildRequest,
+			opError:        context.DeadlineExceeded,
+			wantErr:        fmt.Errorf(`build step 0 "gcr.io/my-project/my-compiler" failed: %v`, context.DeadlineExceeded),
+			wantStepStatus: []pb.Build_Status{pb.Build_WORKING, pb.Build_QUEUED},
+		}, {
+			name:           "Step Timeout",
+			buildRequest:   stepTimeoutBuildRequest,
 			opError:        context.DeadlineExceeded,
 			wantErr:        fmt.Errorf(`build step 0 "gcr.io/my-project/my-compiler" failed: %v`, context.DeadlineExceeded),
 			wantStepStatus: []pb.Build_Status{pb.Build_TIMEOUT, pb.Build_QUEUED},
@@ -776,52 +795,55 @@ func TestRunBuildSteps(t *testing.T) {
 			wantStepStatus: []pb.Build_Status{pb.Build_CANCELLED, pb.Build_QUEUED},
 		}}
 	for _, tc := range testCases {
-		r := newMockRunner(t, tc.name)
-		r.dockerRunHandler = func([]string, io.Writer, io.Writer) error {
-			if !tc.opFailsToWrite {
-				r.localImages["gcr.io/build-output-tag-1"] = true
-				r.localImages["gcr.io/build-output-tag-no-digest"] = true
+		t.Run(tc.name, func(t *testing.T) {
+			r := newMockRunner(t, tc.name)
+			r.dockerRunHandler = func([]string, io.Writer, io.Writer) error {
+				if !tc.opFailsToWrite {
+					r.localImages["gcr.io/build-output-tag-1"] = true
+					r.localImages["gcr.io/build-output-tag-no-digest"] = true
+				}
+				r.localImages["gcr.io/build-output-tag-2"] = true
+				return tc.opError
 			}
-			r.localImages["gcr.io/build-output-tag-2"] = true
-			return tc.opError
-		}
-		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
-		gotErr := b.runBuildSteps(ctx)
-		if !reflect.DeepEqual(gotErr, tc.wantErr) {
-			t.Errorf("%s: Wanted error %q, but got %q", tc.name, tc.wantErr, gotErr)
-		}
-		if tc.wantCommands != nil {
-			got := strings.Join(r.commands, "\n")
-			want := strings.Join(tc.wantCommands, "\n")
-			if match, _ := regexp.MatchString(want, got); !match {
-				t.Errorf("%s: Commands didn't match!\n===Want:\n%s\n===Got:\n%s", tc.name, want, got)
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
+			gotErr := b.runBuildSteps(ctx)
+			if !reflect.DeepEqual(gotErr, tc.wantErr) {
+				t.Errorf("Wanted error %q, but got %q", tc.wantErr, gotErr)
 			}
-		}
-
-		b.mu.Lock()
-		if len(b.stepStatus) != len(tc.wantStepStatus) {
-			t.Errorf("%s: want len(b.stepStatus)==%d, got %d", tc.name, len(tc.wantStepStatus), len(b.stepStatus))
-		} else {
-			for i, stepStatus := range tc.wantStepStatus {
-				if b.stepStatus[i] != stepStatus {
-					t.Errorf("%s step %d: want %s, got %s", tc.name, i, stepStatus, b.stepStatus[i])
+			if tc.wantCommands != nil {
+				got := strings.Join(r.commands, "\n")
+				want := strings.Join(tc.wantCommands, "\n")
+				if match, _ := regexp.MatchString(want, got); !match {
+					t.Errorf("Commands didn't match!\n===Want:\n%s\n===Got:\n%s", want, got)
 				}
 			}
-		}
-		b.mu.Unlock()
 
-		// Confirm proper population of per-step status in BuildSummary.
-		summary := b.Summary()
-		got := summary.StepStatus
-		if len(got) != len(tc.wantStepStatus) {
-			t.Errorf("%s: build summary wrong size; want %d, got %d", tc.name, len(tc.wantStepStatus), len(got))
-		} else {
-			for i, stepStatus := range tc.wantStepStatus {
-				if got[i] != stepStatus {
-					t.Errorf("%s summary step %d: want %s, got %s", tc.name, i, stepStatus, got[i])
+			b.mu.Lock()
+			if len(b.stepStatus) != len(tc.wantStepStatus) {
+				t.Errorf("Want len(b.stepStatus)==%d, got %d", len(tc.wantStepStatus), len(b.stepStatus))
+			} else {
+				for i, stepStatus := range tc.wantStepStatus {
+					if b.stepStatus[i] != stepStatus {
+						t.Errorf("Step %d: want %s, got %s", i, stepStatus, b.stepStatus[i])
+						t.Logf("Step %d timeout is %#v", i, tc.buildRequest.GetSteps()[i].GetTimeout())
+					}
 				}
 			}
-		}
+			b.mu.Unlock()
+
+			// Confirm proper population of per-step status in BuildSummary.
+			summary := b.Summary()
+			got := summary.StepStatus
+			if len(got) != len(tc.wantStepStatus) {
+				t.Errorf("Build summary wrong size; want %d, got %d", len(tc.wantStepStatus), len(got))
+			} else {
+				for i, stepStatus := range tc.wantStepStatus {
+					if got[i] != stepStatus {
+						t.Errorf("Summary step %d: want %s, got %s", i, stepStatus, got[i])
+					}
+				}
+			}
+		})
 	}
 }
 
