@@ -48,13 +48,13 @@ const (
 	maxNumImages = 100  // max number of images.
 	// MaxImageLength is the max length of image value. Used in other packages.
 	MaxImageLength      = 1000
-	maxNumSubstitutions = 100  // max number of user-defined substitutions.
-	maxSubstKeyLength   = 100  // max length of a substitution key.
-	maxSubstValueLength = 4000 // max length of a substitution value.
-	maxNumSecretEnvs    = 100  // max number of unique secret env values.
-	maxSecretSize       = 2048 // max size of a secret
-	maxArtifactsPaths   = 100  // max number of artifacts paths that can be specified.
-	maxNumTags          = 64   // max length of the list of tags.
+	maxNumSubstitutions = 100       // max number of user-defined substitutions.
+	maxSubstKeyLength   = 100       // max length of a substitution key.
+	maxSubstValueLength = 4000      // max length of a substitution value.
+	maxNumSecretEnvs    = 100       // max number of unique secret env values.
+	maxSecretSize       = 64 * 1024 // max size of a secret
+	maxArtifactsPaths   = 100       // max number of artifacts paths that can be specified.
+	maxNumTags          = 64        // max length of the list of tags.
 )
 
 var (
@@ -130,9 +130,18 @@ func CheckBuild(b *pb.Build) error {
 		}
 	}
 
+	if err := checkVolumes(b); err != nil {
+		return err
+	}
+
+	if err := checkEnvVars(b); err != nil {
+		return err
+	}
+
 	if err := checkSecrets(b); err != nil {
 		return fmt.Errorf("invalid .secrets field: %v", err)
 	}
+
 	return nil
 }
 
@@ -374,7 +383,6 @@ func CheckBuildSteps(steps []*pb.BuildStep, buildTimeout time.Duration) error {
 	knownSteps := map[string]bool{
 		StartStep: true,
 	}
-	volumesUsed := map[string]int{} // Maps volume name -> # of times used.
 	for i, s := range steps {
 		if s.Name == "" {
 			return fmt.Errorf("build step %d must specify name", i)
@@ -389,15 +397,6 @@ func CheckBuildSteps(steps []*pb.BuildStep, buildTimeout time.Duration) error {
 		for ai, a := range s.Args {
 			if len(a) > maxArgLength {
 				return fmt.Errorf("build step %d arg %d too long (max: %d)", i, ai, maxArgLength)
-			}
-		}
-
-		if len(s.Env) > maxNumEnvs {
-			return fmt.Errorf("build step %d too many envs (max: %d)", i, maxNumEnvs)
-		}
-		for ei, a := range s.Env {
-			if len(a) > maxEnvLength {
-				return fmt.Errorf("build step %d env %d too long (max: %d)", i, ei, maxEnvLength)
 			}
 		}
 
@@ -427,44 +426,6 @@ func CheckBuildSteps(steps []*pb.BuildStep, buildTimeout time.Duration) error {
 			}
 		}
 
-		stepVolumes, stepPaths := map[string]bool{}, map[string]bool{}
-		for _, vol := range s.Volumes {
-			volName, volPath := vol.Name, vol.Path
-
-			// Check valid volume name.
-			if !validVolumeNameRE.MatchString(volName) {
-				return fmt.Errorf("build step #%d - %q: volume name %q must match %q", i, s.Id, volName, validVolumeNameRE.String())
-			}
-
-			p := path.Clean(volPath)
-			// Clean and check valid volume path.
-			if !path.IsAbs(path.Clean(p)) {
-				return fmt.Errorf("build step #%d - %q: volume path %q is not valid, must be absolute", i, s.Id, volPath)
-			}
-
-			// Check volume path blacklist.
-			if _, found := reservedVolumePaths[p]; found {
-				return fmt.Errorf("build step #%d - %q: volume path %q is reserved", i, s.Id, volPath)
-			}
-			// Check volume path doesn't start with /cloudbuild/ to allow future paths.
-			if strings.HasPrefix(p, "/cloudbuild/") {
-				return fmt.Errorf("build step #%d - %q: volume path %q cannot start with /cloudbuild/", i, s.Id, volPath)
-			}
-
-			// Check volume name uniqueness.
-			if stepVolumes[volName] {
-				return fmt.Errorf("build step #%d - %q: the Volumes entry must contain unique names (%q)", i, s.Id, volName)
-			}
-			stepVolumes[volName] = true
-
-			// Check volume path uniqueness.
-			if stepPaths[p] {
-				return fmt.Errorf("build step #%d - %q: the Volumes entry must contain unique paths (%q)", i, s.Id, p)
-			}
-			stepPaths[p] = true
-			volumesUsed[volName]++
-		}
-
 		if s.Timeout != nil {
 			if timeout, err := ptypes.Duration(s.Timeout); err != nil {
 				return fmt.Errorf("invalid .timeout in build step #%d: %v", i, err)
@@ -478,20 +439,32 @@ func CheckBuildSteps(steps []*pb.BuildStep, buildTimeout time.Duration) error {
 		}
 	}
 
-	// Check that all volumes are referenced by at least two steps.
-	for volume, used := range volumesUsed {
-		if used < 2 {
-			return fmt.Errorf("Volume %q is only used by one step", volume)
-		}
-	}
-
 	return nil
 }
 
 func checkSecrets(b *pb.Build) error {
-	// Collect set of all used secret_envs. Also make sure a step doesn't use the
-	// same secret_env twice.
+
+	// Collect set of all used secret_envs.
 	usedSecretEnvs := map[string]struct{}{}
+
+	// Make sure global secret_env are defined once
+	for _, se := range b.GetOptions().GetSecretEnv() {
+		if _, found := usedSecretEnvs[se]; found {
+			return fmt.Errorf("Build uses global secretEnv %q more than once", se)
+		}
+		usedSecretEnvs[se] = struct{}{}
+	}
+
+	// Make sure global secret_env are not defined in a step
+	for i, step := range b.Steps {
+		for _, se := range step.SecretEnv {
+			if _, found := usedSecretEnvs[se]; found {
+				return fmt.Errorf("Step %d uses the global secretEnv %q", i, se)
+			}
+		}
+	}
+
+	// Make sure a step doesn't use the same secret_env twice.
 	for i, step := range b.Steps {
 		thisStepSecretEnvs := map[string]struct{}{}
 		for _, se := range step.SecretEnv {
@@ -549,20 +522,23 @@ func checkSecrets(b *pb.Build) error {
 		}
 	}
 
-	// Check that no step's env and secretEnv specify the same variable.
+	globalEnvs := b.Options.GetEnv()
+
+	// Check for conflicts between local + global secrets and local + global envs
 	for i, step := range b.Steps {
 		envs := map[string]struct{}{}
-		for _, e := range step.Env {
+		for _, e := range append(globalEnvs, step.Env...) {
 			// Previous validation ensures that envs include "=".
 			k := e[:strings.Index(e, "=")]
 			envs[k] = struct{}{}
 		}
-		for _, se := range step.SecretEnv {
+		for _, se := range append(b.GetOptions().GetSecretEnv(), step.SecretEnv...) {
 			if _, found := envs[se]; found {
 				return fmt.Errorf("step %d has secret and non-secret env %q", i, se)
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -631,4 +607,134 @@ func sanitizeBuildTags(tags []string) ([]string, error) {
 		}
 	}
 	return cp, nil
+}
+
+// checkEnvVars validates global and local env vars
+func checkEnvVars(b *pb.Build) error {
+	// global env vars
+	if err := runCommonEnvChecks(b.GetOptions().GetEnv()); err != nil {
+		return fmt.Errorf("invalid .options.env field: %v", err)
+	}
+
+	// build step local env vars
+	for i, s := range b.GetSteps() {
+		if err := runCommonEnvChecks(s.GetEnv()); err != nil {
+			return fmt.Errorf("invalid .steps.env field: build step %d %v", i, maxNumEnvs)
+
+		}
+	}
+	return nil
+}
+
+// runCommonEnvChecks performs the checks that are common to global and build
+// step local environment variables.
+func runCommonEnvChecks(envs []string) error {
+	if len(envs) > maxNumEnvs {
+		return fmt.Errorf("too many envs (max: %d)", maxNumEnvs)
+	}
+	for ei, a := range envs {
+		if len(a) > maxEnvLength {
+			return fmt.Errorf("env %d too long (max: %d)", ei, maxEnvLength)
+		}
+	}
+	return nil
+}
+
+// commonVolumeChecks performs the volume validations that are common between
+// global and build step local volumes.
+func commonVolumeChecks(volumes []*pb.Volume) error {
+	volumeNames, volumePaths := map[string]bool{}, map[string]bool{}
+	for _, vol := range volumes {
+
+		// Check valid volume name.
+		if !validVolumeNameRE.MatchString(vol.Name) {
+			return fmt.Errorf("volume name %q does not match %q", vol.Name, validVolumeNameRE.String())
+		}
+
+		p := path.Clean(vol.Path)
+		// Clean and check valid volume path.
+		if !path.IsAbs(path.Clean(p)) {
+			return fmt.Errorf("path %q is not valid, must be absolute", vol.Path)
+		}
+
+		// Check volume path blacklist.
+		if _, found := reservedVolumePaths[p]; found {
+			return fmt.Errorf("path %q is reserved", vol.Path)
+		}
+		// Check volume path doesn't start with /cloudbuild/ to allow future paths.
+		if strings.HasPrefix(p, "/cloudbuild/") {
+			return fmt.Errorf("volume path %q cannot start with /cloudbuild/", vol.Path)
+		}
+
+		// Check volume name uniqueness within the provided array.
+		if volumeNames[vol.Name] {
+			return fmt.Errorf("volume name %q is defined in more than one volume entry", vol.Name)
+		}
+		volumeNames[vol.Name] = true
+
+		// Check volume path uniqueness within the provided array.
+		if volumePaths[p] {
+			return fmt.Errorf("volume path %q is defined in more than one volume entry", p)
+		}
+		volumePaths[p] = true
+	}
+
+	return nil
+}
+
+// checkVolumes performs validation for global and local volumes.
+func checkVolumes(b *pb.Build) error {
+	// If global volumes are used, check if there are at least two steps.
+	if len(b.GetOptions().GetVolumes()) > 0 {
+		if len(b.GetSteps()) < 2 {
+			return fmt.Errorf("Global volumes defined but there are fewer than two steps")
+		}
+	}
+
+	if err := commonVolumeChecks(b.GetOptions().GetVolumes()); err != nil {
+		return fmt.Errorf("invalid .options.volumes: %v", err)
+	}
+
+	for i, s := range b.GetSteps() {
+		if err := commonVolumeChecks(s.GetVolumes()); err != nil {
+			return fmt.Errorf("build step #%d - %q: %v", i, s.Id, err)
+		}
+	}
+
+	// Check that build step local volumes do not conflict with global volumes
+	globalNames := map[string]bool{}
+	globalPaths := map[string]bool{}
+
+	for _, vol := range b.GetOptions().GetVolumes() {
+		// At this point, global volumes have been checked for uniqueness
+		globalNames[vol.GetName()] = true
+		globalPaths[vol.GetPath()] = true
+	}
+
+	for i, s := range b.GetSteps() {
+		for _, vol := range s.GetVolumes() {
+			if _, found := globalNames[vol.Name]; found {
+				return fmt.Errorf("build step #%d - %q: volume name %q conflicts with global volume", i, s.Id, vol.Name)
+			}
+			if _, found := globalPaths[vol.Path]; found {
+				return fmt.Errorf("build step #%d - %q: volume path %q conflicts with global volume", i, s.Id, vol.Path)
+			}
+		}
+	}
+
+	// Check that all volumes are referenced by at least two steps.
+	volumesUsed := map[string]int{} // Maps volume name -> # of times used.
+	for _, s := range b.GetSteps() {
+		for _, vol := range s.GetVolumes() {
+			volumesUsed[vol.GetName()]++
+		}
+	}
+
+	for volume, used := range volumesUsed {
+		if used < 2 {
+			return fmt.Errorf("Volume %q is only used by one step", volume)
+		}
+	}
+
+	return nil
 }

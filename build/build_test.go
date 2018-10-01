@@ -24,9 +24,10 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"runtime"
+	"path"
 	"reflect"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -304,6 +305,9 @@ ea358092da77: Image successfully pushed
 	if startsWith(args, "docker", "volume") {
 		if startsWith(args, "docker", "volume", "create", "--name") {
 			volName := args[len(args)-1]
+			if r.volumes[volName] {
+				return fmt.Errorf("volume %q has already been created", volName)
+			}
 			r.volumes[volName] = true
 			return nil
 		}
@@ -486,8 +490,8 @@ func TestFetchBuilder(t *testing.T) {
 		var gotErr error
 		var gotDigest string
 		wantDigest := ""
-		for i, bs := range tc.buildRequest.Steps {
-			gotDigest, gotErr = b.fetchBuilder(ctx, bs.Name, fmt.Sprintf("Step #%d", i), 0)
+		for i := range tc.buildRequest.Steps {
+			gotDigest, gotErr = b.fetchBuilder(ctx, i)
 			if gotErr != nil {
 				break
 			}
@@ -705,8 +709,8 @@ func TestRunBuildSteps(t *testing.T) {
 			"docker inspect gcr.io/my-project/my-builder",
 			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 			dockerRunInStepDir(1, "foo/baz") +
-				" --env FOO=bar" +
 				" --env BAZ=buz" +
+				" --env FOO=bar" +
 				" --volume myvol:/foo" +
 				" gcr.io/my-project/my-builder a b c",
 			"docker images -q gcr.io/build-output-tag-1",
@@ -745,8 +749,8 @@ func TestRunBuildSteps(t *testing.T) {
 			"docker inspect gcr.io/my-project/my-builder",
 			"docker run --name cloudbuild_docker_pull_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock gcr.io/cloud-builders/docker pull gcr.io/my-project/my-builder",
 			dockerRunInStepDir(1, "subdir/foo/baz") +
-				" --env FOO=bar" +
 				" --env BAZ=buz" +
+				" --env FOO=bar" +
 				" --volume myvol:/foo" +
 				" gcr.io/my-project/my-builder a b c",
 			"docker images -q gcr.io/build-output-tag-1",
@@ -867,8 +871,8 @@ func TestBuildStepOrder(t *testing.T) {
 		},
 		wantCommands: []string{
 			dockerRunInStepDir(0, "foo/baz") +
-				" --env FOO=bar" +
 				" --env BAZ=buz" +
+				" --env FOO=bar" +
 				" gcr.io/my-project/my-builder a b c",
 		},
 	}, {
@@ -886,8 +890,8 @@ func TestBuildStepOrder(t *testing.T) {
 		wantCommands: []string{
 			dockerRunString(0) + " gcr.io/my-project/my-compiler",
 			dockerRunInStepDir(1, "foo/baz") +
-				" --env FOO=bar" +
 				" --env BAZ=buz" +
+				" --env FOO=bar" +
 				" gcr.io/my-project/my-builder a b c",
 		},
 	}, {
@@ -1152,6 +1156,7 @@ func TestPushImages(t *testing.T) {
 				BuildStepImages: []string{"", ""},
 				Timing:          TimingInfo{},
 				StepStatus:      []pb.Build_Status{},
+				StepOutputs:     [][]byte{},
 			}
 			if !reflect.DeepEqual(summary, wantSummary) {
 				t.Errorf("%s: unexpected build summary:\n got %+v\nwant %+v", tc.name, summary, wantSummary)
@@ -1578,6 +1583,15 @@ func TestBuildTiming(t *testing.T) {
 			}
 			if stepTimings != expectedStepTimings {
 				t.Errorf("unexpected number of build step times:\n got %d\nwant %d", stepTimings, expectedStepTimings)
+			}
+
+			for _, bs := range b.Timing.BuildStepPulls {
+				if bs == nil {
+					continue // do not evaluate nil timings
+				}
+				if !isEndTimeAfterStartTime(bs) {
+					t.Errorf("unexpected build step pull time:\n got %+v\nwant TimeSpan EndTime to occur after StartTime", bs)
+				}
 			}
 
 			if tc.hasError {
@@ -2111,8 +2125,8 @@ func TestEntrypoint(t *testing.T) {
 		},
 		wantCommands: []string{
 			dockerRunInStepDir(0, "foo/baz") +
-				" --env FOO=bar" +
 				" --env BAZ=buz" +
+				" --env FOO=bar" +
 				" gcr.io/my-project/my-builder a b c",
 		},
 	}, {
@@ -2128,8 +2142,8 @@ func TestEntrypoint(t *testing.T) {
 		},
 		wantCommands: []string{
 			dockerRunInStepDir(0, "foo/baz") +
-				" --env FOO=bar" +
 				" --env BAZ=buz" +
+				" --env FOO=bar" +
 				" --entrypoint bash" +
 				" gcr.io/my-project/my-builder a b c",
 		},
@@ -2186,38 +2200,223 @@ func TestStripTagDigest(t *testing.T) {
 	}
 }
 
+func TestVolumes(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	for _, tc := range []struct {
+		name         string
+		wantCommands []string
+		steps        []*pb.BuildStep
+		globalVol    []*pb.Volume
+	}{{
+		name: "Happy case per-step volumes",
+		steps: []*pb.BuildStep{{
+			Name:    "gcr.io/my-project/my-builder",
+			Volumes: []*pb.Volume{{Name: "myVol", Path: "/foo"}},
+		}, {
+			Name:    "gcr.io/my-project/my-builder",
+			Volumes: []*pb.Volume{{Name: "myVol", Path: "/foo"}},
+		}},
+		wantCommands: []string{
+			dockerRunInStepDir(0, "") + " --volume myVol:/foo gcr.io/my-project/my-builder",
+			dockerRunInStepDir(1, "") + " --volume myVol:/foo gcr.io/my-project/my-builder",
+		},
+	}, {
+		name: "Happy case global volumes",
+		globalVol: []*pb.Volume{
+			{Name: "myVol", Path: "/foo"},
+		},
+		steps: []*pb.BuildStep{{
+			Name: "gcr.io/my-project/my-builder",
+		}, {
+			Name: "gcr.io/my-project/my-builder",
+		}},
+		wantCommands: []string{
+			dockerRunInStepDir(0, "") + " --volume myVol:/foo gcr.io/my-project/my-builder",
+			dockerRunInStepDir(1, "") + " --volume myVol:/foo gcr.io/my-project/my-builder",
+		},
+	}, {
+		name: "More global volumes",
+		globalVol: []*pb.Volume{
+			{Name: "myVol", Path: "/foo"},
+			{Name: "yourVol", Path: "/bar"},
+			{Name: "ourVol", Path: "/baz"},
+		},
+		steps: []*pb.BuildStep{{
+			Name: "gcr.io/my-project/my-builder",
+		}, {
+			Name: "gcr.io/my-project/my-builder",
+		}},
+		wantCommands: []string{
+			dockerRunInStepDir(0, "") + " --volume myVol:/foo --volume yourVol:/bar --volume ourVol:/baz gcr.io/my-project/my-builder",
+			dockerRunInStepDir(1, "") + " --volume myVol:/foo --volume yourVol:/bar --volume ourVol:/baz gcr.io/my-project/my-builder",
+		},
+	}, {
+		name: "Per-step + global volumes",
+		globalVol: []*pb.Volume{
+			{Name: "myVol", Path: "/foo"},
+		},
+		steps: []*pb.BuildStep{{
+			Name:    "gcr.io/my-project/my-builder",
+			Volumes: []*pb.Volume{{Name: "localVol", Path: "/bar"}},
+		}, {
+			Name:    "gcr.io/my-project/my-builder",
+			Volumes: []*pb.Volume{{Name: "someOtherVol", Path: "/baz"}},
+		}},
+		wantCommands: []string{
+			dockerRunInStepDir(0, "") + " --volume myVol:/foo --volume localVol:/bar gcr.io/my-project/my-builder",
+			dockerRunInStepDir(1, "") + " --volume myVol:/foo --volume someOtherVol:/baz gcr.io/my-project/my-builder",
+		},
+	}} {
+		t.Run("", func(t *testing.T) {
+			buildRequest := pb.Build{
+				Steps: tc.steps,
+				Options: &pb.BuildOptions{
+					Volumes: tc.globalVol,
+				},
+			}
+
+			var gotCommands []string
+			r := newMockRunner(t, tc.name)
+			r.dockerRunHandler = func(args []string, _, _ io.Writer) error {
+				gotCommands = append(gotCommands, strings.Join(args, " "))
+				return nil
+			}
+
+			b := New(r, buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
+			if err := b.runBuildSteps(ctx); err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			if !reflect.DeepEqual(gotCommands, tc.wantCommands) {
+				t.Errorf("Unexpected command\n got: %v\nwant: %v", gotCommands, tc.wantCommands)
+			}
+		})
+	}
+}
+
+func TestEnvVars(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	for _, tc := range []struct {
+		name        string
+		wantCommand string
+		global      []string
+		local       []string
+	}{{
+		name:  "Local env var",
+		local: []string{"LOCAL=VAR"},
+		wantCommand: dockerRunInStepDir(0, "") +
+			" --env LOCAL=VAR" +
+			" gcr.io/my-project/my-builder",
+	}, {
+		name:   "Global env var",
+		global: []string{"GLOBAL=VAR"},
+		wantCommand: dockerRunInStepDir(0, "") +
+			" --env GLOBAL=VAR" +
+			" gcr.io/my-project/my-builder",
+	}, {
+		name:   "Both local and global env var",
+		global: []string{"GLOBAL=VAR"},
+		local:  []string{"LOCAL=VAR"},
+		wantCommand: dockerRunInStepDir(0, "") +
+			" --env GLOBAL=VAR" +
+			" --env LOCAL=VAR" +
+			" gcr.io/my-project/my-builder",
+	}, {
+		name:   "Local env var overwrite global",
+		global: []string{"VAR=GLOBAL"},
+		local:  []string{"VAR=LOCAL"},
+		wantCommand: dockerRunInStepDir(0, "") +
+			" --env VAR=LOCAL" +
+			" gcr.io/my-project/my-builder",
+	}, {
+		name: "No env vars",
+		wantCommand: dockerRunInStepDir(0, "") +
+			" gcr.io/my-project/my-builder",
+	}} {
+		t.Run(tc.name, func(t *testing.T) {
+			// All tests use the same build request.
+			buildRequest := pb.Build{
+				Options: &pb.BuildOptions{
+					Env: tc.global,
+				},
+				Steps: []*pb.BuildStep{{
+					Name: "gcr.io/my-project/my-builder",
+					Env:  tc.local,
+				}},
+			}
+			var gotCommand string
+			r := newMockRunner(t, tc.name)
+			r.dockerRunHandler = func(args []string, _, _ io.Writer) error {
+				gotCommand = strings.Join(args, " ")
+				return nil
+			}
+			b := New(r, buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
+
+			if err := b.runBuildSteps(ctx); err != nil {
+				t.Errorf("%s: Unexpected error\n got: %v", tc.name, err)
+			}
+			if gotCommand != tc.wantCommand {
+				t.Errorf("%s: Unexpected command\n got: %s\nwant: %s", tc.name, gotCommand, tc.wantCommand)
+			}
+		})
+	}
+
+}
+
 func TestSecrets(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	kmsKeyName := "projects/my-project/locations/global/keyRings/my-key-ring/cryptoKeys/my-crypto-key"
+	secretPlainText := base64.StdEncoding.EncodeToString([]byte("sup3rs3kr1t"))
 	for _, c := range []struct {
-		name        string
-		plaintext   string
-		kmsErr      error
-		wantErr     error
-		wantCommand string
+		name         string
+		plaintext    string
+		kmsErr       error
+		wantErr      error
+		wantCommand  string
+		globalSecret []string
+		localSecret  []string
 	}{{
-		name: "Happy case",
+		name: "Local secret",
 		wantCommand: dockerRunInStepDir(0, "") +
 			" --env MY_SECRET=sup3rs3kr1t" +
 			" gcr.io/my-project/my-builder",
-		plaintext: base64.StdEncoding.EncodeToString([]byte("sup3rs3kr1t")),
-		kmsErr:    nil,
+		plaintext:   secretPlainText,
+		localSecret: []string{"MY_SECRET"},
 	}, {
-		name:    "KMS returns error",
-		kmsErr:  errors.New("kms failure"),
-		wantErr: fmt.Errorf(`build step 0 "gcr.io/my-project/my-builder" failed: Failed to decrypt "MY_SECRET" using key %q: kms failure`, kmsKeyName),
+		name:         "Global secret",
+		globalSecret: []string{"MY_SECRET"},
+		wantCommand: dockerRunInStepDir(0, "") +
+			" --env MY_SECRET=sup3rs3kr1t" +
+			" gcr.io/my-project/my-builder",
+		plaintext: secretPlainText,
 	}, {
-		name:      "KMS returns non-base64 response",
-		plaintext: "This is not valid base64!",
-		kmsErr:    nil,
-		wantErr:   fmt.Errorf(`build step 0 "gcr.io/my-project/my-builder" failed: Plaintext was not base64-decodeable: illegal base64 data at input byte 4`),
+		name: "No secrets",
+		wantCommand: dockerRunInStepDir(0, "") +
+			" gcr.io/my-project/my-builder",
+	}, {
+		name:        "KMS returns error",
+		kmsErr:      errors.New("kms failure"),
+		wantErr:     fmt.Errorf(`build step 0 "gcr.io/my-project/my-builder" failed: Failed to decrypt "MY_SECRET" using key %q: kms failure`, kmsKeyName),
+		localSecret: []string{"MY_SECRET"},
+	}, {
+		name:        "KMS returns non-base64 response",
+		plaintext:   "This is not valid base64!",
+		wantErr:     fmt.Errorf(`build step 0 "gcr.io/my-project/my-builder" failed: Plaintext was not base64-decodeable: illegal base64 data at input byte 4`),
+		localSecret: []string{"MY_SECRET"},
 	}} {
 		// All tests use the same build request.
 		buildRequest := pb.Build{
+			Options: &pb.BuildOptions{
+				SecretEnv: c.globalSecret,
+			},
 			Steps: []*pb.BuildStep{{
 				Name:      "gcr.io/my-project/my-builder",
-				SecretEnv: []string{"MY_SECRET"},
+				SecretEnv: c.localSecret,
 			}},
 			Secrets: []*pb.Secret{{
 				KmsKeyName: kmsKeyName,
@@ -2243,7 +2442,7 @@ func TestSecrets(t *testing.T) {
 			t.Errorf("%s: Unexpected error\n got %v\nwant %v", c.name, err, c.wantErr)
 		}
 		if !reflect.DeepEqual(gotCommand, c.wantCommand) {
-			t.Errorf("%s: Unexpected command\n got %s\nwant: %s", c.name, c.wantCommand, gotCommand)
+			t.Errorf("%s: Unexpected command\n got %s\nwant: %s", c.name, gotCommand, c.wantCommand)
 		}
 	}
 }
@@ -2643,6 +2842,95 @@ func TestWorkdir(t *testing.T) {
 	}
 }
 
+func TestBuildOutput(t *testing.T) {
+	r := newMockRunner(t, "desc")
+	r.dockerRunHandler = func([]string, io.Writer, io.Writer) error { return nil }
+
+	for _, c := range []struct {
+		contents    []string
+		wantOutputs [][]byte
+	}{{
+		// no contents, no outputs.
+		contents:    nil,
+		wantOutputs: nil,
+	}, {
+		// one step with contents.
+		contents:    []string{"foo"},
+		wantOutputs: [][]byte{[]byte("foo")},
+	}, {
+		// no contents in 0th step, contents in 1st.
+		contents:    []string{"", "foo"},
+		wantOutputs: [][]byte{nil, []byte("foo")},
+	}, {
+		// contents in 0th step, no contents in 1st.
+		contents:    []string{"foo", ""},
+		wantOutputs: [][]byte{[]byte("foo"), nil},
+	}} {
+		fs := afero.NewMemMapFs()
+		req := pb.Build{}
+		for i := 0; i < len(c.contents); i++ {
+			req.Steps = append(req.Steps, &pb.BuildStep{Name: "gcr.io/my-project/my-compiler"})
+		}
+		b := New(r, req, mockTokenSource(), nopBuildLogger{}, "", fs, true, false, false)
+
+		for i, contents := range c.contents {
+			stepOutputDir := afero.GetTempDir(fs, fmt.Sprintf("step-%d", i))
+			if err := b.fs.MkdirAll(stepOutputDir, os.FileMode(os.O_CREATE)); err != nil {
+				t.Errorf("MkDirAll(%q): %v", stepOutputDir, err)
+			}
+
+			if contents != "" {
+				p := path.Join(stepOutputDir, builderOutputFile)
+				if err := afero.WriteFile(fs, p, []byte(contents), os.FileMode(os.O_CREATE)); err != nil {
+					t.Fatalf("WriteFile(%q -> %q): %v", contents, p, err)
+				}
+			}
+
+			if err := b.captureStepOutput(i, stepOutputDir); err != nil {
+				t.Errorf("captureBuildOutputs failed: %v", err)
+			}
+		}
+
+		if !reflect.DeepEqual(b.stepOutputs, c.wantOutputs) {
+			t.Errorf("Collected outputs; got %v, want %v", b.stepOutputs, c.wantOutputs)
+		}
+	}
+}
+
+func TestStepOutputByStatus(t *testing.T) {
+	r := newMockRunner(t, t.Name())
+	contents := "foo"
+	wantOutputs := [][]byte{[]byte(contents)}
+
+	fs := afero.NewMemMapFs()
+	for _, stepErr := range []error{nil, errors.New("failed")} {
+		t.Run(fmt.Sprint(stepErr), func(t *testing.T) {
+			r.dockerRunHandler = func([]string, io.Writer, io.Writer) error { return stepErr }
+
+			req := pb.Build{Steps: []*pb.BuildStep{{Name: "gcr.io/step-zero"}}}
+			b := New(r, req, mockTokenSource(), nopBuildLogger{}, "", fs, true, false, false)
+
+			stepOutputDir := afero.GetTempDir(fs, fmt.Sprintf("step-0"))
+			if err := b.fs.MkdirAll(stepOutputDir, os.FileMode(os.O_CREATE)); err != nil {
+				t.Errorf("MkDirAll(%q): %v", stepOutputDir, err)
+			}
+
+			p := path.Join(stepOutputDir, builderOutputFile)
+			if err := afero.WriteFile(fs, p, []byte(contents), os.FileMode(os.O_CREATE)); err != nil {
+				t.Fatalf("WriteFile(%q -> %q): %v", contents, p, err)
+			}
+
+			err := b.runStep(context.Background(), 0, 0, "d1gest")
+			if (err == nil) != (stepErr == nil) {
+				t.Errorf("Step status: got %v; want %v", err, stepErr)
+			}
+
+			if !reflect.DeepEqual(b.stepOutputs, wantOutputs) {
+				t.Errorf("Collected outputs; got %v, want %v", b.stepOutputs, wantOutputs)
+			}
+		})
+	}
+}
 
 func TestOsTempDir(t *testing.T) {
 	defer func() { runtimeGOOS = runtime.GOOS }()
@@ -2725,3 +3013,4 @@ func TestDataRace(t *testing.T) {
 	close(starter)
 	<-b.Done // Wait for build to complete.
 }
+

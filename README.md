@@ -73,9 +73,9 @@ See the
 
 ## Support
 
-File issues here on gitHub, email `cloud-build-contact@google.com`, or join our
-[Slack channel] if you have general questions about Local Builder or Container
-Builder.
+File issues here on gitHub, email `google-cloud-dev@googlegroups.com`, or join
+our [Slack channel] if you have general questions about Local Builder or
+Container Builder.
 
 [Google Cloud Build]: http://cloud.google.com/cloud-build/
 [Slack channel]: https://googlecloud-community.slack.com/messages/C4KCRJL4D/details/

@@ -64,9 +64,6 @@ func exitUsage(msg string) {
 }
 
 func main() {
-	if strings.Contains(os.Args[0], "container-builder") {
-		log.Printf("WARNING: %v is deprecated. Please run `gcloud install cloud-build-local` to install its replacement.", os.Args[0])
-	}
 	flag.Parse()
 	ctx := context.Background()
 	args := flag.Args()

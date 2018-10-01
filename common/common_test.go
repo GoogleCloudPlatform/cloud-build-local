@@ -138,6 +138,12 @@ func TestParseSubstitutionsFlag(t *testing.T) {
 		input: "_FOO=bar, _BAR=baz", // space between the pair
 		want:  map[string]string{"_FOO": "bar", "_BAR": "baz"},
 	}, {
+		input: "_FOO=1+1=2,_BAR=baz", // equal sign in substitution value
+		want:  map[string]string{"_FOO": "1+1=2", "_BAR": "baz"},
+	}, {
+		input: "_FOO=1+1=2=4-2=5-3,_BAR=baz", // equal sign in substitution value
+		want:  map[string]string{"_FOO": "1+1=2=4-2=5-3", "_BAR": "baz"},
+	}, {
 		input:   "_FOO",
 		wantErr: true,
 	}}
