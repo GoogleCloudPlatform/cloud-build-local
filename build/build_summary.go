@@ -77,8 +77,9 @@ type Hash struct {
 
 // BuildSummary is the data returned by the blocking /build/summary endpoint.
 type BuildSummary struct {
-	Status     BuildStatus
-	StepStatus []pb.Build_Status
+	Status          BuildStatus
+	StepStatus      []pb.Build_Status
+	StepOutputs     [][]byte
 	BuiltImages     []BuiltImage
 	BuildStepImages []string // index of build step -> digest, else empty string
 	FileHashes      map[string][]Hash

@@ -1,4 +1,4 @@
-// Copyright 2017, Google Inc. All rights reserved.
+// Copyright 2017, Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -122,6 +122,11 @@ func TestClientMethods(t *testing.T) {
 			func() (interface{}, error) { return c.CropHints(ctx, img, ictx) },
 			[]*pb.Feature{{Type: pb.Feature_CROP_HINTS, MaxResults: 0}},
 			batchResponse.Responses[0].CropHintsAnnotation,
+		},
+		{
+			func() (interface{}, error) { return c.LocalizeObjects(ctx, img, ictx) },
+			[]*pb.Feature{{Type: pb.Feature_OBJECT_LOCALIZATION, MaxResults: 0}},
+			batchResponse.Responses[0].LocalizedObjectAnnotations,
 		},
 	} {
 		mockImageAnnotator.reqs = nil

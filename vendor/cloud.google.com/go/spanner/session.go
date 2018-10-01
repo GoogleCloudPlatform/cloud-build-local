@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Google Inc. All Rights Reserved.
+Copyright 2017 Google LLC
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -451,6 +451,7 @@ func (p *sessionPool) createSession(ctx context.Context) (*session, error) {
 		if !done {
 			// Session creation failed, give budget back.
 			p.numOpened--
+			recordStat(ctx, OpenSessionCount, int64(p.numOpened))
 		}
 		p.createReqs--
 		// Notify other waiters blocking on session creation.
@@ -551,6 +552,7 @@ func (p *sessionPool) take(ctx context.Context) (*sessionHandle, error) {
 		}
 		// Take budget before the actual session creation.
 		p.numOpened++
+		recordStat(ctx, OpenSessionCount, int64(p.numOpened))
 		p.createReqs++
 		p.mu.Unlock()
 		if s, err = p.createSession(ctx); err != nil {
@@ -613,6 +615,7 @@ func (p *sessionPool) takeWriteSession(ctx context.Context) (*sessionHandle, err
 
 			// Take budget before the actual session creation.
 			p.numOpened++
+			recordStat(ctx, OpenSessionCount, int64(p.numOpened))
 			p.createReqs++
 			p.mu.Unlock()
 			if s, err = p.createSession(ctx); err != nil {
@@ -673,6 +676,7 @@ func (p *sessionPool) remove(s *session, isExpire bool) bool {
 	if s.invalidate() {
 		// Decrease the number of opened sessions.
 		p.numOpened--
+		recordStat(context.Background(), OpenSessionCount, int64(p.numOpened))
 		// Broadcast that a session has been destroyed.
 		close(p.mayGetSession)
 		p.mayGetSession = make(chan struct{})
@@ -966,6 +970,7 @@ func (hc *healthChecker) maintainer() {
 				break
 			}
 			p.numOpened++
+			recordStat(ctx, OpenSessionCount, int64(p.numOpened))
 			p.createReqs++
 			shouldPrepareWrite := p.shouldPrepareWrite()
 			p.mu.Unlock()
@@ -1072,7 +1077,7 @@ func shouldDropSession(err error) bool {
 	}
 	// If a Cloud Spanner can no longer locate the session (for example, if session is garbage collected), then caller
 	// should not try to return the session back into the session pool.
-	// TODO: once gRPC can return auxilary error information, stop parsing the error message.
+	// TODO: once gRPC can return auxiliary error information, stop parsing the error message.
 	if ErrCode(err) == codes.NotFound && strings.Contains(ErrDesc(err), "Session not found:") {
 		return true
 	}

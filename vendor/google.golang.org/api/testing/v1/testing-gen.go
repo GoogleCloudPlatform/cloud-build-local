@@ -286,7 +286,6 @@ func (s *AndroidDeviceList) MarshalJSON() ([]byte, error) {
 // more information on types of Android tests.
 type AndroidInstrumentationTest struct {
 	// AppApk: The APK for the application under test.
-	// Required
 	AppApk *FileReference `json:"appApk,omitempty"`
 
 	// AppPackageId: The java package for the application under
@@ -312,17 +311,16 @@ type AndroidInstrumentationTest struct {
 	// .html#using-android-test-orchestrator>
 	// for more information about Android Test Orchestrator.
 	//
-	// Optional, if empty, test will be run without orchestrator.
+	// Optional. If not set, the test will be run without the orchestrator.
 	//
 	// Possible values:
-	//   "ORCHESTRATOR_OPTION_UNSPECIFIED" - This means that the server
-	// should choose the mode. And test will be run
-	// without orchestrator.
-	// Using orchestrator is highly encouraged because of all the benefits
-	// it
-	// offers. And in the future, all instrumentation tests will be run
-	// with
-	// orchestrator by default if preference unspecified.
+	//   "ORCHESTRATOR_OPTION_UNSPECIFIED" - Default value: the server will
+	// choose the mode. Currently implies that
+	// the test will run without the orchestrator. In the future,
+	// all instrumentation tests will be run with the orchestrator.
+	// Using the orchestrator is highly encouraged because of all the
+	// benefits it
+	// offers.
 	//   "USE_ORCHESTRATOR" - Run test using orchestrator.
 	// ** Only compatible with AndroidJUnitRunner version 1.0 or higher!
 	// **
@@ -459,6 +457,18 @@ type AndroidModel struct {
 	//   "PHYSICAL" - Actual hardware
 	Form string `json:"form,omitempty"`
 
+	// FormFactor: Whether this device is a phone, tablet, wearable,
+	// etc.
+	// @OutputOnly
+	//
+	// Possible values:
+	//   "DEVICE_FORM_FACTOR_UNSPECIFIED" - Do not use. For proto versioning
+	// only.
+	//   "PHONE" - This device has the shape of a phone
+	//   "TABLET" - This device has the shape of a tablet
+	//   "WEARABLE" - This device has the shape of a watch or other wearable
+	FormFactor string `json:"formFactor,omitempty"`
+
 	// Id: The unique opaque id for this model.
 	// Use this for invoking the TestExecutionService.
 	// @OutputOnly
@@ -546,7 +556,6 @@ func (s *AndroidModel) MarshalJSON() ([]byte, error) {
 // or physical Android Device, finding culprits and crashes as it goes.
 type AndroidRoboTest struct {
 	// AppApk: The APK for the application under test.
-	// Required
 	AppApk *FileReference `json:"appApk,omitempty"`
 
 	// AppInitialActivity: The initial activity that should be used to start
@@ -616,8 +625,8 @@ func (s *AndroidRoboTest) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
-// AndroidRuntimeConfiguration: Configuration that can be selected at
-// the time a test is run.
+// AndroidRuntimeConfiguration: Android configuration that can be
+// selected at the time a test is run.
 type AndroidRuntimeConfiguration struct {
 	// Locales: The set of available locales.
 	// @OutputOnly
@@ -657,7 +666,6 @@ func (s *AndroidRuntimeConfiguration) MarshalJSON() ([]byte, error) {
 // user of this api, for the time being.
 type AndroidTestLoop struct {
 	// AppApk: The APK for the application under test.
-	// Required
 	AppApk *FileReference `json:"appApk,omitempty"`
 
 	// AppPackageId: The java package for the application under
@@ -1032,19 +1040,19 @@ func (s *ClientInfoDetail) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
-// Date: Represents a whole calendar date, e.g. date of birth. The time
-// of day and
-// time zone are either specified elsewhere or are not significant. The
-// date
-// is relative to the Proleptic Gregorian Calendar. The day may be 0
+// Date: Represents a whole calendar date, for example date of birth.
+// The time of day
+// and time zone are either specified elsewhere or are not significant.
+// The date
+// is relative to the Proleptic Gregorian Calendar. The day can be 0
 // to
-// represent a year and month where the day is not significant, e.g.
-// credit card
-// expiration date. The year may be 0 to represent a month and day
-// independent
-// of year, e.g. anniversary date. Related types are
-// google.type.TimeOfDay
-// and `google.protobuf.Timestamp`.
+// represent a year and month where the day is not significant, for
+// example
+// credit card expiration date. The year can be 0 to represent a month
+// and day
+// independent of year, for example anniversary date. Related types
+// are
+// google.type.TimeOfDay and `google.protobuf.Timestamp`.
 type Date struct {
 	// Day: Day of month. Must be from 1 to 31 and valid for the year and
 	// month, or 0
@@ -1171,6 +1179,9 @@ type Environment struct {
 	// test.
 	AndroidDevice *AndroidDevice `json:"androidDevice,omitempty"`
 
+	// IosDevice: An iOS device which must be used with an iOS test.
+	IosDevice *IosDevice `json:"iosDevice,omitempty"`
+
 	// ForceSendFields is a list of field names (e.g. "AndroidDevice") to
 	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
@@ -1204,6 +1215,9 @@ type EnvironmentMatrix struct {
 
 	// AndroidMatrix: A matrix of Android devices.
 	AndroidMatrix *AndroidMatrix `json:"androidMatrix,omitempty"`
+
+	// IosDeviceList: A list of iOS devices.
+	IosDeviceList *IosDeviceList `json:"iosDeviceList,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "AndroidDeviceList")
 	// to unconditionally include in API requests. By default, fields with
@@ -1408,6 +1422,339 @@ func (s *IntentFilter) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// IosDevice: A single iOS device.
+type IosDevice struct {
+	// IosModelId: Required. The id of the iOS device to be used.
+	// Use the EnvironmentDiscoveryService to get supported options.
+	IosModelId string `json:"iosModelId,omitempty"`
+
+	// IosVersionId: Required. The id of the iOS major software version to
+	// be used.
+	// Use the EnvironmentDiscoveryService to get supported options.
+	IosVersionId string `json:"iosVersionId,omitempty"`
+
+	// Locale: Required. The locale the test device used for testing.
+	// Use the EnvironmentDiscoveryService to get supported options.
+	Locale string `json:"locale,omitempty"`
+
+	// Orientation: Required. How the device is oriented during the
+	// test.
+	// Use the EnvironmentDiscoveryService to get supported options.
+	Orientation string `json:"orientation,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "IosModelId") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "IosModelId") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *IosDevice) MarshalJSON() ([]byte, error) {
+	type NoMethod IosDevice
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// IosDeviceCatalog: The currently supported iOS devices.
+type IosDeviceCatalog struct {
+	// Models: Output only. The set of supported iOS device models.
+	Models []*IosModel `json:"models,omitempty"`
+
+	// RuntimeConfiguration: Output only. The set of supported runtime
+	// configurations.
+	RuntimeConfiguration *IosRuntimeConfiguration `json:"runtimeConfiguration,omitempty"`
+
+	// Versions: Output only. The set of supported iOS software versions.
+	Versions []*IosVersion `json:"versions,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Models") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Models") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *IosDeviceCatalog) MarshalJSON() ([]byte, error) {
+	type NoMethod IosDeviceCatalog
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// IosDeviceList: A list of iOS device configurations in which the test
+// is to be executed.
+type IosDeviceList struct {
+	// IosDevices: Required. A list of iOS devices
+	IosDevices []*IosDevice `json:"iosDevices,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "IosDevices") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "IosDevices") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *IosDeviceList) MarshalJSON() ([]byte, error) {
+	type NoMethod IosDeviceList
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// IosModel: A description of an iOS device tests may be run on.
+type IosModel struct {
+	// DeviceCapabilities: Output only. Device capabilities.
+	// Copied
+	// from
+	// https://developer.apple.com/library/archive/documentation/DeviceI
+	// nformation/Reference/iOSDeviceCompatibility/DeviceCompatibilityMatrix/
+	// DeviceCompatibilityMatrix.html
+	DeviceCapabilities []string `json:"deviceCapabilities,omitempty"`
+
+	// FormFactor: Whether this device is a phone, tablet, wearable,
+	// etc.
+	// @OutputOnly
+	//
+	// Possible values:
+	//   "DEVICE_FORM_FACTOR_UNSPECIFIED" - Do not use. For proto versioning
+	// only.
+	//   "PHONE" - This device has the shape of a phone
+	//   "TABLET" - This device has the shape of a tablet
+	//   "WEARABLE" - This device has the shape of a watch or other wearable
+	FormFactor string `json:"formFactor,omitempty"`
+
+	// Id: Output only. The unique opaque id for this model.
+	// Use this for invoking the TestExecutionService.
+	Id string `json:"id,omitempty"`
+
+	// Name: Output only. The human-readable name for this device
+	// model.
+	// Examples: "iPhone 4s", "iPad Mini 2"
+	Name string `json:"name,omitempty"`
+
+	// SupportedVersionIds: Output only. The set of iOS major software
+	// versions this device supports.
+	SupportedVersionIds []string `json:"supportedVersionIds,omitempty"`
+
+	// Tags: Output only. Tags for this dimension.
+	// Examples: "default", "preview", "deprecated"
+	Tags []string `json:"tags,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "DeviceCapabilities")
+	// to unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "DeviceCapabilities") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *IosModel) MarshalJSON() ([]byte, error) {
+	type NoMethod IosModel
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// IosRuntimeConfiguration: iOS configuration that can be selected at
+// the time a test is run.
+type IosRuntimeConfiguration struct {
+	// Locales: Output only. The set of available locales.
+	Locales []*Locale `json:"locales,omitempty"`
+
+	// Orientations: Output only. The set of available orientations.
+	Orientations []*Orientation `json:"orientations,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Locales") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Locales") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *IosRuntimeConfiguration) MarshalJSON() ([]byte, error) {
+	type NoMethod IosRuntimeConfiguration
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// IosTestSetup: A description of how to set up an iOS device prior to a
+// test.
+type IosTestSetup struct {
+	// NetworkProfile: Optional. The network traffic profile used for
+	// running the test.
+	// Available network profiles can be queried by using
+	// the
+	// NETWORK_CONFIGURATION environment type when
+	// calling
+	// TestEnvironmentDiscoveryService.GetTestEnvironmentCatalog.
+	NetworkProfile string `json:"networkProfile,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "NetworkProfile") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "NetworkProfile") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *IosTestSetup) MarshalJSON() ([]byte, error) {
+	type NoMethod IosTestSetup
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// IosVersion: An iOS version
+type IosVersion struct {
+	// Id: Output only. An opaque id for this iOS version.
+	// Use this id to invoke the TestExecutionService.
+	Id string `json:"id,omitempty"`
+
+	// MajorVersion: Output only. An integer representing the major iOS
+	// version.
+	// Examples: "8", "9"
+	MajorVersion int64 `json:"majorVersion,omitempty"`
+
+	// MinorVersion: Output only. An integer representing the minor iOS
+	// version.
+	// Examples: "1", "2"
+	MinorVersion int64 `json:"minorVersion,omitempty"`
+
+	// Tags: Output only. Tags for this dimension.
+	// Examples: "default", "preview", "deprecated"
+	Tags []string `json:"tags,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Id") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Id") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *IosVersion) MarshalJSON() ([]byte, error) {
+	type NoMethod IosVersion
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// IosXcTest: A test of an iOS application that uses the XCTest
+// framework.
+// Xcode supports the option to "build for testing", which generates
+// an
+// .xctestrun file that contains a test specification (arguments, test
+// methods,
+// etc). This test type accepts a zip file containing the .xctestrun
+// file and
+// the corresponding contents of the Build/Products directory that
+// contains all
+// the binaries needed to run the tests.
+type IosXcTest struct {
+	// TestsZip: Required. The .zip containing the .xctestrun file and the
+	// contents of the
+	// DerivedData/Build/Products directory.
+	// The .xctestrun file in this zip is ignored if the xctestrun field
+	// is
+	// specified.
+	TestsZip *FileReference `json:"testsZip,omitempty"`
+
+	// Xctestrun: Optional. An .xctestrun file that will override the
+	// .xctestrun file in the
+	// tests zip. Because the .xctestrun file contains environment variables
+	// along
+	// with test methods to run and/or ignore, this can be useful for
+	// sharding
+	// tests. Default is taken from the tests zip.
+	Xctestrun *FileReference `json:"xctestrun,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "TestsZip") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "TestsZip") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *IosXcTest) MarshalJSON() ([]byte, error) {
+	type NoMethod IosXcTest
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // LauncherActivityIntent: Specifies an intent that starts the main
 // launcher activity.
 type LauncherActivityIntent struct {
@@ -1597,6 +1944,38 @@ type Orientation struct {
 
 func (s *Orientation) MarshalJSON() ([]byte, error) {
 	type NoMethod Orientation
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// ProvidedSoftwareCatalog: The currently provided software environment
+// on the devices under test.
+type ProvidedSoftwareCatalog struct {
+	// OrchestratorVersion: A string representing the current version of
+	// Android Test Orchestrator that
+	// is provided by TestExecutionService. Example: "1.0.2 beta"
+	OrchestratorVersion string `json:"orchestratorVersion,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "OrchestratorVersion")
+	// to unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "OrchestratorVersion") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ProvidedSoftwareCatalog) MarshalJSON() ([]byte, error) {
+	type NoMethod ProvidedSoftwareCatalog
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -1886,8 +2265,15 @@ type TestEnvironmentCatalog struct {
 	// Instrumentation Tests.
 	AndroidDeviceCatalog *AndroidDeviceCatalog `json:"androidDeviceCatalog,omitempty"`
 
+	// IosDeviceCatalog: Supported iOS devices
+	IosDeviceCatalog *IosDeviceCatalog `json:"iosDeviceCatalog,omitempty"`
+
 	// NetworkConfigurationCatalog: Supported network configurations
 	NetworkConfigurationCatalog *NetworkConfigurationCatalog `json:"networkConfigurationCatalog,omitempty"`
+
+	// SoftwareCatalog: The software test environment provided by
+	// TestExecutionService.
+	SoftwareCatalog *ProvidedSoftwareCatalog `json:"softwareCatalog,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
 	// server.
@@ -2101,13 +2487,38 @@ type TestMatrix struct {
 	// manifest.
 	//   "DEVICE_ADMIN_RECEIVER" - Device administrator applications are not
 	// allowed.
+	//   "MALFORMED_XC_TEST_ZIP" - The zipped XCTest was malformed. The zip
+	// did not contain a single
+	// .xctestrun file and the contents of the
+	// DerivedData/Build/Products
+	// directory.
+	//   "BUILT_FOR_IOS_SIMULATOR" - The zipped XCTest was built for the iOS
+	// simulator rather than for a
+	// physical device.
+	//   "NO_TESTS_IN_XC_TEST_ZIP" - The .xctestrun file did not specify any
+	// test targets.
+	//   "USE_DESTINATION_ARTIFACTS" - One or more of the test targets
+	// defined in the .xctestrun file specifies
+	// "UseDestinationArtifacts", which is disallowed.
+	//   "TEST_NOT_APP_HOSTED" - XC tests which run on physical devices must
+	// have
+	// "IsAppHostedTestBundle" == "true" in the xctestrun file.
 	//   "TEST_ONLY_APK" - The APK is marked as "testOnly".
+	// NOT USED
+	//   "MALFORMED_IPA" - The input IPA could not be parsed.
 	// NOT USED
 	//   "NO_CODE_APK" - APK contains no code.
 	// See
 	// also
 	// https://developer.android.com/guide/topics/manifest/application-e
 	// lement.html#code
+	//   "INVALID_INPUT_APK" - Either the provided input APK path was
+	// malformed,
+	// the APK file does not exist, or the user does not have permission
+	// to
+	// access the APK file.
+	//   "INVALID_APK_PREVIEW_SDK" - APK is built for a preview SDK which is
+	// unsupported
 	InvalidMatrixDetails string `json:"invalidMatrixDetails,omitempty"`
 
 	// ProjectId: The cloud project that owns the test matrix.
@@ -2259,9 +2670,13 @@ type TestSetup struct {
 	// Optional
 	FilesToPush []*DeviceFile `json:"filesToPush,omitempty"`
 
-	// NetworkProfile: The network traffic profile used for running the
-	// test.
-	// Optional
+	// NetworkProfile: Optional. The network traffic profile used for
+	// running the test.
+	// Available network profiles can be queried by using
+	// the
+	// NETWORK_CONFIGURATION environment type when
+	// calling
+	// TestEnvironmentDiscoveryService.GetTestEnvironmentCatalog.
 	NetworkProfile string `json:"networkProfile,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Account") to
@@ -2320,6 +2735,12 @@ type TestSpecification struct {
 	// DisableVideoRecording: Disables video recording; may reduce test
 	// latency.
 	DisableVideoRecording bool `json:"disableVideoRecording,omitempty"`
+
+	// IosTestSetup: Optional. Test setup requirements for iOS.
+	IosTestSetup *IosTestSetup `json:"iosTestSetup,omitempty"`
+
+	// IosXcTest: An iOS XCTest, via an .xctestrun file
+	IosXcTest *IosXcTest `json:"iosXcTest,omitempty"`
 
 	// TestSetup: Test setup requirements for Android e.g. files to install,
 	// bootstrap
@@ -2592,6 +3013,7 @@ func (c *ApplicationDetailServiceGetApkDetailsCall) doRequest(alt string) (*http
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/applicationDetailService/getApkDetails")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
@@ -2719,6 +3141,7 @@ func (c *ProjectsTestMatricesCancelCall) doRequest(alt string) (*http.Response, 
 	reqHeaders.Set("User-Agent", c.s.userAgent())
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/projects/{projectId}/testMatrices/{testMatrixId}:cancel")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
@@ -2882,6 +3305,7 @@ func (c *ProjectsTestMatricesCreateCall) doRequest(alt string) (*http.Response, 
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/projects/{projectId}/testMatrices")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
@@ -3036,6 +3460,7 @@ func (c *ProjectsTestMatricesGetCall) doRequest(alt string) (*http.Response, err
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/projects/{projectId}/testMatrices/{testMatrixId}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
@@ -3197,6 +3622,7 @@ func (c *TestEnvironmentCatalogGetCall) doRequest(alt string) (*http.Response, e
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/testEnvironmentCatalog/{environmentType}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
@@ -3258,7 +3684,9 @@ func (c *TestEnvironmentCatalogGetCall) Do(opts ...googleapi.CallOption) (*TestE
 	//       "enum": [
 	//         "ENVIRONMENT_TYPE_UNSPECIFIED",
 	//         "ANDROID",
-	//         "NETWORK_CONFIGURATION"
+	//         "IOS",
+	//         "NETWORK_CONFIGURATION",
+	//         "PROVIDED_SOFTWARE"
 	//       ],
 	//       "location": "path",
 	//       "required": true,

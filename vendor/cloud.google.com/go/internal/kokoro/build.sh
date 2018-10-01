@@ -19,7 +19,7 @@ mkdir -p $GOCLOUD_HOME
 # Move code into $GOPATH and get dependencies
 cp -R ./* $GOCLOUD_HOME
 cd $GOCLOUD_HOME
-go get -v ./...
+go get -v -t ./...
 
 # # Don't run integration tests until we can protect against code from 
 # # untrusted forks reading and storing our service account key.
@@ -41,4 +41,4 @@ go get -v ./...
 go test -race -v -short ./... 2>&1 | tee $KOKORO_ARTIFACTS_DIR/$KOKORO_GERRIT_CHANGE_NUMBER.txt
 
 # Make sure README.md is up to date.
-make -C internal/readme test diff
+#make -C internal/readme test diff

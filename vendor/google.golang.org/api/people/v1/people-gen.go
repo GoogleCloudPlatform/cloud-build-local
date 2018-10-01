@@ -189,9 +189,9 @@ type Address struct {
 	// StreetAddress: The street address.
 	StreetAddress string `json:"streetAddress,omitempty"`
 
-	// Type: The type of the address. The type can be custom or
-	// predefined.
-	// Possible values include, but are not limited to, the following:
+	// Type: The type of the address. The type can be custom or one of these
+	// predefined
+	// values:
 	//
 	// * `home`
 	// * `work`
@@ -481,9 +481,7 @@ func (s *ContactGroup) MarshalJSON() ([]byte, error) {
 type ContactGroupMembership struct {
 	// ContactGroupId: The contact group ID for the contact group
 	// membership. The contact group
-	// ID can be custom or predefined. Possible values include, but are
-	// not
-	// limited to, the following:
+	// ID can be custom or one of these predefined values:
 	//
 	// *  `myContacts`
 	// *  `starred`
@@ -665,12 +663,14 @@ func (s *CreateContactGroupRequest) MarshalJSON() ([]byte, error) {
 type Date struct {
 	// Day: Day of month. Must be from 1 to 31 and valid for the year and
 	// month, or 0
-	// if specifying a year/month where the day is not significant.
+	// if specifying a year by itself or a year and month where the day is
+	// not
+	// significant.
 	Day int64 `json:"day,omitempty"`
 
-	// Month: Month of year. Must be from 1 to 12, or 0 if specifying a date
+	// Month: Month of year. Must be from 1 to 12, or 0 if specifying a year
 	// without a
-	// month.
+	// month and day.
 	Month int64 `json:"month,omitempty"`
 
 	// Year: Year of date. Must be from 1 to 9999, or 0 if specifying a date
@@ -744,9 +744,9 @@ type EmailAddress struct {
 	// Metadata: Metadata about the email address.
 	Metadata *FieldMetadata `json:"metadata,omitempty"`
 
-	// Type: The type of the email address. The type can be custom or
-	// predefined.
-	// Possible values include, but are not limited to, the following:
+	// Type: The type of the email address. The type can be custom or one of
+	// these
+	// predefined values:
 	//
 	// * `home`
 	// * `work`
@@ -810,9 +810,9 @@ type Event struct {
 	// Metadata: Metadata about the event.
 	Metadata *FieldMetadata `json:"metadata,omitempty"`
 
-	// Type: The type of the event. The type can be custom or
-	// predefined.
-	// Possible values include, but are not limited to, the following:
+	// Type: The type of the event. The type can be custom or one of these
+	// predefined
+	// values:
 	//
 	// * `anniversary`
 	// * `other`
@@ -891,10 +891,9 @@ type Gender struct {
 	// Metadata: Metadata about the gender.
 	Metadata *FieldMetadata `json:"metadata,omitempty"`
 
-	// Value: The gender for the person. The gender can be custom or
-	// predefined.
-	// Possible values include, but are not limited to, the
-	// following:
+	// Value: The gender for the person. The gender can be custom or one of
+	// these
+	// predefined values:
 	//
 	// * `male`
 	// * `female`
@@ -973,8 +972,8 @@ type ImClient struct {
 	Metadata *FieldMetadata `json:"metadata,omitempty"`
 
 	// Protocol: The protocol of the IM client. The protocol can be custom
-	// or predefined.
-	// Possible values include, but are not limited to, the following:
+	// or one of these
+	// predefined values:
 	//
 	// * `aim`
 	// * `msn`
@@ -987,9 +986,9 @@ type ImClient struct {
 	// * `netMeeting`
 	Protocol string `json:"protocol,omitempty"`
 
-	// Type: The type of the IM client. The type can be custom or
-	// predefined.
-	// Possible values include, but are not limited to, the following:
+	// Type: The type of the IM client. The type can be custom or one of
+	// these
+	// predefined values:
 	//
 	// * `home`
 	// * `work`
@@ -1492,9 +1491,9 @@ type Organization struct {
 	// Title: The person's job title at the organization.
 	Title string `json:"title,omitempty"`
 
-	// Type: The type of the organization. The type can be custom or
-	// predefined.
-	// Possible values include, but are not limited to, the following:
+	// Type: The type of the organization. The type can be custom or  one of
+	// these
+	// predefined values:
 	//
 	// * `work`
 	// * `school`
@@ -1628,6 +1627,9 @@ type Person struct {
 	// of
 	// `people/`<var>person_id</var>.
 	ResourceName string `json:"resourceName,omitempty"`
+
+	// SipAddresses: The person's SIP addresses.
+	SipAddresses []*SipAddress `json:"sipAddresses,omitempty"`
 
 	// Skills: The person's skills.
 	Skills []*Skill `json:"skills,omitempty"`
@@ -1799,9 +1801,9 @@ type PhoneNumber struct {
 	// Metadata: Metadata about the phone number.
 	Metadata *FieldMetadata `json:"metadata,omitempty"`
 
-	// Type: The type of the phone number. The type can be custom or
-	// predefined.
-	// Possible values include, but are not limited to, the following:
+	// Type: The type of the phone number. The type can be custom or one of
+	// these
+	// predefined values:
 	//
 	// * `home`
 	// * `work`
@@ -1941,9 +1943,8 @@ type Relation struct {
 	Person string `json:"person,omitempty"`
 
 	// Type: The person's relation to the other person. The type can be
-	// custom or predefined.
-	// Possible values include, but are not limited to, the following
-	// values:
+	// custom or one of
+	// these predefined values:
 	//
 	// * `spouse`
 	// * `child`
@@ -1998,9 +1999,7 @@ type RelationshipInterest struct {
 
 	// Value: The kind of relationship the person is looking for. The value
 	// can be custom
-	// or predefined. Possible values include, but are not limited to,
-	// the
-	// following values:
+	// or one of these predefined values:
 	//
 	// * `friend`
 	// * `date`
@@ -2043,9 +2042,9 @@ type RelationshipStatus struct {
 	// Metadata: Metadata about the relationship status.
 	Metadata *FieldMetadata `json:"metadata,omitempty"`
 
-	// Value: The relationship status. The value can be custom or
-	// predefined.
-	// Possible values include, but are not limited to, the following:
+	// Value: The relationship status. The value can be custom or one of
+	// these
+	// predefined values:
 	//
 	// * `single`
 	// * `inARelationship`
@@ -2114,6 +2113,57 @@ type Residence struct {
 
 func (s *Residence) MarshalJSON() ([]byte, error) {
 	type NoMethod Residence
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// SipAddress: A person's SIP address. Session Initial Protocol
+// addresses are used for VoIP
+// communications to make voice or video calls over the internet.
+type SipAddress struct {
+	// FormattedType: The read-only type of the SIP address translated and
+	// formatted in the
+	// viewer's account locale or the `Accept-Language` HTTP header locale.
+	FormattedType string `json:"formattedType,omitempty"`
+
+	// Metadata: Metadata about the SIP address.
+	Metadata *FieldMetadata `json:"metadata,omitempty"`
+
+	// Type: The type of the SIP address. The type can be custom or or one
+	// of these
+	// predefined values:
+	//
+	// * `home`
+	// * `work`
+	// * `mobile`
+	// * `other`
+	Type string `json:"type,omitempty"`
+
+	// Value: The SIP address in the
+	// [RFC 3261 19.1](https://tools.ietf.org/html/rfc3261#section-19.1) SIP
+	// URI
+	// format.
+	Value string `json:"value,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "FormattedType") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "FormattedType") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *SipAddress) MarshalJSON() ([]byte, error) {
+	type NoMethod SipAddress
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -2405,9 +2455,9 @@ type Url struct {
 	// Metadata: Metadata about the URL.
 	Metadata *FieldMetadata `json:"metadata,omitempty"`
 
-	// Type: The type of the URL. The type can be custom or
-	// predefined.
-	// Possible values include, but are not limited to, the following:
+	// Type: The type of the URL. The type can be custom or one of these
+	// predefined
+	// values:
 	//
 	// * `home`
 	// * `work`
@@ -2558,6 +2608,7 @@ func (c *ContactGroupsBatchGetCall) doRequest(alt string) (*http.Response, error
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/contactGroups:batchGet")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
@@ -2689,6 +2740,7 @@ func (c *ContactGroupsCreateCall) doRequest(alt string) (*http.Response, error) 
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/contactGroups")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
@@ -2813,6 +2865,7 @@ func (c *ContactGroupsDeleteCall) doRequest(alt string) (*http.Response, error) 
 	reqHeaders.Set("User-Agent", c.s.userAgent())
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+resourceName}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("DELETE", urls, body)
@@ -2966,6 +3019,7 @@ func (c *ContactGroupsGetCall) doRequest(alt string) (*http.Response, error) {
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+resourceName}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
@@ -3139,6 +3193,7 @@ func (c *ContactGroupsListCall) doRequest(alt string) (*http.Response, error) {
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/contactGroups")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
@@ -3299,6 +3354,7 @@ func (c *ContactGroupsUpdateCall) doRequest(alt string) (*http.Response, error) 
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+resourceName}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("PUT", urls, body)
@@ -3435,6 +3491,7 @@ func (c *ContactGroupsMembersModifyCall) doRequest(alt string) (*http.Response, 
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+resourceName}/members:modify")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
@@ -3577,6 +3634,7 @@ func (c *PeopleCreateContactCall) doRequest(alt string) (*http.Response, error) 
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/people:createContact")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
@@ -3699,6 +3757,7 @@ func (c *PeopleDeleteContactCall) doRequest(alt string) (*http.Response, error) 
 	reqHeaders.Set("User-Agent", c.s.userAgent())
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+resourceName}:deleteContact")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("DELETE", urls, body)
@@ -3827,9 +3886,11 @@ func (r *PeopleService) Get(resourceName string) *PeopleGetCall {
 // * relationshipInterests
 // * relationshipStatuses
 // * residences
+// * sipAddresses
 // * skills
 // * taglines
 // * urls
+// * userDefined
 func (c *PeopleGetCall) PersonFields(personFields string) *PeopleGetCall {
 	c.urlParams_.Set("personFields", personFields)
 	return c
@@ -3892,6 +3953,7 @@ func (c *PeopleGetCall) doRequest(alt string) (*http.Response, error) {
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+resourceName}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
@@ -3949,7 +4011,7 @@ func (c *PeopleGetCall) Do(opts ...googleapi.CallOption) (*Person, error) {
 	//   ],
 	//   "parameters": {
 	//     "personFields": {
-	//       "description": "**Required.** A field mask to restrict which fields on the person are\nreturned. Multiple fields can be specified by separating them with commas.\nValid values are:\n\n* addresses\n* ageRanges\n* biographies\n* birthdays\n* braggingRights\n* coverPhotos\n* emailAddresses\n* events\n* genders\n* imClients\n* interests\n* locales\n* memberships\n* metadata\n* names\n* nicknames\n* occupations\n* organizations\n* phoneNumbers\n* photos\n* relations\n* relationshipInterests\n* relationshipStatuses\n* residences\n* skills\n* taglines\n* urls",
+	//       "description": "**Required.** A field mask to restrict which fields on the person are\nreturned. Multiple fields can be specified by separating them with commas.\nValid values are:\n\n* addresses\n* ageRanges\n* biographies\n* birthdays\n* braggingRights\n* coverPhotos\n* emailAddresses\n* events\n* genders\n* imClients\n* interests\n* locales\n* memberships\n* metadata\n* names\n* nicknames\n* occupations\n* organizations\n* phoneNumbers\n* photos\n* relations\n* relationshipInterests\n* relationshipStatuses\n* residences\n* sipAddresses\n* skills\n* taglines\n* urls\n* userDefined",
 	//       "format": "google-fieldmask",
 	//       "location": "query",
 	//       "type": "string"
@@ -4040,9 +4102,11 @@ func (r *PeopleService) GetBatchGet() *PeopleGetBatchGetCall {
 // * relationshipInterests
 // * relationshipStatuses
 // * residences
+// * sipAddresses
 // * skills
 // * taglines
 // * urls
+// * userDefined
 func (c *PeopleGetBatchGetCall) PersonFields(personFields string) *PeopleGetBatchGetCall {
 	c.urlParams_.Set("personFields", personFields)
 	return c
@@ -4124,6 +4188,7 @@ func (c *PeopleGetBatchGetCall) doRequest(alt string) (*http.Response, error) {
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/people:batchGet")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
@@ -4176,7 +4241,7 @@ func (c *PeopleGetBatchGetCall) Do(opts ...googleapi.CallOption) (*GetPeopleResp
 	//   "parameterOrder": [],
 	//   "parameters": {
 	//     "personFields": {
-	//       "description": "**Required.** A field mask to restrict which fields on each person are\nreturned. Multiple fields can be specified by separating them with commas.\nValid values are:\n\n* addresses\n* ageRanges\n* biographies\n* birthdays\n* braggingRights\n* coverPhotos\n* emailAddresses\n* events\n* genders\n* imClients\n* interests\n* locales\n* memberships\n* metadata\n* names\n* nicknames\n* occupations\n* organizations\n* phoneNumbers\n* photos\n* relations\n* relationshipInterests\n* relationshipStatuses\n* residences\n* skills\n* taglines\n* urls",
+	//       "description": "**Required.** A field mask to restrict which fields on each person are\nreturned. Multiple fields can be specified by separating them with commas.\nValid values are:\n\n* addresses\n* ageRanges\n* biographies\n* birthdays\n* braggingRights\n* coverPhotos\n* emailAddresses\n* events\n* genders\n* imClients\n* interests\n* locales\n* memberships\n* metadata\n* names\n* nicknames\n* occupations\n* organizations\n* phoneNumbers\n* photos\n* relations\n* relationshipInterests\n* relationshipStatuses\n* residences\n* sipAddresses\n* skills\n* taglines\n* urls\n* userDefined",
 	//       "format": "google-fieldmask",
 	//       "location": "query",
 	//       "type": "string"
@@ -4272,7 +4337,9 @@ func (r *PeopleService) UpdateContact(resourceName string, person *Person) *Peop
 // * phoneNumbers
 // * relations
 // * residences
+// * sipAddresses
 // * urls
+// * userDefined
 func (c *PeopleUpdateContactCall) UpdatePersonFields(updatePersonFields string) *PeopleUpdateContactCall {
 	c.urlParams_.Set("updatePersonFields", updatePersonFields)
 	return c
@@ -4316,6 +4383,7 @@ func (c *PeopleUpdateContactCall) doRequest(alt string) (*http.Response, error) 
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+resourceName}:updateContact")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("PATCH", urls, body)
@@ -4380,7 +4448,7 @@ func (c *PeopleUpdateContactCall) Do(opts ...googleapi.CallOption) (*Person, err
 	//       "type": "string"
 	//     },
 	//     "updatePersonFields": {
-	//       "description": "**Required.** A field mask to restrict which fields on the person are\nupdated. Multiple fields can be specified by separating them with commas.\nAll updated fields will be replaced. Valid values are:\n\n* addresses\n* biographies\n* birthdays\n* emailAddresses\n* events\n* genders\n* imClients\n* interests\n* locales\n* names\n* nicknames\n* occupations\n* organizations\n* phoneNumbers\n* relations\n* residences\n* urls",
+	//       "description": "**Required.** A field mask to restrict which fields on the person are\nupdated. Multiple fields can be specified by separating them with commas.\nAll updated fields will be replaced. Valid values are:\n\n* addresses\n* biographies\n* birthdays\n* emailAddresses\n* events\n* genders\n* imClients\n* interests\n* locales\n* names\n* nicknames\n* occupations\n* organizations\n* phoneNumbers\n* relations\n* residences\n* sipAddresses\n* urls\n* userDefined",
 	//       "format": "google-fieldmask",
 	//       "location": "query",
 	//       "type": "string"
@@ -4468,9 +4536,11 @@ func (c *PeopleConnectionsListCall) PageToken(pageToken string) *PeopleConnectio
 // * relationshipInterests
 // * relationshipStatuses
 // * residences
+// * sipAddresses
 // * skills
 // * taglines
 // * urls
+// * userDefined
 func (c *PeopleConnectionsListCall) PersonFields(personFields string) *PeopleConnectionsListCall {
 	c.urlParams_.Set("personFields", personFields)
 	return c
@@ -4571,6 +4641,7 @@ func (c *PeopleConnectionsListCall) doRequest(alt string) (*http.Response, error
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+resourceName}/connections")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
@@ -4639,7 +4710,7 @@ func (c *PeopleConnectionsListCall) Do(opts ...googleapi.CallOption) (*ListConne
 	//       "type": "string"
 	//     },
 	//     "personFields": {
-	//       "description": "**Required.** A field mask to restrict which fields on each person are\nreturned. Multiple fields can be specified by separating them with commas.\nValid values are:\n\n* addresses\n* ageRanges\n* biographies\n* birthdays\n* braggingRights\n* coverPhotos\n* emailAddresses\n* events\n* genders\n* imClients\n* interests\n* locales\n* memberships\n* metadata\n* names\n* nicknames\n* occupations\n* organizations\n* phoneNumbers\n* photos\n* relations\n* relationshipInterests\n* relationshipStatuses\n* residences\n* skills\n* taglines\n* urls",
+	//       "description": "**Required.** A field mask to restrict which fields on each person are\nreturned. Multiple fields can be specified by separating them with commas.\nValid values are:\n\n* addresses\n* ageRanges\n* biographies\n* birthdays\n* braggingRights\n* coverPhotos\n* emailAddresses\n* events\n* genders\n* imClients\n* interests\n* locales\n* memberships\n* metadata\n* names\n* nicknames\n* occupations\n* organizations\n* phoneNumbers\n* photos\n* relations\n* relationshipInterests\n* relationshipStatuses\n* residences\n* sipAddresses\n* skills\n* taglines\n* urls\n* userDefined",
 	//       "format": "google-fieldmask",
 	//       "location": "query",
 	//       "type": "string"

@@ -1,4 +1,4 @@
-// Copyright 2017, Google Inc. All rights reserved.
+// Copyright 2017, Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 package vision
 
 import (
-	"github.com/googleapis/gax-go"
+	gax "github.com/googleapis/gax-go"
 	"golang.org/x/net/context"
 	pb "google.golang.org/genproto/googleapis/cloud/vision/v1"
 	"google.golang.org/grpc/codes"
@@ -148,4 +148,13 @@ func (c *ImageAnnotatorClient) CropHints(ctx context.Context, img *pb.Image, ict
 		return nil, err
 	}
 	return res.CropHintsAnnotation, nil
+}
+
+// LocalizeObject runs the localizer for object detection.
+func (c *ImageAnnotatorClient) LocalizeObjects(ctx context.Context, img *pb.Image, ictx *pb.ImageContext, opts ...gax.CallOption) ([]*pb.LocalizedObjectAnnotation, error) {
+	res, err := c.annotateOne(ctx, img, ictx, pb.Feature_OBJECT_LOCALIZATION, 0, opts)
+	if err != nil {
+		return nil, err
+	}
+	return res.LocalizedObjectAnnotations, nil
 }

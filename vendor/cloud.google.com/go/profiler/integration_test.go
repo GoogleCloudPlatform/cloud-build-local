@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
+	"strings"
 	"testing"
 	"text/template"
 	"time"
@@ -33,7 +35,7 @@ import (
 
 var (
 	commit = flag.String("commit", "", "git commit to test")
-	runID  = time.Now().Unix()
+	runID  = strings.Replace(time.Now().Format("2006-01-02-15-04-05.000000-0700"), ".", "-", -1)
 )
 
 const (
@@ -49,6 +51,13 @@ const startupTemplate = `
 # to stop accounting the VM for billing and cores quota.
 trap "sleep 300 && poweroff" EXIT
 
+retry() {
+  for i in {1..3}; do
+    "${@}" && return 0
+  done
+  return 1
+}
+
 # Fail on any error.
 set -eo pipefail
 
@@ -56,16 +65,16 @@ set -eo pipefail
 set -x
 
 # Install git
-apt-get update  >/dev/null
-apt-get -y -q install git >/dev/null
+retry apt-get update >/dev/null
+retry apt-get -y -q install git >/dev/null
 
 # Install desired Go version
 mkdir -p /tmp/bin
-curl -sL -o /tmp/bin/gimme https://raw.githubusercontent.com/travis-ci/gimme/master/gimme
+retry curl -sL -o /tmp/bin/gimme https://raw.githubusercontent.com/travis-ci/gimme/master/gimme
 chmod +x /tmp/bin/gimme
 export PATH=$PATH:/tmp/bin
 
-eval "$(gimme {{.GoVersion}})"
+retry eval "$(gimme {{.GoVersion}})"
 
 # Set $GOPATH
 export GOPATH="$HOME/go"
@@ -74,11 +83,11 @@ export GOCLOUD_HOME=$GOPATH/src/cloud.google.com/go
 mkdir -p $GOCLOUD_HOME
 
 # Install agent
-git clone https://code.googlesource.com/gocloud $GOCLOUD_HOME >/dev/null
+retry git clone https://code.googlesource.com/gocloud $GOCLOUD_HOME >/dev/null
 
 cd $GOCLOUD_HOME/profiler/busybench
 git reset --hard {{.Commit}}
-go get -v >/dev/null
+retry go get >/dev/null
 
 # Run benchmark with agent
 go run busybench.go --service="{{.Service}}" --mutex_profiling="{{.MutexProfiling}}"
@@ -90,7 +99,7 @@ go run busybench.go --service="{{.Service}}" --mutex_profiling="{{.MutexProfilin
 const dockerfileFmt = `FROM golang
 RUN git clone https://code.googlesource.com/gocloud /go/src/cloud.google.com/go \
     && cd /go/src/cloud.google.com/go/profiler/busybench && git reset --hard %s \
-    && go get -v && go install -v
+    && go get && go install
 CMD ["busybench", "--service", "%s"]
  `
 
@@ -169,11 +178,23 @@ func TestAgentIntegration(t *testing.T) {
 			InstanceConfig: proftest.InstanceConfig{
 				ProjectID:   projectID,
 				Zone:        zone,
-				Name:        fmt.Sprintf("profiler-test-go110-%d", runID),
+				Name:        fmt.Sprintf("profiler-test-go111-%s", runID),
 				MachineType: "n1-standard-1",
 			},
-			name:             fmt.Sprintf("profiler-test-go110-%d-gce", runID),
-			wantProfileTypes: []string{"CPU", "HEAP", "THREADS", "CONTENTION"},
+			name:             fmt.Sprintf("profiler-test-go111-%s-gce", runID),
+			wantProfileTypes: []string{"CPU", "HEAP", "THREADS", "CONTENTION", "HEAP_ALLOC"},
+			goVersion:        "1.11",
+			mutexProfiling:   true,
+		},
+		{
+			InstanceConfig: proftest.InstanceConfig{
+				ProjectID:   projectID,
+				Zone:        zone,
+				Name:        fmt.Sprintf("profiler-test-go110-%s", runID),
+				MachineType: "n1-standard-1",
+			},
+			name:             fmt.Sprintf("profiler-test-go110-%s-gce", runID),
+			wantProfileTypes: []string{"CPU", "HEAP", "THREADS", "CONTENTION", "HEAP_ALLOC"},
 			goVersion:        "1.10",
 			mutexProfiling:   true,
 		},
@@ -181,11 +202,11 @@ func TestAgentIntegration(t *testing.T) {
 			InstanceConfig: proftest.InstanceConfig{
 				ProjectID:   projectID,
 				Zone:        zone,
-				Name:        fmt.Sprintf("profiler-test-go19-%d", runID),
+				Name:        fmt.Sprintf("profiler-test-go19-%s", runID),
 				MachineType: "n1-standard-1",
 			},
-			name:             fmt.Sprintf("profiler-test-go19-%d-gce", runID),
-			wantProfileTypes: []string{"CPU", "HEAP", "THREADS", "CONTENTION"},
+			name:             fmt.Sprintf("profiler-test-go19-%s-gce", runID),
+			wantProfileTypes: []string{"CPU", "HEAP", "THREADS", "CONTENTION", "HEAP_ALLOC"},
 			goVersion:        "1.9",
 			mutexProfiling:   true,
 		},
@@ -193,11 +214,11 @@ func TestAgentIntegration(t *testing.T) {
 			InstanceConfig: proftest.InstanceConfig{
 				ProjectID:   projectID,
 				Zone:        zone,
-				Name:        fmt.Sprintf("profiler-test-go18-%d", runID),
+				Name:        fmt.Sprintf("profiler-test-go18-%s", runID),
 				MachineType: "n1-standard-1",
 			},
-			name:             fmt.Sprintf("profiler-test-go18-%d-gce", runID),
-			wantProfileTypes: []string{"CPU", "HEAP", "THREADS", "CONTENTION"},
+			name:             fmt.Sprintf("profiler-test-go18-%s-gce", runID),
+			wantProfileTypes: []string{"CPU", "HEAP", "THREADS", "CONTENTION", "HEAP_ALLOC"},
 			goVersion:        "1.8",
 			mutexProfiling:   true,
 		},
@@ -205,26 +226,27 @@ func TestAgentIntegration(t *testing.T) {
 			InstanceConfig: proftest.InstanceConfig{
 				ProjectID:   projectID,
 				Zone:        zone,
-				Name:        fmt.Sprintf("profiler-test-go17-%d", runID),
+				Name:        fmt.Sprintf("profiler-test-go17-%s", runID),
 				MachineType: "n1-standard-1",
 			},
-			name:             fmt.Sprintf("profiler-test-go17-%d-gce", runID),
-			wantProfileTypes: []string{"CPU", "HEAP", "THREADS"},
+			name:             fmt.Sprintf("profiler-test-go17-%s-gce", runID),
+			wantProfileTypes: []string{"CPU", "HEAP", "THREADS", "HEAP_ALLOC"},
 			goVersion:        "1.7",
 		},
 		{
 			InstanceConfig: proftest.InstanceConfig{
 				ProjectID:   projectID,
 				Zone:        zone,
-				Name:        fmt.Sprintf("profiler-test-go16-%d", runID),
+				Name:        fmt.Sprintf("profiler-test-go16-%s", runID),
 				MachineType: "n1-standard-1",
 			},
-			name:             fmt.Sprintf("profiler-test-go16-%d-gce", runID),
-			wantProfileTypes: []string{"CPU", "HEAP", "THREADS"},
+			name:             fmt.Sprintf("profiler-test-go16-%s-gce", runID),
+			wantProfileTypes: []string{"CPU", "HEAP", "THREADS", "HEAP_ALLOC"},
 			goVersion:        "1.6",
 		},
 	}
-
+	// The number of tests run in parallel is the current value of GOMAXPROCS.
+	runtime.GOMAXPROCS(len(testcases))
 	for _, tc := range testcases {
 		tc := tc // capture range variable
 		t.Run(tc.name, func(t *testing.T) {
@@ -245,7 +267,7 @@ func TestAgentIntegration(t *testing.T) {
 			timeoutCtx, cancel := context.WithTimeout(ctx, time.Minute*25)
 			defer cancel()
 			if err := gceTr.PollForSerialOutput(timeoutCtx, &tc.InstanceConfig, benchFinishString); err != nil {
-				t.Fatal(err)
+				t.Fatalf("PollForSerialOutput() got error: %v", err)
 			}
 
 			timeNow := time.Now()

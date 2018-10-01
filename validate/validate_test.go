@@ -347,6 +347,91 @@ func TestValidateBuild(t *testing.T) {
 	}
 }
 
+func TestCheckEnvVars(t *testing.T) {
+	testCases := []struct {
+		build *pb.Build
+		valid bool
+	}{{
+		build: &pb.Build{
+			Id: "max-local-env",
+			Steps: []*pb.BuildStep{{
+				Env: manyStrings(maxNumEnvs),
+			}},
+		},
+		valid: true,
+	}, {
+		build: &pb.Build{
+			Id: "longest-local-env",
+			Steps: []*pb.BuildStep{{
+				Env: []string{"a=" + strings.Repeat("b", maxEnvLength-2)},
+			}},
+		},
+		valid: true,
+	}, {
+		build: &pb.Build{
+			Id: "longest-global-env",
+			Options: &pb.BuildOptions{
+				Env: []string{"a=" + strings.Repeat("b", maxEnvLength-2)},
+			},
+		},
+		valid: true,
+	}, {
+		build: &pb.Build{
+			Id: "max-global-envs",
+			Options: &pb.BuildOptions{
+				Env: manyStrings(maxNumEnvs),
+			},
+		},
+		valid: true,
+	}, {
+		// fails because too many global envs
+		build: &pb.Build{
+			Id: "too-many-global-envs",
+			Options: &pb.BuildOptions{
+				Env: manyStrings(maxNumEnvs + 1),
+			},
+		},
+		valid: false,
+	}, {
+		// fails because global env too long
+		build: &pb.Build{
+			Id: "too-long-global-env",
+			Options: &pb.BuildOptions{
+				Env: []string{"a=" + strings.Repeat("b", maxEnvLength)},
+			},
+		},
+		valid: false,
+	}, {
+		// fails because too many local envs
+		build: &pb.Build{
+			Id: "too-many-local-env",
+			Steps: []*pb.BuildStep{{
+				Env: manyStrings(maxNumEnvs + 1),
+			}},
+		},
+		valid: false,
+	}, {
+		// fails because local env too long
+		build: &pb.Build{
+			Id: "too-long-local-env",
+			Steps: []*pb.BuildStep{{
+				Env: []string{"a=" + strings.Repeat("b", maxEnvLength)},
+			}},
+		},
+		valid: false,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.build.Id, func(t *testing.T) {
+			if err := checkEnvVars(tc.build); err == nil && !tc.valid {
+				t.Errorf("checkEnvVars(%v) did not return an error", tc.build)
+			} else if err != nil && tc.valid {
+				t.Errorf("checkEnvVars(%v) got unexpected error: %v", tc.build, err)
+			}
+		})
+	}
+}
+
 func TestCheckBuildAfterSubstitutions(t *testing.T) {
 	testCases := []struct {
 		build *pb.Build
@@ -543,6 +628,257 @@ func TestCheckArtifacts(t *testing.T) {
 	}
 }
 
+func TestCheckVolumes(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		steps     []*pb.BuildStep
+		globalVol []*pb.Volume
+		wantErr   bool
+	}{{
+		name: "happy build with local volumes",
+		steps: []*pb.BuildStep{{
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
+		}},
+	}, {
+		name: "happy build with more volumes",
+		steps: []*pb.BuildStep{{
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
+		}},
+	}, {
+		name: "fails because volume isn't used 2+ times",
+		steps: []*pb.BuildStep{{
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
+		}},
+		wantErr: true,
+	}, {
+		name: "fails because volume isn't used 2+ times, even when another is",
+		steps: []*pb.BuildStep{{
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "othervol", Path: "/foo"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "othervol", Path: "/foo"}},
+		}},
+		wantErr: true,
+	}, {
+		name: "fails because volume name is invalid",
+		steps: []*pb.BuildStep{{
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "@#()*$@)(*$@", Path: "/foo"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "@#()*$@)(*$@", Path: "/foo"}},
+		}},
+		wantErr: true,
+	}, {
+		name: "fails because volume path is invalid",
+		steps: []*pb.BuildStep{{
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "myvol", Path: ")(!*!)($*@#"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
+		}},
+		wantErr: true,
+	}, {
+		name: "fails because volume path is reserved",
+		steps: []*pb.BuildStep{{
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/workspace"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
+		}},
+		wantErr: true,
+	}, {
+		name: "fails because volume path starts with /cloudbuild/",
+		steps: []*pb.BuildStep{{
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/cloudbuild/foo"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
+		}},
+		wantErr: true,
+	}, {
+		name: "fails because volume path is not absolute",
+		steps: []*pb.BuildStep{{
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "/absolute"}},
+		}, {
+			Name:    "okay",
+			Volumes: []*pb.Volume{{Name: "myvol", Path: "relative"}},
+		}},
+		wantErr: true,
+	}, {
+		name: "fails because volume name is specified twice in the same step",
+		steps: []*pb.BuildStep{{
+			Name: "okay",
+			Volumes: []*pb.Volume{
+				{Name: "myvol", Path: "/foo"},
+				{Name: "myvol", Path: "/bar"},
+			},
+		}, {
+			Name: "okay",
+			Volumes: []*pb.Volume{
+				{Name: "myvol", Path: "/foo"},
+				{Name: "othervol", Path: "/bar"},
+			},
+		}},
+		wantErr: true,
+	}, {
+		name: "fails because volume path is specified twice in the same step",
+		steps: []*pb.BuildStep{{
+			Name: "okay",
+			Volumes: []*pb.Volume{
+				{Name: "myvol", Path: "/foo"},
+				{Name: "othervol", Path: "/foo"},
+			},
+		}, {
+			Name: "okay",
+			Volumes: []*pb.Volume{
+				{Name: "myvol", Path: "/foo"},
+				{Name: "othervol", Path: "/bar"},
+			},
+		}},
+		wantErr: true,
+	}, {
+		name: "happy build global volume",
+		globalVol: []*pb.Volume{
+			{Name: "myvol", Path: "/foo"},
+		},
+		steps: []*pb.BuildStep{{}, {}},
+	}, {
+		name: "fails because global volume defined but only one step",
+		globalVol: []*pb.Volume{
+			{Name: "myvol", Path: "/foo"},
+		},
+		steps:   []*pb.BuildStep{{}},
+		wantErr: true,
+	}, {
+		name: "fails because global volume defined but no steps",
+		globalVol: []*pb.Volume{
+			{Name: "myvol", Path: "/foo"},
+		},
+		wantErr: true,
+	}, {
+		name: "fails because global volume path is specified twice",
+		globalVol: []*pb.Volume{
+			{Name: "myvol", Path: "/foo"},
+			{Name: "othervol", Path: "/foo"},
+		},
+		steps:   []*pb.BuildStep{{}, {}},
+		wantErr: true,
+	}, {
+		name: "fails because global volume name is specified twice",
+		globalVol: []*pb.Volume{
+			{Name: "myvol", Path: "/foo"},
+			{Name: "myvol", Path: "/bar"},
+		},
+		steps:   []*pb.BuildStep{{}, {}},
+		wantErr: true,
+	}, {
+		name: "fails because global volume path is not absolute",
+		globalVol: []*pb.Volume{
+			{Name: "myvol", Path: "relative"},
+		},
+		steps:   []*pb.BuildStep{{}, {}},
+		wantErr: true,
+	}, {
+		name: "fails because global volume path is invalid",
+		globalVol: []*pb.Volume{
+			{Name: "myvol", Path: ")(!*!)($*@#"},
+		},
+		steps:   []*pb.BuildStep{{}, {}},
+		wantErr: true,
+	}, {
+		name: "fails because global volume name is invalid",
+		globalVol: []*pb.Volume{
+			{Name: "@#()*$@)(*$@", Path: "/foo"},
+		},
+		steps:   []*pb.BuildStep{{}, {}},
+		wantErr: true,
+	}, {
+		name: "fails because global volume path is reserved",
+		globalVol: []*pb.Volume{
+			{Name: "myvol", Path: "/workspace"},
+		},
+		steps:   []*pb.BuildStep{{}, {}},
+		wantErr: true,
+	}, {
+		name: "fails because global volume path starts with /cloudbuild",
+		globalVol: []*pb.Volume{
+			{Name: "myvol", Path: "/cloudbuild/foo"},
+		},
+		steps:   []*pb.BuildStep{{}, {}},
+		wantErr: true,
+	}, {
+		name: "fails because global volume path conflicts with local volume path",
+		globalVol: []*pb.Volume{
+			{Name: "myvol", Path: "/foo"},
+		},
+		steps: []*pb.BuildStep{{
+			Name: "okay",
+			Volumes: []*pb.Volume{
+				{Name: "myothervol", Path: "/foo"},
+			},
+		}, {
+			Name: "okay",
+			Volumes: []*pb.Volume{
+				{Name: "myothervol", Path: "/foo"},
+			},
+		}},
+		wantErr: true,
+	}, {
+		name: "fails because global volume name conflicts with local volume name",
+		globalVol: []*pb.Volume{
+			{Name: "myvol", Path: "/foo"},
+		},
+		steps: []*pb.BuildStep{{
+			Name: "okay",
+			Volumes: []*pb.Volume{
+				{Name: "myvol", Path: "/bar"},
+			},
+		}, {
+			Name: "okay",
+			Volumes: []*pb.Volume{
+				{Name: "myvol", Path: "/bar"},
+			},
+		}},
+		wantErr: true,
+	}} {
+		build := &pb.Build{
+			Id:    tc.name,
+			Steps: tc.steps,
+			Options: &pb.BuildOptions{
+				Volumes: tc.globalVol,
+			},
+		}
+		t.Run(tc.name, func(t *testing.T) {
+			if err := checkVolumes(build); err == nil && tc.wantErr {
+				t.Errorf("checkVolumes(%v) did not return error, want error", build)
+			} else if err != nil && !tc.wantErr {
+				t.Errorf("checkVolumes(%v) got unexpected error: %v", build, err)
+			}
+		})
+	}
+}
+
 func TestCheckBuildSteps(t *testing.T) {
 	for _, c := range []struct {
 		steps   []*pb.BuildStep
@@ -667,20 +1003,6 @@ func TestCheckBuildSteps(t *testing.T) {
 		}},
 		wantErr: true,
 	}, {
-		// fails because too many envs
-		steps: []*pb.BuildStep{{
-			Name: "okay",
-			Env:  manyStrings(maxNumEnvs + 1),
-		}},
-		wantErr: true,
-	}, {
-		// fails because env too long
-		steps: []*pb.BuildStep{{
-			Name: "okay",
-			Env:  []string{"a=" + strings.Repeat("b", maxEnvLength)},
-		}},
-		wantErr: true,
-	}, {
 		// fails because too many args
 		steps: []*pb.BuildStep{{
 			Name: "okay",
@@ -703,129 +1025,6 @@ func TestCheckBuildSteps(t *testing.T) {
 		steps: []*pb.BuildStep{{
 			Name: "okay",
 			Dir:  strings.Repeat("a", maxDirLength+1),
-		}},
-		wantErr: true,
-	}, {
-		// happy build with volumes.
-		steps: []*pb.BuildStep{{
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
-		}, {
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
-		}},
-	}, {
-		// happy build with more volumes.
-		steps: []*pb.BuildStep{{
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
-		}, {
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
-		}, {
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
-		}},
-	}, {
-		// fails because volume isn't used 2+ times
-		steps: []*pb.BuildStep{{
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
-		}},
-		wantErr: true,
-	}, {
-		// fails because volume isn't used 2+ times, even when another is
-		steps: []*pb.BuildStep{{
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
-		}, {
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "othervol", Path: "/foo"}},
-		}, {
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "othervol", Path: "/foo"}},
-		}},
-		wantErr: true,
-	}, {
-		// fails because volume name is invalid
-		steps: []*pb.BuildStep{{
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "@#()*$@)(*$@", Path: "/foo"}},
-		}, {
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "@#()*$@)(*$@", Path: "/foo"}},
-		}},
-		wantErr: true,
-	}, {
-		// fails because volume path is invalid
-		steps: []*pb.BuildStep{{
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "myvol", Path: ")(!*!)($*@#"}},
-		}, {
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
-		}},
-		wantErr: true,
-	}, {
-		// fails because volume path is reserved
-		steps: []*pb.BuildStep{{
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "myvol", Path: "/workspace"}},
-		}, {
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
-		}},
-		wantErr: true,
-	}, {
-		// fails because volume path starts with /cloudbuild/
-		steps: []*pb.BuildStep{{
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "myvol", Path: "/cloudbuild/foo"}},
-		}, {
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "myvol", Path: "/foo"}},
-		}},
-		wantErr: true,
-	}, {
-		// fails because volume path is not absolute
-		steps: []*pb.BuildStep{{
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "myvol", Path: "/absolute"}},
-		}, {
-			Name:    "okay",
-			Volumes: []*pb.Volume{{Name: "myvol", Path: "relative"}},
-		}},
-		wantErr: true,
-	}, {
-		// fails because volume name is specified twice in the same step
-		steps: []*pb.BuildStep{{
-			Name: "okay",
-			Volumes: []*pb.Volume{
-				{Name: "myvol", Path: "/foo"},
-				{Name: "myvol", Path: "/bar"},
-			},
-		}, {
-			Name: "okay",
-			Volumes: []*pb.Volume{
-				{Name: "myvol", Path: "/foo"},
-				{Name: "othervol", Path: "/bar"},
-			},
-		}},
-		wantErr: true,
-	}, {
-		// fails because volume path is specified twice in the same step
-		steps: []*pb.BuildStep{{
-			Name: "okay",
-			Volumes: []*pb.Volume{
-				{Name: "myvol", Path: "/foo"},
-				{Name: "othervol", Path: "/foo"},
-			},
-		}, {
-			Name: "okay",
-			Volumes: []*pb.Volume{
-				{Name: "myvol", Path: "/foo"},
-				{Name: "othervol", Path: "/bar"},
-			},
 		}},
 		wantErr: true,
 	}, {
@@ -1000,7 +1199,7 @@ func TestCheckSecrets(t *testing.T) {
 		},
 		wantErr: errors.New(`Step 0 uses the secretEnv "MY_SECRET" more than once`),
 	}, {
-		desc: "Build with secret value >1 KB",
+		desc: "Build with secret value >64 KB",
 		b: &pb.Build{
 			Steps: []*pb.BuildStep{{
 				SecretEnv: []string{"MY_SECRET"},
@@ -1012,7 +1211,7 @@ func TestCheckSecrets(t *testing.T) {
 				},
 			}},
 		},
-		wantErr: errors.New(`secretEnv value for "MY_SECRET" cannot exceed 2048B`),
+		wantErr: errors.New(`secretEnv value for "MY_SECRET" cannot exceed 65536B`),
 	}, {
 		desc: "Happy case: Build with acceptable secret values",
 		b: &pb.Build{
@@ -1051,6 +1250,94 @@ func TestCheckSecrets(t *testing.T) {
 			}},
 		},
 		wantErr: errors.New(`step 0 has secret and non-secret env "MY_SECRET"`),
+	}, {
+		desc: "Build with no secrets, but global secret is used",
+		b: &pb.Build{
+			Options: &pb.BuildOptions{
+				SecretEnv: []string{"MY_SECRET"},
+			},
+			Steps: []*pb.BuildStep{{}},
+		},
+		wantErr: errors.New(`secretEnv "MY_SECRET" is used without being defined`),
+	}, {
+		desc: "Build with one secret, used once globally",
+		b: &pb.Build{
+			Options: &pb.BuildOptions{
+				SecretEnv: []string{"MY_SECRET"},
+			},
+			Steps: []*pb.BuildStep{{}},
+			Secrets: []*pb.Secret{{
+				KmsKeyName: kmsKeyName,
+				SecretEnv: map[string][]byte{
+					"MY_SECRET": []byte("hunter2"),
+				},
+			}},
+		},
+	}, {
+		desc: "Step has global env and local secret_env collision",
+		b: &pb.Build{
+			Options: &pb.BuildOptions{
+				Env: []string{"MY_SECRET=awesome"},
+			},
+			Steps: []*pb.BuildStep{{
+				SecretEnv: []string{"MY_SECRET"},
+			}},
+			Secrets: []*pb.Secret{{
+				KmsKeyName: kmsKeyName,
+				SecretEnv: map[string][]byte{
+					"MY_SECRET": []byte("hunter2"),
+				},
+			}},
+		},
+		wantErr: errors.New(`step 0 has secret and non-secret env "MY_SECRET"`),
+	}, {
+		desc: "Step has local env and global secret_env collision",
+		b: &pb.Build{
+			Options: &pb.BuildOptions{
+				SecretEnv: []string{"MY_SECRET"},
+			},
+			Steps: []*pb.BuildStep{{
+				Env: []string{"MY_SECRET=awesome"},
+			}},
+			Secrets: []*pb.Secret{{
+				KmsKeyName: kmsKeyName,
+				SecretEnv: map[string][]byte{
+					"MY_SECRET": []byte("hunter2"),
+				},
+			}},
+		},
+		wantErr: errors.New(`step 0 has secret and non-secret env "MY_SECRET"`),
+	}, {
+		desc: "Step has global env and global secret_env collision",
+		b: &pb.Build{
+			Options: &pb.BuildOptions{
+				Env:       []string{"MY_SECRET=awesome"},
+				SecretEnv: []string{"MY_SECRET"},
+			},
+			Steps: []*pb.BuildStep{{}},
+			Secrets: []*pb.Secret{{
+				KmsKeyName: kmsKeyName,
+				SecretEnv: map[string][]byte{
+					"MY_SECRET": []byte("hunter2"),
+				},
+			}},
+		},
+		wantErr: errors.New(`step 0 has secret and non-secret env "MY_SECRET"`),
+	}, {
+		desc: "Step has global secret_env collision",
+		b: &pb.Build{
+			Options: &pb.BuildOptions{
+				SecretEnv: []string{"MY_SECRET", "MY_SECRET"},
+			},
+			Steps: []*pb.BuildStep{{}},
+			Secrets: []*pb.Secret{{
+				KmsKeyName: kmsKeyName,
+				SecretEnv: map[string][]byte{
+					"MY_SECRET": []byte("hunter2"),
+				},
+			}},
+		},
+		wantErr: errors.New(`Build uses global secretEnv "MY_SECRET" more than once`),
 	}, {
 		desc: "Build has secret and non-secret env in separate steps (which is okay)",
 		b: &pb.Build{

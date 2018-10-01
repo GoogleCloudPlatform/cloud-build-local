@@ -1,4 +1,4 @@
-// Copyright 2016 Google Inc. All Rights Reserved.
+// Copyright 2016 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -63,6 +63,10 @@ type Copier struct {
 	// The Cloud KMS key, in the form projects/P/locations/L/keyRings/R/cryptoKeys/K,
 	// that will be used to encrypt the object. Overrides the object's KMSKeyName, if
 	// any.
+	//
+	// Providing both a DestinationKMSKeyName and a customer-supplied encryption key
+	// (via ObjectHandle.Key) on the destination object will result in an error when
+	// Run is called.
 	DestinationKMSKeyName string
 
 	dst, src *ObjectHandle
@@ -78,6 +82,9 @@ func (c *Copier) Run(ctx context.Context) (attrs *ObjectAttrs, err error) {
 	}
 	if err := c.dst.validate(); err != nil {
 		return nil, err
+	}
+	if c.DestinationKMSKeyName != "" && c.dst.encryptionKey != nil {
+		return nil, errors.New("storage: cannot use DestinationKMSKeyName with a customer-supplied encryption key")
 	}
 	// Convert destination attributes to raw form, omitting the bucket.
 	// If the bucket is included but name or content-type aren't, the service
@@ -107,6 +114,9 @@ func (c *Copier) callRewrite(ctx context.Context, rawObj *raw.Object) (*raw.Rewr
 	}
 	if c.DestinationKMSKeyName != "" {
 		call.DestinationKmsKeyName(c.DestinationKMSKeyName)
+	}
+	if c.PredefinedACL != "" {
+		call.DestinationPredefinedAcl(c.PredefinedACL)
 	}
 	if err := applyConds("Copy destination", c.dst.gen, c.dst.conds, call); err != nil {
 		return nil, err
@@ -201,6 +211,9 @@ func (c *Composer) Run(ctx context.Context) (attrs *ObjectAttrs, err error) {
 	}
 	if c.dst.userProject != "" {
 		call.UserProject(c.dst.userProject)
+	}
+	if c.PredefinedACL != "" {
+		call.DestinationPredefinedAcl(c.PredefinedACL)
 	}
 	if err := setEncryptionHeaders(call.Header(), c.dst.encryptionKey, false); err != nil {
 		return nil, err

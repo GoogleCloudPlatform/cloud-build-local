@@ -49,9 +49,6 @@ const basePath = "https://serviceconsumermanagement.googleapis.com/"
 const (
 	// View and manage your data across Google Cloud Platform services
 	CloudPlatformScope = "https://www.googleapis.com/auth/cloud-platform"
-
-	// Manage your Google API service configuration
-	ServiceManagementScope = "https://www.googleapis.com/auth/service.management"
 )
 
 func New(client *http.Client) (*APIService, error) {
@@ -465,9 +462,6 @@ type AuthenticationRule struct {
 	// any other credential.
 	AllowWithoutCredential bool `json:"allowWithoutCredential,omitempty"`
 
-	// CustomAuth: Configuration for custom authentication.
-	CustomAuth *CustomAuthRequirements `json:"customAuth,omitempty"`
-
 	// Oauth: The requirements for OAuth credentials.
 	Oauth *OAuthRequirements `json:"oauth,omitempty"`
 
@@ -540,68 +534,6 @@ type AuthorizationConfig struct {
 
 func (s *AuthorizationConfig) MarshalJSON() ([]byte, error) {
 	type NoMethod AuthorizationConfig
-	raw := NoMethod(*s)
-	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
-}
-
-// AuthorizationRule: Authorization rule for API services.
-//
-// It specifies the permission(s) required for an API element for the
-// overall
-// API request to succeed. It is typically used to mark request message
-// fields
-// that contain the name of the resource and indicates the permissions
-// that
-// will be checked on that resource.
-//
-// For example:
-//
-//     package google.storage.v1;
-//
-//     message CopyObjectRequest {
-//       string source = 1 [
-//         (google.api.authz).permissions = "storage.objects.get"];
-//
-//       string destination = 2 [
-//         (google.api.authz).permissions =
-//             "storage.objects.create,storage.objects.update"];
-//     }
-type AuthorizationRule struct {
-	// Permissions: The required permissions. The acceptable values vary
-	// depend on the
-	// authorization system used. For Google APIs, it should be a
-	// comma-separated
-	// Google IAM permission values. When multiple permissions are listed,
-	// the
-	// semantics is not defined by the system. Additional documentation
-	// must
-	// be provided manually.
-	Permissions string `json:"permissions,omitempty"`
-
-	// Selector: Selects the API elements to which this rule applies.
-	//
-	// Refer to selector for syntax details.
-	Selector string `json:"selector,omitempty"`
-
-	// ForceSendFields is a list of field names (e.g. "Permissions") to
-	// unconditionally include in API requests. By default, fields with
-	// empty values are omitted from API requests. However, any non-pointer,
-	// non-interface field appearing in ForceSendFields will be sent to the
-	// server regardless of whether the field is empty or not. This may be
-	// used to include empty fields in Patch requests.
-	ForceSendFields []string `json:"-"`
-
-	// NullFields is a list of field names (e.g. "Permissions") to include
-	// in API requests with the JSON null value. By default, fields with
-	// empty values are omitted from API requests. However, any field with
-	// an empty value appearing in NullFields will be sent to the server as
-	// null. It is an error if a field in this list has a non-empty value.
-	// This may be used to include null fields in Patch requests.
-	NullFields []string `json:"-"`
-}
-
-func (s *AuthorizationRule) MarshalJSON() ([]byte, error) {
-	type NoMethod AuthorizationRule
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -1027,39 +959,6 @@ type CreateTenancyUnitRequest struct {
 
 func (s *CreateTenancyUnitRequest) MarshalJSON() ([]byte, error) {
 	type NoMethod CreateTenancyUnitRequest
-	raw := NoMethod(*s)
-	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
-}
-
-// CustomAuthRequirements: Configuration for a custom authentication
-// provider.
-type CustomAuthRequirements struct {
-	// Provider: A configuration string containing connection information
-	// for the
-	// authentication provider, typically formatted as a SmartService
-	// string
-	// (go/smartservice).
-	Provider string `json:"provider,omitempty"`
-
-	// ForceSendFields is a list of field names (e.g. "Provider") to
-	// unconditionally include in API requests. By default, fields with
-	// empty values are omitted from API requests. However, any non-pointer,
-	// non-interface field appearing in ForceSendFields will be sent to the
-	// server regardless of whether the field is empty or not. This may be
-	// used to include empty fields in Patch requests.
-	ForceSendFields []string `json:"-"`
-
-	// NullFields is a list of field names (e.g. "Provider") to include in
-	// API requests with the JSON null value. By default, fields with empty
-	// values are omitted from API requests. However, any field with an
-	// empty value appearing in NullFields will be sent to the server as
-	// null. It is an error if a field in this list has a non-empty value.
-	// This may be used to include null fields in Patch requests.
-	NullFields []string `json:"-"`
-}
-
-func (s *CustomAuthRequirements) MarshalJSON() ([]byte, error) {
-	type NoMethod CustomAuthRequirements
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -1699,114 +1598,119 @@ func (s *Http) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
-// HttpRule: `HttpRule` defines the mapping of an RPC method to one or
-// more HTTP
-// REST API methods. The mapping specifies how different portions of the
-// RPC
-// request message are mapped to URL path, URL query parameters,
-// and
-// HTTP request body. The mapping is typically specified as
-// an
-// `google.api.http` annotation on the RPC method,
-// see "google/api/annotations.proto" for details.
+// HttpRule: # gRPC Transcoding
 //
-// The mapping consists of a field specifying the path template
-// and
-// method kind.  The path template can refer to fields in the
-// request
-// message, as in the example below which describes a REST GET
-// operation on a resource collection of messages:
+// gRPC Transcoding is a feature for mapping between a gRPC method and
+// one or
+// more HTTP REST endpoints. It allows developers to build a single API
+// service
+// that supports both gRPC APIs and REST APIs. Many systems, including
+// [Google
+// APIs](https://github.com/googleapis/googleapis),
+// [Cloud Endpoints](https://cloud.google.com/endpoints),
+// [gRPC
+// Gateway](https://github.com/grpc-ecosystem/grpc-gateway),
+// and [Envoy](https://github.com/envoyproxy/envoy) proxy support this
+// feature
+// and use it for large scale production services.
 //
+// `HttpRule` defines the schema of the gRPC/REST mapping. The mapping
+// specifies
+// how different portions of the gRPC request message are mapped to the
+// URL
+// path, URL query parameters, and HTTP request body. It also controls
+// how the
+// gRPC response message is mapped to the HTTP response body. `HttpRule`
+// is
+// typically specified as an `google.api.http` annotation on the gRPC
+// method.
+//
+// Each mapping specifies a URL path template and an HTTP method. The
+// path
+// template may refer to one or more fields in the gRPC request message,
+// as long
+// as each field is a non-repeated field with a primitive (non-message)
+// type.
+// The path template controls how fields of the request message are
+// mapped to
+// the URL path.
+//
+// Example:
 //
 //     service Messaging {
 //       rpc GetMessage(GetMessageRequest) returns (Message) {
-//         option (google.api.http).get =
-// "/v1/messages/{message_id}/{sub.subfield}";
+//         option (google.api.http) = {
+//             get: "/v1/{name=messages/*"}"
+//         };
 //       }
 //     }
 //     message GetMessageRequest {
-//       message SubMessage {
-//         string subfield = 1;
-//       }
-//       string message_id = 1; // mapped to the URL
-//       SubMessage sub = 2;    // `sub.subfield` is url-mapped
+//       string name = 1; // Mapped to URL path.
 //     }
 //     message Message {
-//       string text = 1; // content of the resource
+//       string text = 1; // The resource content.
 //     }
 //
-// The same http annotation can alternatively be expressed inside
-// the
-// `GRPC API Configuration` YAML file.
+// This enables an HTTP REST to gRPC mapping as below:
 //
-//     http:
-//       rules:
-//         - selector: <proto_package_name>.Messaging.GetMessage
-//           get: /v1/messages/{message_id}/{sub.subfield}
-//
-// This definition enables an automatic, bidrectional mapping of
-// HTTP
-// JSON to RPC. Example:
-//
-// HTTP | RPC
+// HTTP | gRPC
 // -----|-----
-// `GET /v1/messages/123456/foo`  | `GetMessage(message_id: "123456"
-// sub: SubMessage(subfield: "foo"))`
+// `GET /v1/messages/123456`  | `GetMessage(name:
+// "messages/123456")`
 //
-// In general, not only fields but also field paths can be
-// referenced
-// from a path pattern. Fields mapped to the path pattern cannot
-// be
-// repeated and must have a primitive (non-message) type.
-//
-// Any fields in the request message which are not bound by the
-// path
-// pattern automatically become (optional) HTTP query
-// parameters. Assume the following definition of the request
-// message:
-//
+// Any fields in the request message which are not bound by the path
+// template
+// automatically become HTTP query parameters if there is no HTTP
+// request body.
+// For example:
 //
 //     service Messaging {
 //       rpc GetMessage(GetMessageRequest) returns (Message) {
-//         option (google.api.http).get = "/v1/messages/{message_id}";
+//         option (google.api.http) = {
+//             get:"/v1/messages/{message_id}"
+//         };
 //       }
 //     }
 //     message GetMessageRequest {
 //       message SubMessage {
 //         string subfield = 1;
 //       }
-//       string message_id = 1; // mapped to the URL
-//       int64 revision = 2;    // becomes a parameter
-//       SubMessage sub = 3;    // `sub.subfield` becomes a parameter
+//       string message_id = 1; // Mapped to URL path.
+//       int64 revision = 2;    // Mapped to URL query parameter
+// `revision`.
+//       SubMessage sub = 3;    // Mapped to URL query parameter
+// `sub.subfield`.
 //     }
-//
 //
 // This enables a HTTP JSON to RPC mapping as below:
 //
-// HTTP | RPC
+// HTTP | gRPC
 // -----|-----
 // `GET /v1/messages/123456?revision=2&sub.subfield=foo` |
 // `GetMessage(message_id: "123456" revision: 2 sub:
 // SubMessage(subfield: "foo"))`
 //
-// Note that fields which are mapped to HTTP parameters must have
+// Note that fields which are mapped to URL query parameters must have
 // a
-// primitive type or a repeated primitive type. Message types are
-// not
-// allowed. In the case of a repeated type, the parameter can
-// be
-// repeated in the URL, as in `...?param=A&param=B`.
+// primitive type or a repeated primitive type or a non-repeated message
+// type.
+// In the case of a repeated type, the parameter can be repeated in the
+// URL
+// as `...?param=A&param=B`. In the case of a message type, each field
+// of the
+// message is mapped to a separate parameter, such
+// as
+// `...?foo.a=A&foo.b=B&foo.c=C`.
 //
-// For HTTP method kinds which allow a request body, the `body`
+// For HTTP methods that allow a request body, the `body`
 // field
 // specifies the mapping. Consider a REST update method on the
 // message resource collection:
 //
-//
 //     service Messaging {
 //       rpc UpdateMessage(UpdateMessageRequest) returns (Message) {
 //         option (google.api.http) = {
-//           put: "/v1/messages/{message_id}"
+//           patch: "/v1/messages/{message_id}"
 //           body: "message"
 //         };
 //       }
@@ -1816,16 +1720,15 @@ func (s *Http) MarshalJSON() ([]byte, error) {
 //       Message message = 2;   // mapped to the body
 //     }
 //
-//
 // The following HTTP JSON to RPC mapping is enabled, where
 // the
 // representation of the JSON in the request body is determined
 // by
 // protos JSON encoding:
 //
-// HTTP | RPC
+// HTTP | gRPC
 // -----|-----
-// `PUT /v1/messages/123456 { "text": "Hi!" }` |
+// `PATCH /v1/messages/123456 { "text": "Hi!" }` |
 // `UpdateMessage(message_id: "123456" message { text: "Hi!" })`
 //
 // The special name `*` can be used in the body mapping to define
@@ -1839,7 +1742,7 @@ func (s *Http) MarshalJSON() ([]byte, error) {
 //     service Messaging {
 //       rpc UpdateMessage(Message) returns (Message) {
 //         option (google.api.http) = {
-//           put: "/v1/messages/{message_id}"
+//           patch: "/v1/messages/{message_id}"
 //           body: "*"
 //         };
 //       }
@@ -1852,16 +1755,16 @@ func (s *Http) MarshalJSON() ([]byte, error) {
 //
 // The following HTTP JSON to RPC mapping is enabled:
 //
-// HTTP | RPC
+// HTTP | gRPC
 // -----|-----
-// `PUT /v1/messages/123456 { "text": "Hi!" }` |
+// `PATCH /v1/messages/123456 { "text": "Hi!" }` |
 // `UpdateMessage(message_id: "123456" text: "Hi!")`
 //
 // Note that when using `*` in the body mapping, it is not possible
 // to
 // have HTTP parameters, as all fields not bound by the path end in
 // the body. This makes this option more rarely used in practice
-// of
+// when
 // defining REST APIs. The common usage of `*` is in custom
 // methods
 // which don't use the URL at all for transferring data.
@@ -1885,38 +1788,39 @@ func (s *Http) MarshalJSON() ([]byte, error) {
 //       string user_id = 2;
 //     }
 //
-//
-// This enables the following two alternative HTTP JSON to
-// RPC
+// This enables the following two alternative HTTP JSON to RPC
 // mappings:
 //
-// HTTP | RPC
+// HTTP | gRPC
 // -----|-----
 // `GET /v1/messages/123456` | `GetMessage(message_id: "123456")`
 // `GET /v1/users/me/messages/123456` | `GetMessage(user_id: "me"
 // message_id: "123456")`
 //
-// # Rules for HTTP mapping
+// ## Rules for HTTP mapping
 //
-// The rules for mapping HTTP path, query parameters, and body fields
-// to the request message are as follows:
+// 1. Leaf request fields (recursive expansion nested messages in the
+// request
+//    message) are classified into three categories:
+//    - Fields referred by the path template. They are passed via the
+// URL path.
+//    - Fields referred by the HttpRule.body. They are passed via the
+// HTTP
+//      request body.
+//    - All other fields are passed via the URL query parameters, and
+// the
+//      parameter name is the field path in the request message. A
+// repeated
+//      field can be represented as multiple query parameters under the
+// same
+//      name.
+//  2. If HttpRule.body is "*", there is no URL query parameter, all
+// fields
+//     are passed via URL path and HTTP request body.
+//  3. If HttpRule.body is omitted, there is no HTTP request body, all
+//     fields are passed via URL path and URL query parameters.
 //
-// 1. The `body` field specifies either `*` or a field path, or is
-//    omitted. If omitted, it indicates there is no HTTP request
-// body.
-// 2. Leaf fields (recursive expansion of nested messages in the
-//    request) can be classified into three types:
-//     (a) Matched in the URL template.
-//     (b) Covered by body (if body is `*`, everything except (a)
-// fields;
-//         else everything under the body field)
-//     (c) All other fields.
-// 3. URL query parameters found in the HTTP request are mapped to (c)
-// fields.
-// 4. Any body sent with an HTTP request can contain only (b)
-// fields.
-//
-// The syntax of the path template is as follows:
+// ### Path template syntax
 //
 //     Template = "/" Segments [ Verb ] ;
 //     Segments = Segment { "/" Segment } ;
@@ -1925,11 +1829,11 @@ func (s *Http) MarshalJSON() ([]byte, error) {
 //     FieldPath = IDENT { "." IDENT } ;
 //     Verb     = ":" LITERAL ;
 //
-// The syntax `*` matches a single path segment. The syntax `**` matches
-// zero
-// or more path segments, which must be the last part of the path except
-// the
-// `Verb`. The syntax `LITERAL` matches literal text in the path.
+// The syntax `*` matches a single URL path segment. The syntax `**`
+// matches
+// zero or more URL path segments, which must be the last part of the
+// URL path
+// except the `Verb`.
 //
 // The syntax `Variable` matches part of the URL path as specified by
 // its
@@ -1939,35 +1843,114 @@ func (s *Http) MarshalJSON() ([]byte, error) {
 // `{var}`
 // is equivalent to `{var=*}`.
 //
+// The syntax `LITERAL` matches literal text in the URL path. If the
+// `LITERAL`
+// contains any reserved character, such characters should be
+// percent-encoded
+// before the matching.
+//
 // If a variable contains exactly one path segment, such as "{var}"
 // or
-// "{var=*}", when such a variable is expanded into a URL path, all
-// characters
-// except `[-_.~0-9a-zA-Z]` are percent-encoded. Such variables show up
-// in the
-// Discovery Document as `{var}`.
+// "{var=*}", when such a variable is expanded into a URL path on the
+// client
+// side, all characters except `[-_.~0-9a-zA-Z]` are percent-encoded.
+// The
+// server side does the reverse decoding. Such variables show up in
+// the
+// [Discovery
+// Document](https://developers.google.com/discovery/v1/reference/apis)
+// a
+// s `{var}`.
 //
-// If a variable contains one or more path segments, such as
+// If a variable contains multiple path segments, such as
 // "{var=foo/*}"
-// or "{var=**}", when such a variable is expanded into a URL path,
-// all
-// characters except `[-_.~/0-9a-zA-Z]` are percent-encoded. Such
-// variables
-// show up in the Discovery Document as `{+var}`.
+// or "{var=**}", when such a variable is expanded into a URL path on
+// the
+// client side, all characters except `[-_.~/0-9a-zA-Z]` are
+// percent-encoded.
+// The server side does the reverse decoding, except "%2F" and "%2f" are
+// left
+// unchanged. Such variables show up in the
+// [Discovery
+// Document](https://developers.google.com/discovery/v1/reference/apis)
+// a
+// s `{+var}`.
 //
-// NOTE: While the single segment variable matches the semantics of
-// [RFC 6570](https://tools.ietf.org/html/rfc6570) Section 3.2.2
-// Simple String Expansion, the multi segment variable **does not**
-// match
-// RFC 6570 Reserved Expansion. The reason is that the Reserved
+// ## Using gRPC API Service Configuration
+//
+// gRPC API Service Configuration (service config) is a configuration
+// language
+// for configuring a gRPC service to become a user-facing product.
+// The
+// service config is simply the YAML representation of the
+// `google.api.Service`
+// proto message.
+//
+// As an alternative to annotating your proto file, you can configure
+// gRPC
+// transcoding in your service config YAML files. You do this by
+// specifying a
+// `HttpRule` that maps the gRPC method to a REST endpoint, achieving
+// the same
+// effect as the proto annotation. This can be particularly useful if
+// you
+// have a proto that is reused in multiple services. Note that any
+// transcoding
+// specified in the service config will override any matching
+// transcoding
+// configuration in the proto.
+//
+// Example:
+//
+//     http:
+//       rules:
+//         # Selects a gRPC method and applies HttpRule to it.
+//         - selector: example.v1.Messaging.GetMessage
+//           get: /v1/messages/{message_id}/{sub.subfield}
+//
+// ## Special notes
+//
+// When gRPC Transcoding is used to map a gRPC to JSON REST endpoints,
+// the
+// proto to JSON conversion must follow the
+// [proto3
+// specification](https://developers.google.com/protocol-buffers/
+// docs/proto3#json).
+//
+// While the single segment variable follows the semantics of
+// [RFC 6570](https://tools.ietf.org/html/rfc6570) Section 3.2.2 Simple
+// String
+// Expansion, the multi segment variable **does not** follow RFC 6570
+// Section
+// 3.2.3 Reserved Expansion. The reason is that the Reserved
 // Expansion
 // does not expand special characters like `?` and `#`, which would
 // lead
-// to invalid URLs.
+// to invalid URLs. As the result, gRPC Transcoding uses a custom
+// encoding
+// for multi segment variables.
 //
-// NOTE: the field paths in variables and in the `body` must not refer
-// to
-// repeated fields or map fields.
+// The path variables **must not** refer to any repeated or mapped
+// field,
+// because client libraries are not capable of handling such variable
+// expansion.
+//
+// The path variables **must not** capture the leading "/" character.
+// The reason
+// is that the most common use case "{var}" does not capture the leading
+// "/"
+// character. For consistency, all path variables must share the same
+// behavior.
+//
+// Repeated message fields must not be mapped to URL query parameters,
+// because
+// no client library can support such complicated mapping.
+//
+// If an API needs to use a JSON array for request or response body, it
+// can map
+// the request or response body to a repeated field. However, some
+// gRPC
+// Transcoding implementations may not support this feature.
 type HttpRule struct {
 	// AdditionalBindings: Additional HTTP bindings for the selector. Nested
 	// bindings must
@@ -1975,22 +1958,16 @@ type HttpRule struct {
 	// the nesting may only be one level deep).
 	AdditionalBindings []*HttpRule `json:"additionalBindings,omitempty"`
 
-	// Authorizations: Specifies the permission(s) required for an API
-	// element for the overall
-	// API request to succeed. It is typically used to mark request message
-	// fields
-	// that contain the name of the resource and indicates the permissions
-	// that
-	// will be checked on that resource.
-	Authorizations []*AuthorizationRule `json:"authorizations,omitempty"`
-
 	// Body: The name of the request field whose value is mapped to the HTTP
-	// body, or
-	// `*` for mapping all fields not captured by the path pattern to the
-	// HTTP
-	// body. NOTE: the referred field must not be a repeated field and must
-	// be
-	// present at the top-level of request message type.
+	// request
+	// body, or `*` for mapping all request fields not captured by the
+	// path
+	// pattern to the HTTP body, or omitted for not having any HTTP request
+	// body.
+	//
+	// NOTE: the referred field must be present at the top-level of the
+	// request
+	// message type.
 	Body string `json:"body,omitempty"`
 
 	// Custom: The custom pattern is used for specifying an HTTP method that
@@ -2002,84 +1979,36 @@ type HttpRule struct {
 	// for services that provide content to Web (HTML) clients.
 	Custom *CustomHttpPattern `json:"custom,omitempty"`
 
-	// Delete: Used for deleting a resource.
+	// Delete: Maps to HTTP DELETE. Used for deleting a resource.
 	Delete string `json:"delete,omitempty"`
 
-	// Get: Used for listing and getting information about resources.
+	// Get: Maps to HTTP GET. Used for listing and getting information
+	// about
+	// resources.
 	Get string `json:"get,omitempty"`
 
-	// MediaDownload: Use this only for Scotty Requests. Do not use this for
-	// bytestream methods.
-	// For media support, add instead [][google.bytestream.RestByteStream]
-	// as an
-	// API to your configuration.
-	MediaDownload *MediaDownload `json:"mediaDownload,omitempty"`
-
-	// MediaUpload: Use this only for Scotty Requests. Do not use this for
-	// media support using
-	// Bytestream, add instead
-	// [][google.bytestream.RestByteStream] as an API to your
-	// configuration for Bytestream methods.
-	MediaUpload *MediaUpload `json:"mediaUpload,omitempty"`
-
-	// Patch: Used for updating a resource.
+	// Patch: Maps to HTTP PATCH. Used for updating a resource.
 	Patch string `json:"patch,omitempty"`
 
-	// Post: Used for creating a resource.
+	// Post: Maps to HTTP POST. Used for creating a resource or performing
+	// an action.
 	Post string `json:"post,omitempty"`
 
-	// Put: Used for updating a resource.
+	// Put: Maps to HTTP PUT. Used for replacing a resource.
 	Put string `json:"put,omitempty"`
 
-	// RestCollection: DO NOT USE. This is an experimental field.
+	// ResponseBody: Optional. The name of the response field whose value is
+	// mapped to the HTTP
+	// response body. When omitted, the entire response message will be
+	// used
+	// as the HTTP response body.
 	//
-	// Optional. The REST collection name is by default derived from the
-	// URL
-	// pattern. If specified, this field overrides the default collection
-	// name.
-	// Example:
-	//
-	//     rpc AddressesAggregatedList(AddressesAggregatedListRequest)
-	//         returns (AddressesAggregatedListResponse) {
-	//       option (google.api.http) = {
-	//         get: "/v1/projects/{project_id}/aggregated/addresses"
-	//         rest_collection: "projects.addresses"
-	//       };
-	//     }
-	//
-	// This method has the automatically derived collection
-	// name
-	// "projects.aggregated". Because, semantically, this rpc is actually
-	// an
-	// operation on the "projects.addresses" collection, the
-	// `rest_collection`
-	// field is configured to override the derived collection name.
-	RestCollection string `json:"restCollection,omitempty"`
+	// NOTE: The referred field must be present at the top-level of the
+	// response
+	// message type.
+	ResponseBody string `json:"responseBody,omitempty"`
 
-	// RestMethodName: DO NOT USE. This is an experimental field.
-	//
-	// Optional. The rest method name is by default derived from the
-	// URL
-	// pattern. If specified, this field overrides the default method
-	// name.
-	// Example:
-	//
-	//     rpc CreateResource(CreateResourceRequest)
-	//         returns (CreateResourceResponse) {
-	//       option (google.api.http) = {
-	//         post: "/v1/resources",
-	//         body: "resource",
-	//         rest_method_name: "insert"
-	//       };
-	//     }
-	//
-	// This method has the automatically derived rest method name
-	// "create", but for backwards compatibility with apiary, it is
-	// specified as
-	// insert.
-	RestMethodName string `json:"restMethodName,omitempty"`
-
-	// Selector: Selects methods to which this rule applies.
+	// Selector: Selects a method to which this rule applies.
 	//
 	// Refer to selector for syntax details.
 	Selector string `json:"selector,omitempty"`
@@ -2391,135 +2320,6 @@ func (s *LoggingDestination) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
-// MediaDownload: Defines the Media configuration for a service in case
-// of a download.
-// Use this only for Scotty Requests. Do not use this for media support
-// using
-// Bytestream, add instead [][google.bytestream.RestByteStream] as an
-// API to
-// your configuration for Bytestream methods.
-type MediaDownload struct {
-	// CompleteNotification: A boolean that determines whether a
-	// notification for the completion of a
-	// download should be sent to the backend.
-	CompleteNotification bool `json:"completeNotification,omitempty"`
-
-	// DownloadService: DO NOT USE FIELDS BELOW THIS LINE UNTIL THIS WARNING
-	// IS REMOVED.
-	//
-	// Specify name of the download service if one is used for download.
-	DownloadService string `json:"downloadService,omitempty"`
-
-	// Dropzone: Name of the Scotty dropzone to use for the current API.
-	Dropzone string `json:"dropzone,omitempty"`
-
-	// Enabled: Whether download is enabled.
-	Enabled bool `json:"enabled,omitempty"`
-
-	// MaxDirectDownloadSize: Optional maximum acceptable size for direct
-	// download.
-	// The size is specified in bytes.
-	MaxDirectDownloadSize int64 `json:"maxDirectDownloadSize,omitempty,string"`
-
-	// UseDirectDownload: A boolean that determines if direct download from
-	// ESF should be used for
-	// download of this media.
-	UseDirectDownload bool `json:"useDirectDownload,omitempty"`
-
-	// ForceSendFields is a list of field names (e.g.
-	// "CompleteNotification") to unconditionally include in API requests.
-	// By default, fields with empty values are omitted from API requests.
-	// However, any non-pointer, non-interface field appearing in
-	// ForceSendFields will be sent to the server regardless of whether the
-	// field is empty or not. This may be used to include empty fields in
-	// Patch requests.
-	ForceSendFields []string `json:"-"`
-
-	// NullFields is a list of field names (e.g. "CompleteNotification") to
-	// include in API requests with the JSON null value. By default, fields
-	// with empty values are omitted from API requests. However, any field
-	// with an empty value appearing in NullFields will be sent to the
-	// server as null. It is an error if a field in this list has a
-	// non-empty value. This may be used to include null fields in Patch
-	// requests.
-	NullFields []string `json:"-"`
-}
-
-func (s *MediaDownload) MarshalJSON() ([]byte, error) {
-	type NoMethod MediaDownload
-	raw := NoMethod(*s)
-	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
-}
-
-// MediaUpload: Defines the Media configuration for a service in case of
-// an upload.
-// Use this only for Scotty Requests. Do not use this for media support
-// using
-// Bytestream, add instead [][google.bytestream.RestByteStream] as an
-// API to
-// your configuration for Bytestream methods.
-type MediaUpload struct {
-	// CompleteNotification: A boolean that determines whether a
-	// notification for the completion of an
-	// upload should be sent to the backend. These notifications will not be
-	// seen
-	// by the client and will not consume quota.
-	CompleteNotification bool `json:"completeNotification,omitempty"`
-
-	// Dropzone: Name of the Scotty dropzone to use for the current API.
-	Dropzone string `json:"dropzone,omitempty"`
-
-	// Enabled: Whether upload is enabled.
-	Enabled bool `json:"enabled,omitempty"`
-
-	// MaxSize: Optional maximum acceptable size for an upload.
-	// The size is specified in bytes.
-	MaxSize int64 `json:"maxSize,omitempty,string"`
-
-	// MimeTypes: An array of mimetype patterns. Esf will only accept
-	// uploads that match one
-	// of the given patterns.
-	MimeTypes []string `json:"mimeTypes,omitempty"`
-
-	// ProgressNotification: Whether to receive a notification for progress
-	// changes of media upload.
-	ProgressNotification bool `json:"progressNotification,omitempty"`
-
-	// StartNotification: Whether to receive a notification on the start of
-	// media upload.
-	StartNotification bool `json:"startNotification,omitempty"`
-
-	// UploadService: DO NOT USE FIELDS BELOW THIS LINE UNTIL THIS WARNING
-	// IS REMOVED.
-	//
-	// Specify name of the upload service if one is used for upload.
-	UploadService string `json:"uploadService,omitempty"`
-
-	// ForceSendFields is a list of field names (e.g.
-	// "CompleteNotification") to unconditionally include in API requests.
-	// By default, fields with empty values are omitted from API requests.
-	// However, any non-pointer, non-interface field appearing in
-	// ForceSendFields will be sent to the server regardless of whether the
-	// field is empty or not. This may be used to include empty fields in
-	// Patch requests.
-	ForceSendFields []string `json:"-"`
-
-	// NullFields is a list of field names (e.g. "CompleteNotification") to
-	// include in API requests with the JSON null value. By default, fields
-	// with empty values are omitted from API requests. However, any field
-	// with an empty value appearing in NullFields will be sent to the
-	// server as null. It is an error if a field in this list has a
-	// non-empty value. This may be used to include null fields in Patch
-	// requests.
-	NullFields []string `json:"-"`
-}
-
-func (s *MediaUpload) MarshalJSON() ([]byte, error) {
-	type NoMethod MediaUpload
-	raw := NoMethod(*s)
-	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
-}
-
 // Method: Method represents a method of an API interface.
 type Method struct {
 	// Name: The simple name of this method.
@@ -2599,6 +2399,10 @@ type MetricDescriptor struct {
 	// for responses that failed.
 	Labels []*LabelDescriptor `json:"labels,omitempty"`
 
+	// Metadata: Optional. Metadata which can be used to guide usage of the
+	// metric.
+	Metadata *MetricDescriptorMetadata `json:"metadata,omitempty"`
+
 	// MetricKind: Whether the metric records instantaneous values, changes
 	// to a value, etc.
 	// Some combinations of `metric_kind` and `value_type` might not be
@@ -2621,13 +2425,14 @@ type MetricDescriptor struct {
 
 	// Type: The metric type, including its DNS name prefix. The type is
 	// not
-	// URL-encoded.  All user-defined custom metric types have the DNS
+	// URL-encoded.  All user-defined metric types have the DNS
 	// name
-	// `custom.googleapis.com`.  Metric types should use a natural
-	// hierarchical
-	// grouping. For example:
+	// `custom.googleapis.com` or `external.googleapis.com`.  Metric types
+	// should
+	// use a natural hierarchical grouping. For example:
 	//
 	//     "custom.googleapis.com/invoice/paid/amount"
+	//     "external.googleapis.com/prometheus/up"
 	//     "appengine.googleapis.com/http/server/response_latencies"
 	Type string `json:"type,omitempty"`
 
@@ -2738,6 +2543,100 @@ type MetricDescriptor struct {
 
 func (s *MetricDescriptor) MarshalJSON() ([]byte, error) {
 	type NoMethod MetricDescriptor
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// MetricDescriptorMetadata: Additional annotations that can be used to
+// guide the usage of a metric.
+type MetricDescriptorMetadata struct {
+	// IngestDelay: The delay of data points caused by ingestion. Data
+	// points older than this
+	// age are guaranteed to be ingested and available to be read,
+	// excluding
+	// data loss due to errors.
+	IngestDelay string `json:"ingestDelay,omitempty"`
+
+	// LaunchStage: The launch stage of the metric definition.
+	//
+	// Possible values:
+	//   "LAUNCH_STAGE_UNSPECIFIED" - Do not use this default value.
+	//   "EARLY_ACCESS" - Early Access features are limited to a closed
+	// group of testers. To use
+	// these features, you must sign up in advance and sign a Trusted
+	// Tester
+	// agreement (which includes confidentiality provisions). These features
+	// may
+	// be unstable, changed in backward-incompatible ways, and are
+	// not
+	// guaranteed to be released.
+	//   "ALPHA" - Alpha is a limited availability test for releases before
+	// they are cleared
+	// for widespread use. By Alpha, all significant design issues are
+	// resolved
+	// and we are in the process of verifying functionality. Alpha
+	// customers
+	// need to apply for access, agree to applicable terms, and have
+	// their
+	// projects whitelisted. Alpha releases don’t have to be feature
+	// complete,
+	// no SLAs are provided, and there are no technical support obligations,
+	// but
+	// they will be far enough along that customers can actually use them
+	// in
+	// test environments or for limited-use tests -- just like they would
+	// in
+	// normal production cases.
+	//   "BETA" - Beta is the point at which we are ready to open a release
+	// for any
+	// customer to use. There are no SLA or technical support obligations in
+	// a
+	// Beta release. Products will be complete from a feature perspective,
+	// but
+	// may have some open outstanding issues. Beta releases are suitable
+	// for
+	// limited production use cases.
+	//   "GA" - GA features are open to all developers and are considered
+	// stable and
+	// fully qualified for production use.
+	//   "DEPRECATED" - Deprecated features are scheduled to be shut down
+	// and removed. For more
+	// information, see the “Deprecation Policy” section of our [Terms
+	// of
+	// Service](https://cloud.google.com/terms/)
+	// and the [Google Cloud Platform Subject to the
+	// Deprecation
+	// Policy](https://cloud.google.com/terms/deprecation) documentation.
+	LaunchStage string `json:"launchStage,omitempty"`
+
+	// SamplePeriod: The sampling period of metric data points. For metrics
+	// which are written
+	// periodically, consecutive data points are stored at this time
+	// interval,
+	// excluding data loss due to errors. Metrics with a higher granularity
+	// have
+	// a smaller sampling period.
+	SamplePeriod string `json:"samplePeriod,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "IngestDelay") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "IngestDelay") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *MetricDescriptorMetadata) MarshalJSON() ([]byte, error) {
+	type NoMethod MetricDescriptorMetadata
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -3399,6 +3298,7 @@ func (s *PolicyBinding) MarshalJSON() ([]byte, error) {
 // An example quota configuration in yaml format:
 //
 //    quota:
+//      limits:
 //
 //      - name: apiWriteQpsPerProject
 //        metric: library.googleapis.com/write_calls
@@ -3772,7 +3672,7 @@ type Service struct {
 	// assigned
 	// by the client for tracking purpose. If empty, the server may choose
 	// to
-	// generate one instead.
+	// generate one instead. Must be no longer than 60 characters.
 	Id string `json:"id,omitempty"`
 
 	// Logging: Logging configuration.
@@ -4301,10 +4201,8 @@ func (s *TenancyUnit) MarshalJSON() ([]byte, error) {
 // project
 // removal.
 type TenantProjectConfig struct {
-	// BillingConfig: Billing account properties.
-	// It might be specified explicitly, or created from the specified
-	// group
-	// during provisioning
+	// BillingConfig: Billing account properties.  Billing account must be
+	// specified.
 	BillingConfig *BillingConfig `json:"billingConfig,omitempty"`
 
 	// Folder: Folder where project in this tenancy unit must be
@@ -4698,6 +4596,7 @@ func (c *OperationsCancelCall) doRequest(alt string) (*http.Response, error) {
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}:cancel")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
@@ -4770,8 +4669,7 @@ func (c *OperationsCancelCall) Do(opts ...googleapi.CallOption) (*Empty, error) 
 	//     "$ref": "Empty"
 	//   },
 	//   "scopes": [
-	//     "https://www.googleapis.com/auth/cloud-platform",
-	//     "https://www.googleapis.com/auth/service.management"
+	//     "https://www.googleapis.com/auth/cloud-platform"
 	//   ]
 	// }
 
@@ -4833,6 +4731,7 @@ func (c *OperationsDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders.Set("User-Agent", c.s.userAgent())
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("DELETE", urls, body)
@@ -4902,8 +4801,7 @@ func (c *OperationsDeleteCall) Do(opts ...googleapi.CallOption) (*Empty, error) 
 	//     "$ref": "Empty"
 	//   },
 	//   "scopes": [
-	//     "https://www.googleapis.com/auth/cloud-platform",
-	//     "https://www.googleapis.com/auth/service.management"
+	//     "https://www.googleapis.com/auth/cloud-platform"
 	//   ]
 	// }
 
@@ -4977,6 +4875,7 @@ func (c *OperationsGetCall) doRequest(alt string) (*http.Response, error) {
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
@@ -5046,8 +4945,7 @@ func (c *OperationsGetCall) Do(opts ...googleapi.CallOption) (*Operation, error)
 	//     "$ref": "Operation"
 	//   },
 	//   "scopes": [
-	//     "https://www.googleapis.com/auth/cloud-platform",
-	//     "https://www.googleapis.com/auth/service.management"
+	//     "https://www.googleapis.com/auth/cloud-platform"
 	//   ]
 	// }
 
@@ -5154,6 +5052,7 @@ func (c *OperationsListCall) doRequest(alt string) (*http.Response, error) {
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
@@ -5239,8 +5138,7 @@ func (c *OperationsListCall) Do(opts ...googleapi.CallOption) (*ListOperationsRe
 	//     "$ref": "ListOperationsResponse"
 	//   },
 	//   "scopes": [
-	//     "https://www.googleapis.com/auth/cloud-platform",
-	//     "https://www.googleapis.com/auth/service.management"
+	//     "https://www.googleapis.com/auth/cloud-platform"
 	//   ]
 	// }
 
@@ -5382,6 +5280,7 @@ func (c *ServicesSearchCall) doRequest(alt string) (*http.Response, error) {
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+parent}:search")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
@@ -5558,6 +5457,7 @@ func (c *ServicesTenancyUnitsAddProjectCall) doRequest(alt string) (*http.Respon
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+parent}:addProject")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
@@ -5693,6 +5593,7 @@ func (c *ServicesTenancyUnitsCreateCall) doRequest(alt string) (*http.Response, 
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+parent}/tenancyUnits")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
@@ -5824,6 +5725,7 @@ func (c *ServicesTenancyUnitsDeleteCall) doRequest(alt string) (*http.Response, 
 	reqHeaders.Set("User-Agent", c.s.userAgent())
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("DELETE", urls, body)
@@ -5992,6 +5894,7 @@ func (c *ServicesTenancyUnitsListCall) doRequest(alt string) (*http.Response, er
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+parent}/tenancyUnits")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
@@ -6167,6 +6070,7 @@ func (c *ServicesTenancyUnitsRemoveProjectCall) doRequest(alt string) (*http.Res
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}:removeProject")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)

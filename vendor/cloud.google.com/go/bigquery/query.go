@@ -1,4 +1,4 @@
-// Copyright 2015 Google Inc. All Rights Reserved.
+// Copyright 2015 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -105,6 +105,9 @@ type QueryConfig struct {
 	// for the destination table.
 	TimePartitioning *TimePartitioning
 
+	// Clustering specifies the data clustering configuration for the destination table.
+	Clustering *Clustering
+
 	// The labels associated with this job.
 	Labels map[string]string
 
@@ -119,6 +122,10 @@ type QueryConfig struct {
 
 	// Custom encryption configuration (e.g., Cloud KMS keys).
 	DestinationEncryptionConfig *EncryptionConfig
+
+	// Allows the schema of the destination table to be updated as a side effect of
+	// the query job.
+	SchemaUpdateOptions []string
 }
 
 func (qc *QueryConfig) toBQ() (*bq.JobConfiguration, error) {
@@ -130,7 +137,9 @@ func (qc *QueryConfig) toBQ() (*bq.JobConfiguration, error) {
 		Priority:                           string(qc.Priority),
 		MaximumBytesBilled:                 qc.MaxBytesBilled,
 		TimePartitioning:                   qc.TimePartitioning.toBQ(),
+		Clustering:                         qc.Clustering.toBQ(),
 		DestinationEncryptionConfiguration: qc.DestinationEncryptionConfig.toBQ(),
+		SchemaUpdateOptions:                qc.SchemaUpdateOptions,
 	}
 	if len(qc.TableDefinitions) > 0 {
 		qconf.TableDefinitions = make(map[string]bq.ExternalDataConfiguration)
@@ -189,16 +198,19 @@ func (qc *QueryConfig) toBQ() (*bq.JobConfiguration, error) {
 func bqToQueryConfig(q *bq.JobConfiguration, c *Client) (*QueryConfig, error) {
 	qq := q.Query
 	qc := &QueryConfig{
-		Labels:            q.Labels,
-		DryRun:            q.DryRun,
-		Q:                 qq.Query,
-		CreateDisposition: TableCreateDisposition(qq.CreateDisposition),
-		WriteDisposition:  TableWriteDisposition(qq.WriteDisposition),
-		AllowLargeResults: qq.AllowLargeResults,
-		Priority:          QueryPriority(qq.Priority),
-		MaxBytesBilled:    qq.MaximumBytesBilled,
-		UseLegacySQL:      qq.UseLegacySql == nil || *qq.UseLegacySql,
-		TimePartitioning:  bqToTimePartitioning(qq.TimePartitioning),
+		Labels:                      q.Labels,
+		DryRun:                      q.DryRun,
+		Q:                           qq.Query,
+		CreateDisposition:           TableCreateDisposition(qq.CreateDisposition),
+		WriteDisposition:            TableWriteDisposition(qq.WriteDisposition),
+		AllowLargeResults:           qq.AllowLargeResults,
+		Priority:                    QueryPriority(qq.Priority),
+		MaxBytesBilled:              qq.MaximumBytesBilled,
+		UseLegacySQL:                qq.UseLegacySql == nil || *qq.UseLegacySql,
+		TimePartitioning:            bqToTimePartitioning(qq.TimePartitioning),
+		Clustering:                  bqToClustering(qq.Clustering),
+		DestinationEncryptionConfig: bqToEncryptionConfig(qq.DestinationEncryptionConfiguration),
+		SchemaUpdateOptions:         qq.SchemaUpdateOptions,
 	}
 	qc.UseStandardSQL = !qc.UseLegacySQL
 

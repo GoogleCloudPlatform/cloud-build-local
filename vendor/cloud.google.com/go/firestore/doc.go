@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -168,6 +168,8 @@ You can use SQL to select documents from a collection. Begin with the collection
 build up a query using Select, Where and other methods of Query.
 
 	q := states.Where("pop", ">", 10).OrderBy("pop", firestore.Desc)
+
+Supported operators include `<`, `<=`, `>`, `>=`, `==`, and 'array-contains'.
 
 Call the Query's Documents method to get an iterator, and use it like
 the other Google Cloud Client iterators.

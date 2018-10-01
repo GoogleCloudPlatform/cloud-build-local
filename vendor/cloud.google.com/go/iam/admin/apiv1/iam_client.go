@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/internal/version"
+	"github.com/golang/protobuf/proto"
 	gax "github.com/googleapis/gax-go"
 	"golang.org/x/net/context"
 	"google.golang.org/api/iterator"
@@ -94,6 +95,8 @@ func defaultIamCallOptions() *IamCallOptions {
 }
 
 // IamClient is a client for interacting with Google Identity and Access Management (IAM) API.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
 type IamClient struct {
 	// The connection to the service.
 	conn *grpc.ClientConn
@@ -166,6 +169,7 @@ func (c *IamClient) ListServiceAccounts(ctx context.Context, req *adminpb.ListSe
 	ctx = insertMetadata(ctx, c.xGoogMetadata)
 	opts = append(c.CallOptions.ListServiceAccounts[0:len(c.CallOptions.ListServiceAccounts):len(c.CallOptions.ListServiceAccounts)], opts...)
 	it := &ServiceAccountIterator{}
+	req = proto.Clone(req).(*adminpb.ListServiceAccountsRequest)
 	it.InternalFetch = func(pageSize int, pageToken string) ([]*adminpb.ServiceAccount, string, error) {
 		var resp *adminpb.ListServiceAccountsResponse
 		req.PageToken = pageToken
@@ -193,6 +197,7 @@ func (c *IamClient) ListServiceAccounts(ctx context.Context, req *adminpb.ListSe
 		return nextPageToken, nil
 	}
 	it.pageInfo, it.nextFunc = iterator.NewPageInfo(fetch, it.bufLen, it.takeBuf)
+	it.pageInfo.MaxSize = int(req.PageSize)
 	return it
 }
 

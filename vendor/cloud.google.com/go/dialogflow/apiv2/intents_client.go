@@ -23,6 +23,7 @@ import (
 	"cloud.google.com/go/internal/version"
 	"cloud.google.com/go/longrunning"
 	lroauto "cloud.google.com/go/longrunning/autogen"
+	"github.com/golang/protobuf/proto"
 	structpbpb "github.com/golang/protobuf/ptypes/struct"
 	gax "github.com/googleapis/gax-go"
 	"golang.org/x/net/context"
@@ -81,6 +82,8 @@ func defaultIntentsCallOptions() *IntentsCallOptions {
 }
 
 // IntentsClient is a client for interacting with Dialogflow API.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
 type IntentsClient struct {
 	// The connection to the service.
 	conn *grpc.ClientConn
@@ -184,6 +187,7 @@ func (c *IntentsClient) ListIntents(ctx context.Context, req *dialogflowpb.ListI
 	ctx = insertMetadata(ctx, c.xGoogMetadata)
 	opts = append(c.CallOptions.ListIntents[0:len(c.CallOptions.ListIntents):len(c.CallOptions.ListIntents)], opts...)
 	it := &IntentIterator{}
+	req = proto.Clone(req).(*dialogflowpb.ListIntentsRequest)
 	it.InternalFetch = func(pageSize int, pageToken string) ([]*dialogflowpb.Intent, string, error) {
 		var resp *dialogflowpb.ListIntentsResponse
 		req.PageToken = pageToken
@@ -211,6 +215,7 @@ func (c *IntentsClient) ListIntents(ctx context.Context, req *dialogflowpb.ListI
 		return nextPageToken, nil
 	}
 	it.pageInfo, it.nextFunc = iterator.NewPageInfo(fetch, it.bufLen, it.takeBuf)
+	it.pageInfo.MaxSize = int(req.PageSize)
 	return it
 }
 

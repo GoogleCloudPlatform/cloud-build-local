@@ -1,4 +1,4 @@
-// Copyright 2016 Google Inc. All Rights Reserved.
+// Copyright 2016 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -48,7 +48,10 @@ func TestLicense(t *testing.T) {
 			// Automatically generated.
 			return nil
 		}
-
+		if path == "cmd/go-cloud-debug-agent/internal/debug/elf/elf.go" {
+			// BSD license, which is compatible, is embedded in the file.
+			return nil
+		}
 		src, err := ioutil.ReadFile(path)
 		if err != nil {
 			return nil

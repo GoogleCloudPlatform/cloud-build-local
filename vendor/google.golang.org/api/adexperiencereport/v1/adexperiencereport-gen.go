@@ -131,6 +131,7 @@ type PlatformSummary struct {
 	//   "REGION_UNKNOWN" - Ad standard not yet defined for your region.
 	//   "REGION_A" - Region A.
 	//   "REGION_B" - Region B.
+	//   "REGION_C" - Region C.
 	Region []string `json:"region,omitempty"`
 
 	// ReportUrl: A link that leads to a full ad experience report.
@@ -164,8 +165,6 @@ func (s *PlatformSummary) MarshalJSON() ([]byte, error) {
 }
 
 // SiteSummaryResponse: Response message for GetSiteSummary.
-// Do not confuse with same message in
-// google.chrome.abusiveexperiencereport.v1
 type SiteSummaryResponse struct {
 	// DesktopSummary: Summary for the desktop review of the site.
 	DesktopSummary *PlatformSummary `json:"desktopSummary,omitempty"`
@@ -301,6 +300,7 @@ func (c *SitesGetCall) doRequest(alt string) (*http.Response, error) {
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
@@ -439,6 +439,7 @@ func (c *ViolatingSitesListCall) doRequest(alt string) (*http.Response, error) {
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/violatingSites")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
