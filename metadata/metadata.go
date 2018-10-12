@@ -151,7 +151,11 @@ func getScopes(tok string) ([]string, error) {
 	const maxTries = 3
 	var err error
 	for i := 0; i < maxTries; i++ {
-		time.Sleep(time.Millisecond * 150 * time.Duration(i))
+		if i > 0 {
+			delay := time.Millisecond * 150 * time.Duration(i)
+			log.Printf("Waiting %v before retry...", delay)
+			time.Sleep(delay)
+		}
 		var resp *http.Response
 		if resp, err = http.Post(googleTokenInfoHost+"/oauth2/v3/tokeninfo", "application/x-www-form-urlencoded", strings.NewReader(data.Encode())); err != nil {
 			log.Printf("Error reading scopes on attempt #%d/%d: %v", i+1, maxTries, err)
@@ -168,7 +172,7 @@ func getScopes(tok string) ([]string, error) {
 			Scope string `json:"scope"`
 		}{}
 		if err = json.NewDecoder(resp.Body).Decode(&r); err != nil {
-			log.Printf("Error reading scopes on attempt #%d/%d: %v", i+1, maxTries, err)
+			log.Printf("Error decoding scopes response on attempt #%d/%d: %v", i+1, maxTries, err)
 			continue
 		}
 		return strings.Split(r.Scope, " "), nil

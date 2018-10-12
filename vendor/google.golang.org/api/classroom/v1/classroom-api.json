@@ -109,11 +109,6 @@
       "location": "query",
       "type": "string"
     },
-    "bearer_token": {
-      "description": "OAuth bearer token.",
-      "location": "query",
-      "type": "string"
-    },
     "callback": {
       "description": "JSONP",
       "location": "query",
@@ -133,12 +128,6 @@
       "description": "OAuth 2.0 token for the current user.",
       "location": "query",
       "type": "string"
-    },
-    "pp": {
-      "default": "true",
-      "description": "Pretty-print response.",
-      "location": "query",
-      "type": "boolean"
     },
     "prettyPrint": {
       "default": "true",
@@ -1644,7 +1633,7 @@
     "registrations": {
       "methods": {
         "create": {
-          "description": "Creates a `Registration`, causing Classroom to start sending notifications\nfrom the provided `feed` to the provided `destination`.\n\nReturns the created `Registration`. Currently, this will be the same as\nthe argument, but with server-assigned fields such as `expiry_time` and\n`id` filled in.\n\nNote that any value specified for the `expiry_time` or `id` fields will be\nignored.\n\nWhile Classroom may validate the `destination` and return errors on a best\neffort basis, it is the caller's responsibility to ensure that it exists\nand that Classroom has permission to publish to it.\n\nThis method may return the following error codes:\n\n* `PERMISSION_DENIED` if:\n    * the authenticated user does not have permission to receive\n      notifications from the requested field; or\n    * the credential provided does not include the appropriate scope for the\n      requested feed.\n    * another access error is encountered.\n* `INVALID_ARGUMENT` if:\n    * no `destination` is specified, or the specified `destination` is not\n      valid; or\n    * no `feed` is specified, or the specified `feed` is not valid.\n* `NOT_FOUND` if:\n    * the specified `feed` cannot be located, or the requesting user does not\n      have permission to determine whether or not it exists; or\n    * the specified `destination` cannot be located, or Classroom has not\n      been granted permission to publish to it.",
+          "description": "Creates a `Registration`, causing Classroom to start sending notifications\nfrom the provided `feed` to the destination provided in `cloudPubSubTopic`.\n\nReturns the created `Registration`. Currently, this will be the same as\nthe argument, but with server-assigned fields such as `expiry_time` and\n`id` filled in.\n\nNote that any value specified for the `expiry_time` or `id` fields will be\nignored.\n\nWhile Classroom may validate the `cloudPubSubTopic` and return errors on a\nbest effort basis, it is the caller's responsibility to ensure that it\nexists and that Classroom has permission to publish to it.\n\nThis method may return the following error codes:\n\n* `PERMISSION_DENIED` if:\n    * the authenticated user does not have permission to receive\n      notifications from the requested field; or\n    * the credential provided does not include the appropriate scope for\n      the requested feed.\n    * another access error is encountered.\n* `INVALID_ARGUMENT` if:\n    * no `cloudPubsubTopic` is specified, or the specified\n      `cloudPubsubTopic` is not valid; or\n    * no `feed` is specified, or the specified `feed` is not valid.\n* `NOT_FOUND` if:\n    * the specified `feed` cannot be located, or the requesting user does\n      not have permission to determine whether or not it exists; or\n    * the specified `cloudPubsubTopic` cannot be located, or Classroom has\n      not been granted permission to publish to it.",
           "flatPath": "v1/registrations",
           "httpMethod": "POST",
           "id": "classroom.registrations.create",
@@ -1658,9 +1647,7 @@
             "$ref": "Registration"
           },
           "scopes": [
-            "https://www.googleapis.com/auth/classroom.push-notifications",
-            "https://www.googleapis.com/auth/classroom.rosters",
-            "https://www.googleapis.com/auth/classroom.rosters.readonly"
+            "https://www.googleapis.com/auth/classroom.push-notifications"
           ]
         },
         "delete": {
@@ -1684,9 +1671,7 @@
             "$ref": "Empty"
           },
           "scopes": [
-            "https://www.googleapis.com/auth/classroom.push-notifications",
-            "https://www.googleapis.com/auth/classroom.rosters",
-            "https://www.googleapis.com/auth/classroom.rosters.readonly"
+            "https://www.googleapis.com/auth/classroom.push-notifications"
           ]
         }
       }
@@ -1990,7 +1975,7 @@
       }
     }
   },
-  "revision": "20180416",
+  "revision": "20180919",
   "rootUrl": "https://classroom.googleapis.com/",
   "schemas": {
     "Announcement": {
@@ -2204,7 +2189,7 @@
           "type": "string"
         },
         "name": {
-          "description": "Name of the course.\nFor example, \"10th Grade Biology\".\nThe name is required. It must be between 1 and 50 characters and a valid\nUTF-8 string.",
+          "description": "Name of the course.\nFor example, \"10th Grade Biology\".\nThe name is required. It must be between 1 and 750 characters and a valid\nUTF-8 string.",
           "type": "string"
         },
         "ownerId": {
@@ -2440,17 +2425,28 @@
       },
       "type": "object"
     },
+    "CourseWorkChangesInfo": {
+      "description": "Information about a `Feed` with a `feed_type` of `COURSE_WORK_CHANGES`.",
+      "id": "CourseWorkChangesInfo",
+      "properties": {
+        "courseId": {
+          "description": "The `course_id` of the course to subscribe to work changes for.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "Date": {
-      "description": "Represents a whole calendar date, e.g. date of birth. The time of day and\ntime zone are either specified elsewhere or are not significant. The date\nis relative to the Proleptic Gregorian Calendar. The day may be 0 to\nrepresent a year and month where the day is not significant, e.g. credit card\nexpiration date. The year may be 0 to represent a month and day independent\nof year, e.g. anniversary date. Related types are google.type.TimeOfDay\nand `google.protobuf.Timestamp`.",
+      "description": "Represents a whole or partial calendar date, e.g. a birthday. The time of day\nand time zone are either specified elsewhere or are not significant. The date\nis relative to the Proleptic Gregorian Calendar. This can represent:\n\n* A full date, with non-zero year, month and day values\n* A month and day value, with a zero year, e.g. an anniversary\n* A year on its own, with zero month and day values\n* A year and month value, with a zero day, e.g. a credit card expiration date\n\nRelated types are google.type.TimeOfDay and `google.protobuf.Timestamp`.",
       "id": "Date",
       "properties": {
         "day": {
-          "description": "Day of month. Must be from 1 to 31 and valid for the year and month, or 0\nif specifying a year/month where the day is not significant.",
+          "description": "Day of month. Must be from 1 to 31 and valid for the year and month, or 0\nif specifying a year by itself or a year and month where the day is not\nsignificant.",
           "format": "int32",
           "type": "integer"
         },
         "month": {
-          "description": "Month of year. Must be from 1 to 12, or 0 if specifying a date without a\nmonth.",
+          "description": "Month of year. Must be from 1 to 12, or 0 if specifying a year without a\nmonth and day.",
           "format": "int32",
           "type": "integer"
         },
@@ -2518,17 +2514,23 @@
           "$ref": "CourseRosterChangesInfo",
           "description": "Information about a `Feed` with a `feed_type` of `COURSE_ROSTER_CHANGES`.\nThis field must be specified if `feed_type` is `COURSE_ROSTER_CHANGES`."
         },
+        "courseWorkChangesInfo": {
+          "$ref": "CourseWorkChangesInfo",
+          "description": "Information about a `Feed` with a `feed_type` of `COURSE_WORK_CHANGES`.\nThis field must be specified if `feed_type` is `COURSE_WORK_CHANGES`."
+        },
         "feedType": {
           "description": "The type of feed.",
           "enum": [
             "FEED_TYPE_UNSPECIFIED",
             "DOMAIN_ROSTER_CHANGES",
-            "COURSE_ROSTER_CHANGES"
+            "COURSE_ROSTER_CHANGES",
+            "COURSE_WORK_CHANGES"
           ],
           "enumDescriptions": [
             "Should never be returned or provided.",
             "All roster changes for a particular domain.\n\nNotifications will be generated whenever a user joins or leaves a course.\n\nNo notifications will be generated when an invitation is created or\ndeleted, but notifications will be generated when a user joins a course\nby accepting an invitation.",
-            "All roster changes for a particular course.\n\nNotifications will be generated whenever a user joins or leaves a course.\n\nNo notifications will be generated when an invitation is created or\ndeleted, but notifications will be generated when a user joins a course\nby accepting an invitation."
+            "All roster changes for a particular course.\n\nNotifications will be generated whenever a user joins or leaves a course.\n\nNo notifications will be generated when an invitation is created or\ndeleted, but notifications will be generated when a user joins a course\nby accepting an invitation.",
+            "All course work activity for a particular course.\n\nNotifications will be generated when a CourseWork or\nStudentSubmission object is created or modified. No notification will be\ngenerated when a StudentSubmission object is created in connection with\nthe creation or modification of its parent CourseWork object (but a\nnotification will be generated for that CourseWork object's creation or\nmodification)."
           ],
           "type": "string"
         }
@@ -3087,7 +3089,7 @@
       "type": "object"
     },
     "Registration": {
-      "description": "An instruction to Classroom to send notifications from the `feed` to the\nprovided `destination`.",
+      "description": "An instruction to Classroom to send notifications from the `feed` to the\nprovided destination.",
       "id": "Registration",
       "properties": {
         "cloudPubsubTopic": {
@@ -3101,7 +3103,7 @@
         },
         "feed": {
           "$ref": "Feed",
-          "description": "Specification for the class of notifications that Classroom should deliver\nto the `destination`."
+          "description": "Specification for the class of notifications that Classroom should deliver\nto the destination."
         },
         "registrationId": {
           "description": "A server-generated unique identifier for this `Registration`.\n\nRead-only.",

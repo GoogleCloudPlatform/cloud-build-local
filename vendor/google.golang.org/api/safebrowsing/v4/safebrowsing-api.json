@@ -49,11 +49,6 @@
       "location": "query",
       "type": "string"
     },
-    "bearer_token": {
-      "description": "OAuth bearer token.",
-      "location": "query",
-      "type": "string"
-    },
     "callback": {
       "description": "JSONP",
       "location": "query",
@@ -73,12 +68,6 @@
       "description": "OAuth 2.0 token for the current user.",
       "location": "query",
       "type": "string"
-    },
-    "pp": {
-      "default": "true",
-      "description": "Pretty-print response.",
-      "location": "query",
-      "type": "boolean"
     },
     "prettyPrint": {
       "default": "true",
@@ -269,7 +258,7 @@
       }
     }
   },
-  "revision": "20180405",
+  "revision": "20180626",
   "rootUrl": "https://safebrowsing.googleapis.com/",
   "schemas": {
     "Checksum": {
@@ -556,7 +545,8 @@
             "CLIENT_INCIDENT_WHITELIST",
             "APK_MALWARE_OFFLINE",
             "SUBRESOURCE_FILTER",
-            "SUSPICIOUS"
+            "SUSPICIOUS",
+            "TRICK_TO_BILL"
           ],
           "enumDescriptions": [
             "Unknown.",
@@ -573,7 +563,8 @@
             "Whitelist used when detecting client incident threats.\nThis enum was never launched and should be re-used for the next list.",
             "List used for offline APK checks in PAM.",
             "Patterns to be used for activating the subresource filter. Interstitial\nwill not be shown for patterns from this list.",
-            "Entities that are suspected to present a threat."
+            "Entities that are suspected to present a threat.",
+            "Trick-to-bill threat list."
           ],
           "type": "string"
         }
@@ -686,7 +677,8 @@
             "CLIENT_INCIDENT_WHITELIST",
             "APK_MALWARE_OFFLINE",
             "SUBRESOURCE_FILTER",
-            "SUSPICIOUS"
+            "SUSPICIOUS",
+            "TRICK_TO_BILL"
           ],
           "enumDescriptions": [
             "Unknown.",
@@ -703,7 +695,8 @@
             "Whitelist used when detecting client incident threats.\nThis enum was never launched and should be re-used for the next list.",
             "List used for offline APK checks in PAM.",
             "Patterns to be used for activating the subresource filter. Interstitial\nwill not be shown for patterns from this list.",
-            "Entities that are suspected to present a threat."
+            "Entities that are suspected to present a threat.",
+            "Trick-to-bill threat list."
           ],
           "type": "string"
         }
@@ -919,7 +912,8 @@
             "CLIENT_INCIDENT_WHITELIST",
             "APK_MALWARE_OFFLINE",
             "SUBRESOURCE_FILTER",
-            "SUSPICIOUS"
+            "SUSPICIOUS",
+            "TRICK_TO_BILL"
           ],
           "enumDescriptions": [
             "Unknown.",
@@ -936,7 +930,8 @@
             "Whitelist used when detecting client incident threats.\nThis enum was never launched and should be re-used for the next list.",
             "List used for offline APK checks in PAM.",
             "Patterns to be used for activating the subresource filter. Interstitial\nwill not be shown for patterns from this list.",
-            "Entities that are suspected to present a threat."
+            "Entities that are suspected to present a threat.",
+            "Trick-to-bill threat list."
           ],
           "type": "string"
         },
@@ -1029,7 +1024,8 @@
             "Whitelist used when detecting client incident threats.\nThis enum was never launched and should be re-used for the next list.",
             "List used for offline APK checks in PAM.",
             "Patterns to be used for activating the subresource filter. Interstitial\nwill not be shown for patterns from this list.",
-            "Entities that are suspected to present a threat."
+            "Entities that are suspected to present a threat.",
+            "Trick-to-bill threat list."
           ],
           "items": {
             "enum": [
@@ -1047,7 +1043,8 @@
               "CLIENT_INCIDENT_WHITELIST",
               "APK_MALWARE_OFFLINE",
               "SUBRESOURCE_FILTER",
-              "SUSPICIOUS"
+              "SUSPICIOUS",
+              "TRICK_TO_BILL"
             ],
             "type": "string"
           },
@@ -1125,7 +1122,8 @@
             "CLIENT_INCIDENT_WHITELIST",
             "APK_MALWARE_OFFLINE",
             "SUBRESOURCE_FILTER",
-            "SUSPICIOUS"
+            "SUSPICIOUS",
+            "TRICK_TO_BILL"
           ],
           "enumDescriptions": [
             "Unknown.",
@@ -1142,7 +1140,8 @@
             "Whitelist used when detecting client incident threats.\nThis enum was never launched and should be re-used for the next list.",
             "List used for offline APK checks in PAM.",
             "Patterns to be used for activating the subresource filter. Interstitial\nwill not be shown for patterns from this list.",
-            "Entities that are suspected to present a threat."
+            "Entities that are suspected to present a threat.",
+            "Trick-to-bill threat list."
           ],
           "type": "string"
         }
@@ -1231,7 +1230,8 @@
             "CLIENT_INCIDENT_WHITELIST",
             "APK_MALWARE_OFFLINE",
             "SUBRESOURCE_FILTER",
-            "SUSPICIOUS"
+            "SUSPICIOUS",
+            "TRICK_TO_BILL"
           ],
           "enumDescriptions": [
             "Unknown.",
@@ -1248,7 +1248,8 @@
             "Whitelist used when detecting client incident threats.\nThis enum was never launched and should be re-used for the next list.",
             "List used for offline APK checks in PAM.",
             "Patterns to be used for activating the subresource filter. Interstitial\nwill not be shown for patterns from this list.",
-            "Entities that are suspected to present a threat."
+            "Entities that are suspected to present a threat.",
+            "Trick-to-bill threat list."
           ],
           "type": "string"
         }

@@ -1,4 +1,4 @@
-// Copyright 2014 Google Inc. All Rights Reserved.
+// Copyright 2014 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,12 @@
 Package cloud is the root of the packages used to access Google Cloud
 Services. See https://godoc.org/cloud.google.com/go for a full list
 of sub-packages.
+
+
+Client Options
+
+All clients in sub-packages are configurable via client options. These options are
+described here: https://godoc.org/google.golang.org/api/option.
 
 
 Authentication and Authorization
@@ -49,10 +55,25 @@ underlying HTTP transport to cache connections for later re-use. These are cache
 the default http.MaxIdleConns and http.MaxIdleConnsPerHost settings in
 http.DefaultTransport.
 
-For gPRC clients (all others in this repo), connection pooling is configurable. Users
+For gRPC clients (all others in this repo), connection pooling is configurable. Users
 of cloud client libraries may specify option.WithGRPCConnectionPool(n) as a client
 option to NewClient calls. This configures the underlying gRPC connections to be
 pooled and addressed in a round robin fashion.
+
+
+Using the Libraries with Docker
+
+Minimal docker images like Alpine lack CA certificates. This causes RPCs to appear to
+hang, because gRPC retries indefinitely. See https://github.com/GoogleCloudPlatform/google-cloud-go/issues/928
+for more information.
+
+
+Debugging
+
+To see gRPC logs, set the environment variable GRPC_GO_LOG_SEVERITY_LEVEL. See
+https://godoc.org/google.golang.org/grpc/grpclog for more information.
+
+For HTTP logging, set the GODEBUG environment variable to "http2debug=1" or "http2debug=2".
 
 */
 package cloud // import "cloud.google.com/go"

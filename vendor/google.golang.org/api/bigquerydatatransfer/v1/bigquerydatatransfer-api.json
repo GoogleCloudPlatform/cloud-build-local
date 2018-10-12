@@ -66,11 +66,6 @@
       "location": "query",
       "type": "string"
     },
-    "bearer_token": {
-      "description": "OAuth bearer token.",
-      "location": "query",
-      "type": "string"
-    },
     "callback": {
       "description": "JSONP",
       "location": "query",
@@ -90,12 +85,6 @@
       "description": "OAuth 2.0 token for the current user.",
       "location": "query",
       "type": "string"
-    },
-    "pp": {
-      "default": "true",
-      "description": "Pretty-print response.",
-      "location": "query",
-      "type": "boolean"
     },
     "prettyPrint": {
       "default": "true",
@@ -542,7 +531,7 @@
                       "type": "string"
                     },
                     "name": {
-                      "description": "The resource name of the transfer config.\nTransfer config names have the form\n`projects/{project_id}/transferConfigs/{config_id}`.\nWhere `config_id` is usually a uuid, even though it is not\nguaranteed or required. The name is ignored when creating a transfer\nconfig.",
+                      "description": "The resource name of the transfer config.\nTransfer config names have the form of\n`projects/{project_id}/location/{region}/transferConfigs/{config_id}`.\nThe name is automatically generated based on the config_id specified in\nCreateTransferConfigRequest along with project_id and region. If config_id\nis not provided, usually a uuid, even though it is not guaranteed or\nrequired, will be generated for config_id.",
                       "location": "path",
                       "pattern": "^projects/[^/]+/locations/[^/]+/transferConfigs/[^/]+$",
                       "required": true,
@@ -922,7 +911,7 @@
                   "type": "string"
                 },
                 "name": {
-                  "description": "The resource name of the transfer config.\nTransfer config names have the form\n`projects/{project_id}/transferConfigs/{config_id}`.\nWhere `config_id` is usually a uuid, even though it is not\nguaranteed or required. The name is ignored when creating a transfer\nconfig.",
+                  "description": "The resource name of the transfer config.\nTransfer config names have the form of\n`projects/{project_id}/location/{region}/transferConfigs/{config_id}`.\nThe name is automatically generated based on the config_id specified in\nCreateTransferConfigRequest along with project_id and region. If config_id\nis not provided, usually a uuid, even though it is not guaranteed or\nrequired, will be generated for config_id.",
                   "location": "path",
                   "pattern": "^projects/[^/]+/transferConfigs/[^/]+$",
                   "required": true,
@@ -1156,7 +1145,7 @@
       }
     }
   },
-  "revision": "20180409",
+  "revision": "20181001",
   "rootUrl": "https://bigquerydatatransfer.googleapis.com/",
   "schemas": {
     "CheckValidCredsRequest": {
@@ -1195,7 +1184,7 @@
           "type": "string"
         },
         "clientId": {
-          "description": "Data source client id which should be used to receive refresh token.\nWhen not supplied, no offline credentials are populated for data transfer.",
+          "description": "Data source client id which should be used to receive refresh token.",
           "type": "string"
         },
         "dataRefreshType": {
@@ -1258,7 +1247,7 @@
           "type": "array"
         },
         "scopes": {
-          "description": "Api auth scopes for which refresh token needs to be obtained. Only valid\nwhen `client_id` is specified. Ignored otherwise. These are scopes needed\nby a data source to prepare data and ingest them into BigQuery,\ne.g., https://www.googleapis.com/auth/bigquery",
+          "description": "Api auth scopes for which refresh token needs to be obtained. These are\nscopes needed by a data source to prepare data and ingest them into\nBigQuery, e.g., https://www.googleapis.com/auth/bigquery",
           "items": {
             "type": "string"
           },
@@ -1269,7 +1258,7 @@
           "type": "boolean"
         },
         "supportsMultipleTransfers": {
-          "description": "Indicates whether the data source supports multiple transfers\nto different BigQuery targets.",
+          "description": "Deprecated. This field has no effect.",
           "type": "boolean"
         },
         "transferType": {
@@ -1287,7 +1276,7 @@
           "type": "string"
         },
         "updateDeadlineSeconds": {
-          "description": "The number of seconds to wait for an update from the data source\nbefore BigQuery marks the transfer as failed.",
+          "description": "The number of seconds to wait for an update from the data source\nbefore the Data Transfer Service marks the transfer as FAILED.",
           "format": "int32",
           "type": "integer"
         }
@@ -1314,7 +1303,7 @@
           "type": "string"
         },
         "fields": {
-          "description": "When parameter is a record, describes child fields.",
+          "description": "Deprecated. This field has no effect.",
           "items": {
             "$ref": "DataSourceParameter"
           },
@@ -1339,11 +1328,11 @@
           "type": "string"
         },
         "recurse": {
-          "description": "If set to true, schema should be taken from the parent with the same\nparameter_id. Only applicable when parameter type is RECORD.",
+          "description": "Deprecated. This field has no effect.",
           "type": "boolean"
         },
         "repeated": {
-          "description": "Can parameter have multiple values.",
+          "description": "Deprecated. This field has no effect.",
           "type": "boolean"
         },
         "required": {
@@ -1367,7 +1356,7 @@
             "Integer parameter (64-bits).\nWill be serialized to json as string.",
             "Double precision floating point parameter.",
             "Boolean parameter.",
-            "Record parameter.",
+            "Deprecated. This field has no effect.",
             "Page ID for a Google+ Page."
           ],
           "type": "string"
@@ -1605,7 +1594,7 @@
           "type": "string"
         },
         "name": {
-          "description": "The resource name of the transfer config.\nTransfer config names have the form\n`projects/{project_id}/transferConfigs/{config_id}`.\nWhere `config_id` is usually a uuid, even though it is not\nguaranteed or required. The name is ignored when creating a transfer\nconfig.",
+          "description": "The resource name of the transfer config.\nTransfer config names have the form of\n`projects/{project_id}/location/{region}/transferConfigs/{config_id}`.\nThe name is automatically generated based on the config_id specified in\nCreateTransferConfigRequest along with project_id and region. If config_id\nis not provided, usually a uuid, even though it is not guaranteed or\nrequired, will be generated for config_id.",
           "type": "string"
         },
         "nextRunTime": {
@@ -1729,7 +1718,7 @@
           "type": "string"
         },
         "schedule": {
-          "description": "Output only. Describes the schedule of this transfer run if it was\ncreated as part of a regular schedule. For batch transfer runs that are\nscheduled manually, this is empty.\nNOTE: the system might choose to delay the schedule depending on the\ncurrent load, so `schedule_time` doesn't always matches this.",
+          "description": "Output only. Describes the schedule of this transfer run if it was\ncreated as part of a regular schedule. For batch transfer runs that are\nscheduled manually, this is empty.\nNOTE: the system might choose to delay the schedule depending on the\ncurrent load, so `schedule_time` doesn't always match this.",
           "type": "string"
         },
         "scheduleTime": {

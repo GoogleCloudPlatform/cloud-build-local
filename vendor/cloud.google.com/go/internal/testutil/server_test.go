@@ -1,4 +1,4 @@
-// Copyright 2016 Google Inc. All Rights Reserved.
+// Copyright 2016 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,16 +23,16 @@ import (
 
 func TestNewServer(t *testing.T) {
 	srv, err := NewServer()
+	defer srv.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 	srv.Start()
 	conn, err := grpc.Dial(srv.Addr, grpc.WithInsecure())
+	defer conn.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
-	conn.Close()
-	srv.Close()
 }
 
 func TestPageBounds(t *testing.T) {

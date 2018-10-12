@@ -1,4 +1,4 @@
-// Copyright 2018 Google Inc. All Rights Reserved.
+// Copyright 2018 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -99,7 +99,7 @@ func newWatchStreamForDocument(ctx context.Context, dr *DocumentRef) *watchStrea
 	compare := func(_, _ *DocumentSnapshot) (int, error) { return 0, nil }
 	return newWatchStream(ctx, dr.Parent.c, compare, &pb.Target{
 		TargetType: &pb.Target_Documents{
-			Documents: &pb.Target_DocumentsTarget{[]string{dr.Path}},
+			Documents: &pb.Target_DocumentsTarget{Documents: []string{dr.Path}},
 		},
 		TargetId: watchTargetID,
 	})

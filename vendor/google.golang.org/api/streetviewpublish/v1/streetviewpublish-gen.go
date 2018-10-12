@@ -711,6 +711,19 @@ func (s *Place) MarshalJSON() ([]byte, error) {
 
 // Pose: Raw pose measurement for an entity.
 type Pose struct {
+	// AccuracyMeters: The estimated horizontal accuracy of this pose in
+	// meters with 68%
+	// confidence (one standard deviation). For example, on Android, this
+	// value is
+	// available from this
+	// method:
+	// https://developer.android.com/reference/android/location/Locat
+	// ion#getAccuracy().
+	// Other platforms have different methods of obtaining similar
+	// accuracy
+	// estimations.
+	AccuracyMeters float64 `json:"accuracyMeters,omitempty"`
+
 	// Altitude: Altitude of the pose in meters above WGS84 ellipsoid.
 	// NaN indicates an unmeasured quantity.
 	Altitude float64 `json:"altitude,omitempty"`
@@ -753,7 +766,7 @@ type Pose struct {
 	// NaN indicates an unmeasured quantity.
 	Roll float64 `json:"roll,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "Altitude") to
+	// ForceSendFields is a list of field names (e.g. "AccuracyMeters") to
 	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
 	// non-interface field appearing in ForceSendFields will be sent to the
@@ -761,12 +774,13 @@ type Pose struct {
 	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "Altitude") to include in
-	// API requests with the JSON null value. By default, fields with empty
-	// values are omitted from API requests. However, any field with an
-	// empty value appearing in NullFields will be sent to the server as
-	// null. It is an error if a field in this list has a non-empty value.
-	// This may be used to include null fields in Patch requests.
+	// NullFields is a list of field names (e.g. "AccuracyMeters") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
 	NullFields []string `json:"-"`
 }
 
@@ -779,16 +793,18 @@ func (s *Pose) MarshalJSON() ([]byte, error) {
 func (s *Pose) UnmarshalJSON(data []byte) error {
 	type NoMethod Pose
 	var s1 struct {
-		Altitude gensupport.JSONFloat64 `json:"altitude"`
-		Heading  gensupport.JSONFloat64 `json:"heading"`
-		Pitch    gensupport.JSONFloat64 `json:"pitch"`
-		Roll     gensupport.JSONFloat64 `json:"roll"`
+		AccuracyMeters gensupport.JSONFloat64 `json:"accuracyMeters"`
+		Altitude       gensupport.JSONFloat64 `json:"altitude"`
+		Heading        gensupport.JSONFloat64 `json:"heading"`
+		Pitch          gensupport.JSONFloat64 `json:"pitch"`
+		Roll           gensupport.JSONFloat64 `json:"roll"`
 		*NoMethod
 	}
 	s1.NoMethod = (*NoMethod)(s)
 	if err := json.Unmarshal(data, &s1); err != nil {
 		return err
 	}
+	s.AccuracyMeters = float64(s1.AccuracyMeters)
 	s.Altitude = float64(s1.Altitude)
 	s.Heading = float64(s1.Heading)
 	s.Pitch = float64(s1.Pitch)
@@ -1097,6 +1113,7 @@ func (c *PhotoCreateCall) doRequest(alt string) (*http.Response, error) {
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/photo")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
@@ -1219,6 +1236,7 @@ func (c *PhotoDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders.Set("User-Agent", c.s.userAgent())
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/photo/{photoId}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("DELETE", urls, body)
@@ -1380,6 +1398,7 @@ func (c *PhotoGetCall) doRequest(alt string) (*http.Response, error) {
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/photo/{photoId}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
@@ -1543,6 +1562,7 @@ func (c *PhotoStartUploadCall) doRequest(alt string) (*http.Response, error) {
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/photo:startUpload")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
@@ -1725,6 +1745,7 @@ func (c *PhotoUpdateCall) doRequest(alt string) (*http.Response, error) {
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/photo/{id}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("PUT", urls, body)
@@ -1882,6 +1903,7 @@ func (c *PhotosBatchDeleteCall) doRequest(alt string) (*http.Response, error) {
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/photos:batchDelete")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
@@ -2050,6 +2072,7 @@ func (c *PhotosBatchGetCall) doRequest(alt string) (*http.Response, error) {
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/photos:batchGet")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
@@ -2216,6 +2239,7 @@ func (c *PhotosBatchUpdateCall) doRequest(alt string) (*http.Response, error) {
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/photos:batchUpdate")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
@@ -2394,6 +2418,7 @@ func (c *PhotosListCall) doRequest(alt string) (*http.Response, error) {
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/photos")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)

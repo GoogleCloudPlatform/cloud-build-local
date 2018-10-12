@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Google Inc. All Rights Reserved.
+Copyright 2017 Google LLC
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ func TestRetry(t *testing.T) {
 	responses := []error{
 		status.Errorf(codes.Internal, "transport is closing"),
 		status.Errorf(codes.Unknown, "unexpected EOF"),
+		status.Errorf(codes.Internal, "unexpected EOF"),
 		status.Errorf(codes.Internal, "stream terminated by RST_STREAM with error code: 2"),
 		status.Errorf(codes.Unavailable, "service is currently unavailable"),
 		errRetry(fmt.Errorf("just retry it")),

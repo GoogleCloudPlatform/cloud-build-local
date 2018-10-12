@@ -9,7 +9,7 @@
     }
   },
   "basePath": "",
-  "baseUrl": "https://firebasedynamiclinks-ipv6.googleapis.com/",
+  "baseUrl": "https://firebasedynamiclinks.googleapis.com/",
   "batchPath": "batch",
   "canonicalName": "Firebase Dynamic Links",
   "description": "Programmatically creates and manages Firebase Dynamic Links.",
@@ -59,11 +59,6 @@
       "location": "query",
       "type": "string"
     },
-    "bearer_token": {
-      "description": "OAuth bearer token.",
-      "location": "query",
-      "type": "string"
-    },
     "callback": {
       "description": "JSONP",
       "location": "query",
@@ -83,12 +78,6 @@
       "description": "OAuth 2.0 token for the current user.",
       "location": "query",
       "type": "string"
-    },
-    "pp": {
-      "default": "true",
-      "description": "Pretty-print response.",
-      "location": "query",
-      "type": "boolean"
     },
     "prettyPrint": {
       "default": "true",
@@ -180,6 +169,11 @@
               "location": "path",
               "required": true,
               "type": "string"
+            },
+            "sdkVersion": {
+              "description": "Google SDK version. Version takes the form \"$major.$minor.$patch\"",
+              "location": "query",
+              "type": "string"
             }
           },
           "path": "v1/{dynamicLink}/linkStats",
@@ -207,12 +201,30 @@
           "scopes": [
             "https://www.googleapis.com/auth/firebase"
           ]
+        },
+        "reopenAttribution": {
+          "description": "Get iOS reopen attribution for app universal link open deeplinking.",
+          "flatPath": "v1/reopenAttribution",
+          "httpMethod": "POST",
+          "id": "firebasedynamiclinks.reopenAttribution",
+          "parameterOrder": [],
+          "parameters": {},
+          "path": "v1/reopenAttribution",
+          "request": {
+            "$ref": "GetIosReopenAttributionRequest"
+          },
+          "response": {
+            "$ref": "GetIosReopenAttributionResponse"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/firebase"
+          ]
         }
       }
     }
   },
-  "revision": "20180403",
-  "rootUrl": "https://firebasedynamiclinks-ipv6.googleapis.com/",
+  "revision": "20181002",
+  "rootUrl": "https://firebasedynamiclinks.googleapis.com/",
   "schemas": {
     "AnalyticsInfo": {
       "description": "Tracking parameters supported by Dynamic Link.",
@@ -268,6 +280,10 @@
           "description": "Link name to associate with the link. It's used for marketer to identify\nmanually-created links in the Firebase console\n(https://console.firebase.google.com/).\nLinks must be named to be tracked.",
           "type": "string"
         },
+        "sdkVersion": {
+          "description": "Google SDK version. Version takes the form \"$major.$minor.$patch\"",
+          "type": "string"
+        },
         "suffix": {
           "$ref": "Suffix",
           "description": "Short Dynamic Link suffix. Optional."
@@ -307,6 +323,10 @@
         },
         "longDynamicLink": {
           "description": "Full long Dynamic Link URL with desired query parameters specified.\nFor example,\n\"https://sample.app.goo.gl/?link=http://www.google.com\u0026apn=com.sample\",\n[Learn more](https://firebase.google.com/docs/reference/dynamic-links/link-shortener).",
+          "type": "string"
+        },
+        "sdkVersion": {
+          "description": "Google SDK version. Version takes the form \"$major.$minor.$patch\"",
           "type": "string"
         },
         "suffix": {
@@ -421,13 +441,15 @@
             "DYNAMIC_LINK_PLATFORM_UNSPECIFIED",
             "ANDROID",
             "IOS",
-            "DESKTOP"
+            "DESKTOP",
+            "OTHER"
           ],
           "enumDescriptions": [
             "Unspecified platform.",
             "Represents Android platform.\nAll apps and browsers on Android are classfied in this category.",
             "Represents iOS platform.\nAll apps and browsers on iOS are classfied in this category.",
-            "Represents desktop.\nNote: other platforms like Windows, Blackberry, Amazon fall into this\ncategory."
+            "Represents desktop.",
+            "Platforms are not categorized as Android/iOS/Destop fall into here."
           ],
           "type": "string"
         }
@@ -610,7 +632,7 @@
           "type": "string"
         },
         "sdkVersion": {
-          "description": "Google SDK version.",
+          "description": "Google SDK version. Version takes the form \"$major.$minor.$patch\"",
           "type": "string"
         },
         "uniqueMatchLinkToCheck": {
@@ -682,6 +704,20 @@
           "description": "Describes why match failed, ie: \"discarded due to low confidence\".\nThis message will be publicly visible.",
           "type": "string"
         },
+        "requestIpVersion": {
+          "description": "Which IP version the request was made from.",
+          "enum": [
+            "UNKNOWN_IP_VERSION",
+            "IP_V4",
+            "IP_V6"
+          ],
+          "enumDescriptions": [
+            "Unset.",
+            "Request made from an IPv4 IP address.",
+            "Request made from an IPv6 IP address."
+          ],
+          "type": "string"
+        },
         "requestedLink": {
           "description": "Entire FDL (short or long) attributed post-install via one of several\ntechniques (fingerprint, copy unique).",
           "type": "string"
@@ -700,6 +736,56 @@
         },
         "utmSource": {
           "description": "Scion source value to be propagated by iSDK to Scion at post-install.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GetIosReopenAttributionRequest": {
+      "description": "Request for iSDK to get reopen attribution for app universal link open\ndeeplinking. This endpoint is meant for only iOS requests.",
+      "id": "GetIosReopenAttributionRequest",
+      "properties": {
+        "bundleId": {
+          "description": "APP bundle ID.",
+          "type": "string"
+        },
+        "requestedLink": {
+          "description": "FDL link to be verified from an app universal link open.\nThe FDL link can be one of:\n1) short FDL.\ne.g. \u003capp_code\u003e.page.link/\u003cddl_id\u003e, or\n2) long FDL.\ne.g. \u003capp_code\u003e.page.link/?{query params}, or\n3) Invite FDL.\ne.g. \u003capp_code\u003e.page.link/i/\u003cinvite_id_or_alias\u003e",
+          "type": "string"
+        },
+        "sdkVersion": {
+          "description": "Google SDK version. Version takes the form \"$major.$minor.$patch\"",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GetIosReopenAttributionResponse": {
+      "description": "Response for iSDK to get reopen attribution for app universal link open\ndeeplinking. This endpoint is meant for only iOS requests.",
+      "id": "GetIosReopenAttributionResponse",
+      "properties": {
+        "deepLink": {
+          "description": "The deep-link attributed the app universal link open. For both regular\nFDL links and invite FDL links.",
+          "type": "string"
+        },
+        "invitationId": {
+          "description": "Optional invitation ID, for only invite typed requested FDL links.",
+          "type": "string"
+        },
+        "resolvedLink": {
+          "description": "The entire FDL, expanded from a short link. It is the same as the\nrequested_link, if it is long.",
+          "type": "string"
+        },
+        "utmCampaign": {
+          "description": "Scion campaign value to be propagated by iSDK to Scion at app-reopen.",
+          "type": "string"
+        },
+        "utmMedium": {
+          "description": "Scion medium value to be propagated by iSDK to Scion at app-reopen.",
+          "type": "string"
+        },
+        "utmSource": {
+          "description": "Scion source value to be propagated by iSDK to Scion at app-reopen.",
           "type": "string"
         }
       },

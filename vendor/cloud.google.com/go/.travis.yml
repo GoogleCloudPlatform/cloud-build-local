@@ -5,6 +5,8 @@ go:
 - 1.7.x
 - 1.8.x
 - 1.9.x
+- 1.10.x
+- 1.11.x
 install:
 - go get -v cloud.google.com/go/...
 script:
@@ -14,7 +16,9 @@ script:
   GCLOUD_TESTS_GOLANG_KEY="$(pwd)/dulcet-port-762-key.json"
   GCLOUD_TESTS_GOLANG_FIRESTORE_PROJECT_ID="gcloud-golang-firestore-tests"
   GCLOUD_TESTS_GOLANG_FIRESTORE_KEY="$(pwd)/gcloud-golang-firestore-tests-key.json"
-  ./run-tests.sh $TRAVIS_COMMIT
+  GCLOUD_TESTS_GOLANG_KEYRING="projects/dulcet-port-762/locations/us/keyRings/go-integration-test"
+  GCLOUD_TESTS_GOLANG_ENABLE_REPLAY=yes
+  travis_wait ./run-tests.sh $TRAVIS_COMMIT
 env:
   matrix:
     # The GCLOUD_TESTS_API_KEY environment variable.

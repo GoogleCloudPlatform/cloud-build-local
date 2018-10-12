@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2017 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,4 +28,12 @@ func traceEndSpan(context.Context, error) {
 }
 
 func tracePrintf(context.Context, map[string]interface{}, string, ...interface{}) {
+}
+
+type dummy struct{}
+
+// Not supported below Go 1.8.
+var OpenSessionCount dummy
+
+func recordStat(context.Context, dummy, int64) {
 }

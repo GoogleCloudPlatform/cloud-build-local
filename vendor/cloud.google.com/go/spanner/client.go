@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Google Inc. All Rights Reserved.
+Copyright 2017 Google LLC
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -69,9 +69,12 @@ func validDatabaseName(db string) error {
 // client is safe to use concurrently, except for its Close method.
 type Client struct {
 	// rr must be accessed through atomic operations.
-	rr       uint32
-	conns    []*grpc.ClientConn
-	clients  []sppb.SpannerClient
+	rr uint32
+	// TODO(deklerk): we should not keep multiple ClientConns / SpannerClients. Instead, we should
+	// have a single ClientConn that has many connections: https://github.com/googleapis/google-api-go-client/blob/003c13302b3ea5ae44344459ba080364bd46155f/internal/pool.go
+	conns   []*grpc.ClientConn
+	clients []sppb.SpannerClient
+
 	database string
 	// Metadata to be sent with each request.
 	md           metadata.MD
@@ -442,8 +445,7 @@ func (c *Client) Apply(ctx context.Context, ms []*Mutation, opts ...ApplyOption)
 	}
 	if !ao.atLeastOnce {
 		return c.ReadWriteTransaction(ctx, func(ctx context.Context, t *ReadWriteTransaction) error {
-			t.BufferWrite(ms)
-			return nil
+			return t.BufferWrite(ms)
 		})
 	}
 

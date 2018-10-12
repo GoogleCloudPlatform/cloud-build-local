@@ -1,4 +1,4 @@
-// Copyright 2018 Google Inc. All Rights Reserved.
+// Copyright 2018 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -61,4 +61,5 @@ func (te *TestExporter) ExportView(vd *view.Data) {
 func (te *TestExporter) Unregister() {
 	view.UnregisterExporter(te)
 	trace.UnregisterExporter(te)
+	view.SetReportingPeriod(0) // reset to default value
 }

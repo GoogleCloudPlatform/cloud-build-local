@@ -65,7 +65,8 @@ func ParseSubstitutionsFlag(substitutions string) (map[string]string, error) {
 	substitutionsMap := make(map[string]string)
 	list := strings.Split(substitutions, ",")
 	for _, s := range list {
-		keyValue := strings.Split(s, "=")
+		// Limit the number of elements the string can split into to 2; this allows the substitution value string to contain the `=` character.
+		keyValue := strings.SplitN(s, "=", 2)
 		if len(keyValue) != 2 {
 			return substitutionsMap, fmt.Errorf("The substitution key value pair is not valid: %s", s)
 		}

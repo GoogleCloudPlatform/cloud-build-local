@@ -29,6 +29,7 @@ import (
 	"path"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -59,6 +60,19 @@ const (
 	// in the face of gcr.io DNS lookup errors.
 	maxPushRetries = 10
 
+	// builderOutputFile is the name of the file inside each per-step
+	// temporary output directory where builders can write arbitrary output
+	// information.
+	builderOutputFile = "output"
+
+	// stepOutputPath is the path to step output files produced by a step
+	// execution. This is the path that's exposed to builders. It's backed by a
+	// tempdir in the worker.
+	stepOutputPath = "/builder/outputs"
+
+	// maxOutputBytes is the max length of outputs persisted from builder
+	// outputs. Data beyond this length is ignored.
+	maxOutputBytes = 4 * 1024 // 4 KB
 )
 
 var (
@@ -138,11 +152,16 @@ type Build struct {
 	// filesystem, in tests it's an in-memory filesystem.
 	fs afero.Fs
 
+	// stepOutputs contains builder outputs produced by each step, if any.
+	// It is initialized once using initStepOutputsOnce.
+	stepOutputs         [][]byte
+	initStepOutputsOnce sync.Once
 }
 
 // TimingInfo holds timing information for build execution phases.
 type TimingInfo struct {
 	BuildSteps      []*TimeSpan
+	BuildStepPulls  []*TimeSpan
 	BuildTotal      *TimeSpan
 	ImagePushes     map[string]*TimeSpan
 	PushTotal       *TimeSpan // total time to push images and non-container artifacts
@@ -302,12 +321,28 @@ func (b *Build) Summary() BuildSummary {
 		}
 	}
 
+	var buildStepPulls []*TimeSpan
+	if b.Timing.BuildStepPulls != nil {
+		// Deep copy the TimeSpans to prevent a data race where an
+		// end-time is written while someone else reads buildSummary.
+		for _, t := range b.Timing.BuildStepPulls {
+			if t != nil {
+				clone := *t
+				buildStepPulls = append(buildStepPulls, &clone)
+			} else {
+				buildStepPulls = append(buildStepPulls, nil)
+			}
+		}
+	}
+
 	s := BuildSummary{
 		Status:          b.status,
 		StepStatus:      append([]pb.Build_Status{}, b.stepStatus...),
 		BuildStepImages: append([]string{}, b.stepDigests...),
+		StepOutputs:     append([][]byte{}, b.stepOutputs...),
 		Timing: TimingInfo{
 			BuildSteps:      buildSteps,
+			BuildStepPulls:  buildStepPulls,
 			BuildTotal:      buildTotal,
 			ImagePushes:     imagePushes,
 			PushTotal:       pushTotal,
@@ -731,10 +766,12 @@ func (b *Build) runAndScrape(ctx context.Context, cmd []string) (string, error) 
 
 // fetchBuilder takes a step name and pulls the image if it isn't already present.
 // It returns the digest of the image or empty string.
-func (b *Build) fetchBuilder(ctx context.Context, name string, stepIdentifier string, stepIdx int) (string, error) {
+func (b *Build) fetchBuilder(ctx context.Context, idx int) (string, error) {
+	name := b.Request.Steps[idx].Name
+
 	digest, err := b.dockerInspect(ctx, name)
-	outWriter := b.Log.MakeWriter(fmt.Sprintf("%s", stepIdentifier), stepIdx, true)
-	errWriter := b.Log.MakeWriter(fmt.Sprintf("%s", stepIdentifier), stepIdx, false)
+	outWriter := b.Log.MakeWriter(b.stepIdentifier(idx), idx, true)
+	errWriter := b.Log.MakeWriter(b.stepIdentifier(idx), idx, false)
 	switch err {
 	case nil:
 		fmt.Fprintf(outWriter, "Already have image (with digest): %s\n", name)
@@ -760,7 +797,7 @@ func (b *Build) fetchBuilder(ctx context.Context, name string, stepIdentifier st
 		return "", err
 	default:
 		// all other errors
-		return "", fmt.Errorf("error pulling build step %d %q: %v", stepIdx, name, err)
+		return "", fmt.Errorf("error pulling build step %d %q: %v", idx, name, err)
 	}
 }
 
@@ -882,34 +919,51 @@ func (b *Build) timeAndRunStep(ctx context.Context, idx int, waitChans []chan st
 	}
 	start := timeNow()
 	b.Timing.BuildSteps[idx] = &TimeSpan{Start: start}
+	b.Timing.BuildStepPulls[idx] = &TimeSpan{Start: start}
 	b.mu.Unlock()
 
-	err := b.runStep(ctx, timeout, idx)
-	end := timeNow()
-
-	b.mu.Lock()
-	b.Timing.BuildSteps[idx].End = end
-	switch err {
-	case nil:
-		b.stepStatus[idx] = pb.Build_SUCCESS
-	case context.DeadlineExceeded:
-		// If the build step has no timeout, we got a DeadlineExceeded because the
-		// overall build timed out. The step's final status is its current WORKING
-		// status.
-		if timeout != 0 {
-			// If the build step has a timeout, then either the step timed out or the
-			// build timed out (or both). If it was a build timeout, don't update the
-			// per-step status.
-			if stepTime := end.Sub(start); stepTime >= timeout {
-				b.stepStatus[idx] = pb.Build_TIMEOUT
-			}
-		}
-	case context.Canceled:
-		b.stepStatus[idx] = pb.Build_CANCELLED
-	default:
-		b.stepStatus[idx] = pb.Build_FAILURE
+	if b.HasMultipleSteps {
+		b.Log.WriteMainEntry(fmt.Sprintf("Starting %s", b.stepIdentifier(idx)))
 	}
-	b.mu.Unlock()
+
+	// Fetch the step's builder image and note how long that takes.
+	digest, err := b.fetchBuilder(ctx, idx)
+	end := timeNow()
+	b.Timing.BuildStepPulls[idx].End = end
+	b.recordStepDigest(idx, digest)
+
+	// If pulling succeeded, try running the step.
+	if err == nil {
+		err = b.runStep(ctx, timeout, idx, digest)
+		end = timeNow()
+
+		b.mu.Lock()
+		b.Timing.BuildSteps[idx].End = end
+		switch err {
+		case nil:
+			b.stepStatus[idx] = pb.Build_SUCCESS
+		case context.DeadlineExceeded:
+			// If the build step has no timeout, we got a DeadlineExceeded because the
+			// overall build timed out. The step's final status is its current WORKING
+			// status.
+			if timeout != 0 {
+				// If the build step has a timeout, then either the step timed out or the
+				// build timed out (or both). If it was a build timeout, don't update the
+				// per-step status.
+				if stepTime := end.Sub(start); stepTime >= timeout {
+					b.stepStatus[idx] = pb.Build_TIMEOUT
+				}
+			}
+		case context.Canceled:
+			b.stepStatus[idx] = pb.Build_CANCELLED
+		default:
+			b.stepStatus[idx] = pb.Build_FAILURE
+		}
+		b.mu.Unlock()
+	} else {
+		// Otherwise, step end time == pull end time
+		b.Timing.BuildSteps[idx].End = end
+	}
 
 	// If another step executing in parallel fails and sends an error, this step
 	// will be blocked from sending an error on the channel.
@@ -953,56 +1007,27 @@ func getTempDir(subpath string) string {
 	return fullpath
 }
 
-func (b *Build) runStep(ctx context.Context, timeout time.Duration, idx int) error {
-	step := b.Request.Steps[idx]
+func processEnvVars(b *Build, step *pb.BuildStep) ([]string, error) {
+	envVars := map[string]string{}
 
-	var stepIdentifier string
-	if b.HasMultipleSteps {
-		if step.Id != "" {
-			stepIdentifier = fmt.Sprintf("Step #%d - %q", idx, step.Id)
-		} else {
-			stepIdentifier = fmt.Sprintf("Step #%d", idx)
-		}
-		b.Log.WriteMainEntry(fmt.Sprintf("Starting %s", stepIdentifier))
-		defer b.Log.WriteMainEntry(fmt.Sprintf("Finished %s", stepIdentifier))
+	// Iterate through global env vars before local in order to overwrite
+	// conflicting variables
+	for _, env := range append(b.Request.GetOptions().GetEnv(), step.Env...) {
+		split := strings.SplitN(env, "=", 2)
+		varName := split[0]
+		envVars[varName] = env
 	}
 
-	
-	outWriter := b.Log.MakeWriter(fmt.Sprintf("%s", stepIdentifier), idx, true)
-	errWriter := b.Log.MakeWriter(fmt.Sprintf("%s", stepIdentifier), idx, false)
-
-	digest, err := b.fetchBuilder(ctx, step.Name, stepIdentifier, idx)
-	if err != nil {
-		return err
-	}
-	b.recordStepDigest(idx, digest)
-
-	runTarget := step.Name
-	if digest != "" { // only remove tag / original digest if the digest exists from the builder
-		runTarget = stripTagDigest(step.Name) + "@" + digest
-	}
-
-	var stepOutputDir string
-
-	args := b.dockerRunArgs(path.Clean(step.Dir), stepOutputDir, idx)
-	for _, env := range step.Env {
-		args = append(args, "--env", env)
-	}
-	for _, vol := range step.Volumes {
-		args = append(args, "--volume", fmt.Sprintf("%s:%s", vol.Name, vol.Path))
-	}
-	if step.Entrypoint != "" {
-		args = append(args, "--entrypoint", step.Entrypoint)
-	}
+	secretEnvVars := append(b.Request.GetOptions().GetSecretEnv(), step.SecretEnv...)
 
 	// If the step specifies any secrets, decrypt them and pass the plaintext
 	// values as envs.
-	if len(step.SecretEnv) > 0 {
+	if len(secretEnvVars) > 0 {
 		kms, err := b.getKMSClient()
 		if err != nil {
-			return err
+			return nil, err
 		}
-		for _, se := range step.SecretEnv {
+		for _, se := range secretEnvVars {
 			// Figure out which KMS key to use to decrypt the value. One and only one
 			// secret should be defined for each secretEnv.
 			for _, sec := range b.Request.Secrets {
@@ -1010,17 +1035,79 @@ func (b *Build) runStep(ctx context.Context, timeout time.Duration, idx int) err
 					kmsKeyName := sec.KmsKeyName
 					plaintext, err := kms.Decrypt(kmsKeyName, base64.StdEncoding.EncodeToString(val))
 					if err != nil {
-						return fmt.Errorf("Failed to decrypt %q using key %q: %v", se, kmsKeyName, err)
+						return nil, fmt.Errorf("Failed to decrypt %q using key %q: %v", se, kmsKeyName, err)
 					}
 					dec, err := base64.StdEncoding.DecodeString(plaintext)
 					if err != nil {
-						return fmt.Errorf("Plaintext was not base64-decodeable: %v", err)
+						return nil, fmt.Errorf("Plaintext was not base64-decodeable: %v", err)
 					}
-					args = append(args, "--env", fmt.Sprintf("%s=%s", se, string(dec)))
+					if _, found := envVars[se]; !found {
+						secret := fmt.Sprintf("%s=%s", se, string(dec))
+						envVars[se] = secret
+					}
 					break
 				}
 			}
 		}
+	}
+
+	keys := []string{}
+	for k := range envVars {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	args := []string{}
+	for _, key := range keys {
+		args = append(args, "--env", envVars[key])
+	}
+
+	return args, nil
+}
+
+func (b *Build) stepIdentifier(idx int) string {
+	if !b.HasMultipleSteps {
+		return ""
+	}
+	step := b.Request.Steps[idx]
+	if step.Id != "" {
+		return fmt.Sprintf("Step #%d - %q", idx, step.Id)
+	}
+	return fmt.Sprintf("Step #%d", idx)
+}
+
+func (b *Build) runStep(ctx context.Context, timeout time.Duration, idx int, builderImageDigest string) error {
+	step := b.Request.Steps[idx]
+
+	if b.HasMultipleSteps {
+		defer b.Log.WriteMainEntry(fmt.Sprintf("Finished %s", b.stepIdentifier(idx)))
+	}
+
+	runTarget := step.Name
+	if builderImageDigest != "" { // only remove tag / original digest if the digest exists from the builder
+		runTarget = stripTagDigest(step.Name) + "@" + builderImageDigest
+	}
+
+	var stepOutputDir string
+	stepOutputDir = getTempDir(fmt.Sprintf("step-%d", idx))
+	if err := b.fs.MkdirAll(stepOutputDir, os.FileMode(os.O_CREATE)); err != nil {
+		return fmt.Errorf("failed to create temp dir for step outputs: %v", err)
+	}
+
+	args := b.dockerRunArgs(path.Clean(step.Dir), stepOutputDir, idx)
+
+	envVarArgs, err := processEnvVars(b, step)
+	if err != nil {
+		return err
+	}
+
+	args = append(args, envVarArgs...)
+
+	for _, vol := range append(b.Request.GetOptions().GetVolumes(), step.Volumes...) {
+		args = append(args, "--volume", fmt.Sprintf("%s:%s", vol.Name, vol.Path))
+	}
+	if step.Entrypoint != "" {
+		args = append(args, "--entrypoint", step.Entrypoint)
 	}
 
 	args = append(args, runTarget)
@@ -1032,10 +1119,49 @@ func (b *Build) runStep(ctx context.Context, timeout time.Duration, idx int) err
 		defer cancel()
 	}
 
+	outWriter := b.Log.MakeWriter(b.stepIdentifier(idx), idx, true)
+	errWriter := b.Log.MakeWriter(b.stepIdentifier(idx), idx, false)
 	buildErr := b.Runner.Run(ctx, args, nil, outWriter, errWriter, "")
+	if outputErr := b.captureStepOutput(idx, stepOutputDir); outputErr != nil {
+		// Output capture failed:
+		// - On a failed build step, log the outputErr and return the buildErr.
+		// - On a successful build step, return the outputErr (thus failing the step).
+		if buildErr != nil {
+			log.Printf("ERROR: step %d failed to capture outputs: %v", idx, outputErr)
+			return buildErr
+		}
+		return outputErr
+	}
 	return buildErr
 }
 
+func (b *Build) captureStepOutput(idx int, stepOutputDir string) error {
+	fn := path.Join(stepOutputDir, builderOutputFile)
+	if exists, _ := afero.Exists(b.fs, fn); !exists {
+		// Step didn't write an output file.
+		return nil
+	}
+
+	b.initStepOutputsOnce.Do(func() {
+		b.stepOutputs = make([][]byte, len(b.Request.Steps))
+	})
+
+	// Grab any outputs reported by the builder.
+	f, err := b.fs.Open(path.Join(stepOutputDir, builderOutputFile))
+	if err != nil {
+		log.Printf("failed to open step %d output file: %v", idx, err)
+		return err
+	}
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, io.LimitReader(f, maxOutputBytes)); err != nil {
+		log.Printf("failed to read step %d output file: %v", idx, err)
+		return err
+	}
+
+	b.stepOutputs[idx] = buf.Bytes()
+	return nil
+}
 
 func (b *Build) runBuildSteps(ctx context.Context) error {
 	// Create BuildTotal TimeSpan with Start time. End time has zero value.
@@ -1053,23 +1179,27 @@ func (b *Build) runBuildSteps(ctx context.Context) error {
 
 	// Create all the volumes referenced by all steps and defer cleanup.
 	
-	allVolumes := map[string]bool{}
+	allVolumes := b.Request.GetOptions().GetVolumes()
 	for _, step := range b.Request.Steps {
-		for _, v := range step.Volumes {
-			if !allVolumes[v.Name] {
-				allVolumes[v.Name] = true
-				vol := volume.New(v.Name, b.Runner)
-				if err := vol.Setup(ctx); err != nil {
-					return err
-				}
-				defer func(v *volume.Volume, volName string) {
-					// Clean up on a background context; main context may have been timed out or cancelled.
-					ctx := context.Background()
-					if err := v.Close(ctx); err != nil {
-						log.Printf("Failed to delete volume %q: %v", volName, err)
-					}
-				}(vol, v.Name)
+		allVolumes = append(allVolumes, step.GetVolumes()...)
+	}
+
+	initializedVolumes := map[string]bool{}
+	for _, v := range allVolumes {
+		if !initializedVolumes[v.Name] {
+			initializedVolumes[v.Name] = true
+
+			vol := volume.New(v.Name, b.Runner)
+			if err := vol.Setup(ctx); err != nil {
+				return err
 			}
+			defer func(v *volume.Volume, volName string) {
+				// Clean up on a background context; main context may have been timed out or cancelled.
+				ctx := context.Background()
+				if err := v.Close(ctx); err != nil {
+					log.Printf("Failed to delete volume %q: %v", volName, err)
+				}
+			}(vol, v.Name)
 		}
 	}
 
@@ -1091,6 +1221,7 @@ func (b *Build) runBuildSteps(ctx context.Context) error {
 
 	b.mu.Lock()
 	b.Timing.BuildSteps = make([]*TimeSpan, len(b.Request.Steps))
+	b.Timing.BuildStepPulls = make([]*TimeSpan, len(b.Request.Steps))
 	b.stepStatus = make([]pb.Build_Status, len(b.Request.Steps))
 	b.mu.Unlock()
 
@@ -1157,6 +1288,7 @@ func (b *Build) dockerRunArgs(stepDir, stepOutputDir string, idx int) []string {
 		args = append(args, "--rm")
 	}
 
+	// Take into account RepoSource dir field.
 	srcDir := ""
 	if dir := b.Request.GetSource().GetRepoSource().GetDir(); dir != "" {
 		srcDir = dir
@@ -1165,11 +1297,15 @@ func (b *Build) dockerRunArgs(stepDir, stepOutputDir string, idx int) []string {
 	args = append(args,
 		// Gives a unique name to each build step.
 		// Makes the build step easier to kill when it fails.
-		"--name", fmt.Sprintf("step_%d", idx),
+		"--name", fmt.Sprintf("step_%d", idx))
 
-		// Make sure the container uses the correct docker daemon.
-		"--volume", "/var/run/docker.sock:/var/run/docker.sock",
+		args = append(args,
+			// Make sure the container uses the correct docker daemon.
+			"--volume", "/var/run/docker.sock:/var/run/docker.sock",
+			// Run in privileged mode.
+			"--privileged")
 
+	args = append(args,
 		// Mount the project workspace.
 		"--volume", b.hostWorkspaceDir+":"+containerWorkspaceDir,
 		// The build step runs from the workspace dir.
@@ -1185,9 +1321,11 @@ func (b *Build) dockerRunArgs(stepDir, stepOutputDir string, idx int) []string {
 
 		// Connect to the network for metadata.
 		"--network", "cloudbuild",
-		// Run in privileged mode per discussion in b/31267381.
-		"--privileged",
 
+		// Mount the step output dir.
+		"--volume", stepOutputDir+":"+stepOutputPath,
+		// Communicate the step output path to the builder via env var.
+		"--env", "BUILDER_OUTPUT="+stepOutputPath,
 	)
 	if !b.local {
 		args = append(args,
