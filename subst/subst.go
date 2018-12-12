@@ -101,7 +101,7 @@ func SubstituteBuildFields(b *pb.Build) error {
 		return string(out)
 	}
 
-	// Apply variable expansion to steps and images fields.
+	// Apply variable expansion to fields.
 	for _, step := range b.Steps {
 		step.Name = applyReplacements(step.Name)
 		for i, a := range step.Args {
@@ -119,8 +119,7 @@ func SubstituteBuildFields(b *pb.Build) error {
 	for i, t := range b.Tags {
 		b.Tags[i] = applyReplacements(t)
 	}
-
-	// Apply variable expansion to artifact images and objects.
+	b.LogsBucket = applyReplacements(b.LogsBucket)
 	if b.Artifacts != nil {
 		for i, img := range b.Artifacts.Images {
 			b.Artifacts.Images[i] = applyReplacements(img)

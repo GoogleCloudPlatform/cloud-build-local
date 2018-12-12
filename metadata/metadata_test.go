@@ -15,6 +15,7 @@
 package metadata
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -58,10 +59,56 @@ func TestGetAddress(t *testing.T) {
 	}
 }
 
+func TestReady(t *testing.T) {
+	cases := []struct {
+		readyStatusCode int
+		timeout         time.Duration
+		want            bool
+		name            string
+	}{
+		{http.StatusOK, time.Second, true, "happy case"},
+		{http.StatusOK, -1 * time.Second, false, "timed out"},
+		{http.StatusBadRequest, time.Second, false, "bad request"},
+	}
+
+	for _, tc := range cases {
+		wasInfoHost := googleTokenInfoHost
+		wasMetadataIP := metadataHostedIP
+		defer func() {
+			googleTokenInfoHost = wasInfoHost
+			metadataHostedIP = wasMetadataIP
+		}()
+		t.Run(tc.name, func(t *testing.T) {
+			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					t.Fatalf("want %q, got %q", http.MethodGet, r.Method)
+				}
+				const wantEndpoint = "/ready"
+				if r.URL.Path != wantEndpoint {
+					t.Fatalf("want %q endpoint, got %q endpoint", wantEndpoint, r.URL.Path)
+				}
+				w.WriteHeader(tc.readyStatusCode)
+				return
+			}))
+			defer s.Close()
+			googleTokenInfoHost = s.URL
+			metadataHostedIP = s.URL
+
+			u := RealUpdater{false}
+			ctx, cancel := context.WithTimeout(context.Background(), tc.timeout)
+			defer cancel()
+			got := u.Ready(ctx)
+			if tc.want != got {
+				t.Errorf("got %t, want %t", got, tc.want)
+			}
+		})
+	}
+}
+
 func testServer(t *testing.T,
 	tokenStatusCode int, // response to a SetToken
 	scopesStatusCode int, scopesBody string, // response to a getScopes
-	buildStatusCode int, // response to a SetProjectInfo
+	buildStatusCode int, // response to a POST "/build"
 ) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
@@ -89,6 +136,14 @@ func testServer(t *testing.T,
 }
 
 func TestSetToken(t *testing.T) {
+	ctx := context.Background()
+	wasInfoHost := googleTokenInfoHost
+	wasMetadataIP := metadataHostedIP
+	defer func() {
+		googleTokenInfoHost = wasInfoHost
+		metadataHostedIP = wasMetadataIP
+	}()
+
 	cases := []struct {
 		tokenStatusCode, scopesStatusCode int
 		scopesBody                        string
@@ -100,14 +155,7 @@ func TestSetToken(t *testing.T) {
 		{http.StatusBadRequest, http.StatusOK, "{}", true, "bad token request"},
 		{http.StatusOK, http.StatusBadRequest, "{}", true, "bad scopes request"},
 	}
-
 	for _, tc := range cases {
-		wasInfoHost := googleTokenInfoHost
-		wasMetadataIP := metadataHostedIP
-		defer func() {
-			googleTokenInfoHost = wasInfoHost
-			metadataHostedIP = wasMetadataIP
-		}()
 		t.Run(tc.name, func(t *testing.T) {
 			s := testServer(t, tc.tokenStatusCode, tc.scopesStatusCode, tc.scopesBody, 0)
 			defer s.Close()
@@ -115,7 +163,7 @@ func TestSetToken(t *testing.T) {
 			metadataHostedIP = s.URL
 
 			u := RealUpdater{false}
-			got := u.SetToken(&Token{})
+			got := u.SetToken(ctx, &Token{})
 			if got == nil && tc.wantError || got != nil && !tc.wantError {
 				t.Errorf("got %v, wantError==%t", got, tc.wantError)
 			}
@@ -124,6 +172,7 @@ func TestSetToken(t *testing.T) {
 }
 
 func TestGetScopes(t *testing.T) {
+	ctx := context.Background()
 	wasInfoHost := googleTokenInfoHost
 	wasMetadataIP := metadataHostedIP
 	defer func() {
@@ -151,7 +200,7 @@ func TestGetScopes(t *testing.T) {
 			googleTokenInfoHost = s.URL
 			metadataHostedIP = s.URL
 
-			gotScopes, gotErr := getScopes("token string")
+			gotScopes, gotErr := getScopes(ctx, "token string")
 			if gotErr == nil && tc.wantError || gotErr != nil && !tc.wantError {
 				t.Errorf("got %v, wantError==%t", gotErr, tc.wantError)
 			}
@@ -163,6 +212,7 @@ func TestGetScopes(t *testing.T) {
 }
 
 func TestProjectInfo(t *testing.T) {
+	ctx := context.Background()
 	wasInfoHost := googleTokenInfoHost
 	wasMetadataIP := metadataHostedIP
 	defer func() {
@@ -186,7 +236,7 @@ func TestProjectInfo(t *testing.T) {
 			metadataHostedIP = s.URL
 
 			u := RealUpdater{false}
-			got := u.SetProjectInfo(ProjectInfo{})
+			got := u.SetProjectInfo(ctx, ProjectInfo{})
 			if got == nil && tc.wantError || got != nil && !tc.wantError {
 				t.Errorf("got %v, wantError==%t", got, tc.wantError)
 			}

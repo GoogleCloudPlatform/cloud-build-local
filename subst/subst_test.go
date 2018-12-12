@@ -90,6 +90,9 @@ func checkBuild(got, want *pb.Build) error {
 			return fmt.Errorf("in tags[%d]: got %q, want %q", i, g, want.Tags[i])
 		}
 	}
+	if got.LogsBucket != want.LogsBucket {
+		return fmt.Errorf("logsBucket got %q, want %q", got.LogsBucket, want.LogsBucket)
+	}
 	return nil
 }
 
@@ -102,8 +105,9 @@ func TestBranch(t *testing.T) {
 			Dir:        "let's say... $BRANCH_NAME?",
 			Entrypoint: "thisMakesNoSenseBut...$BUILD_ID",
 		}},
-		Images: []string{"gcr.io/foo/$BRANCH_NAME:${COMMIT_SHA}"},
-		Tags:   []string{"${BRANCH_NAME}", "repo=${REPO_NAME}", "unchanged"},
+		Images:     []string{"gcr.io/foo/$BRANCH_NAME:${COMMIT_SHA}"},
+		Tags:       []string{"${BRANCH_NAME}", "repo=${REPO_NAME}", "unchanged"},
+		LogsBucket: "gs://${PROJECT_ID}/branch/${BRANCH_NAME}",
 	}
 	addProjectSourceAndProvenance(b)
 	addBranchName(b)
@@ -119,8 +123,9 @@ func TestBranch(t *testing.T) {
 			Dir:        "let's say... my-branch?",
 			Entrypoint: "thisMakesNoSenseBut...build_id",
 		}},
-		Images: []string{"gcr.io/foo/my-branch:abcdefg1234567"},
-		Tags:   []string{"my-branch", "repo=my-repo", "unchanged"},
+		Images:     []string{"gcr.io/foo/my-branch:abcdefg1234567"},
+		Tags:       []string{"my-branch", "repo=my-repo", "unchanged"},
+		LogsBucket: "gs://my-project/branch/my-branch",
 	}); err != nil {
 		t.Error(err)
 	}

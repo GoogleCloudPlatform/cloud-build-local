@@ -44,7 +44,7 @@ import (
 
 const (
 	volumeNamePrefix  = "cloudbuild_vol_"
-	gcbDockerVersion  = "17.12.0-ce"
+	gcbDockerVersion  = "18.06.1-ce"
 	metadataImageName = "gcr.io/cloud-builders/metadata"
 )
 
@@ -114,11 +114,6 @@ func run(ctx context.Context, source string) error {
 	r := &runner.RealRunner{
 		DryRun: *dryRun,
 	}
-
-	// Channel to tell goroutines to stop.
-	// Do not defer the close() because we want this stop to happen before other
-	// defer functions.
-	stopchan := make(chan struct{})
 
 	// Clean leftovers from a previous build.
 	if err := common.Clean(ctx, r); err != nil {
@@ -193,7 +188,11 @@ func run(ctx context.Context, source string) error {
 
 	b := build.New(r, *buildConfig, nil /* TokenSource */, stdoutLogger{}, volumeName, afero.NewOsFs(), true, *push, *dryRun)
 
-	// Do not run the spoofed metadata server on a dryrun.
+	// Note: we explicitly call cancel() below rather than awaiting the defer cancel()
+	// because we want cancel() to happen before other defer functions. We defer to
+  // ensure that cancel() will be called on all code paths.
+	cancelableCtx, cancel := context.WithCancel(ctx)
+  defer cancel()
 	if !*dryRun {
 		// Set initial Docker credentials.
 		tok, err := gcloud.AccessToken(ctx, r)
@@ -209,11 +208,13 @@ func run(ctx context.Context, source string) error {
 
 		// On GCE, do not create a spoofed metadata server, use the existing one.
 		// The cloudbuild network is still needed, with a private subnet.
+		var mdTokenSetter metadataTokenSetter
 		if computeMetadata.OnGCE() {
 			if err := metadata.CreateCloudbuildNetwork(ctx, r, "172.22.0.0/16"); err != nil {
 				return fmt.Errorf("Error creating network: %v", err)
 			}
 			defer metadata.CleanCloudbuildNetwork(ctx, r)
+			mdTokenSetter = nopTokenSetter{}
 		} else {
 			if err := metadata.StartLocalServer(ctx, r, metadataImageName); err != nil {
 				return fmt.Errorf("Failed to start spoofed metadata server: %v", err)
@@ -223,50 +224,45 @@ func run(ctx context.Context, source string) error {
 			defer metadataUpdater.Stop(ctx, r)
 
 			// Feed the project info to the metadata server.
-			metadataUpdater.SetProjectInfo(projectInfo)
-
-			go supplyTokenToMetadata(ctx, metadataUpdater, r, stopchan)
+			metadataUpdater.SetProjectInfo(ctx, projectInfo)
+			mdTokenSetter = metadataUpdater
 		}
 
-		// Write docker credentials for GCR. This writes the initial
-		// ~/.docker/config.json, which is made available to build steps, and keeps
-		// a fresh token available. Note that the user could `gcloud auth` to
-		// switch accounts mid-build, and we wouldn't notice that until token
-		// refresh; switching accounts mid-build is not supported.
-		go func(tok *metadata.Token, stopchan <-chan struct{}) {
+		// Keep credentials up-to-date.
+		go func(ctx context.Context, tok *metadata.Token) {
+			var refresh time.Duration
 			for {
-				refresh := time.Duration(0)
-				if tok != nil {
-					refresh = common.RefreshDuration(tok.Expiry)
-				}
-
 				select {
 				case <-time.After(refresh):
-					var err error
-					tok, err = gcloud.AccessToken(ctx, r)
-					if err != nil {
-						log.Printf("Error getting access token to update docker credentials: %v\n", err)
-						continue
-					}
-
-					if err := b.UpdateDockerAccessToken(ctx, tok.AccessToken); err != nil {
-						log.Printf("Error updating docker credentials: %v", err)
-					}
-
-					b.TokenSource = oauth2.StaticTokenSource(&oauth2.Token{
-						AccessToken: tok.AccessToken,
-					})
-				case <-stopchan:
+				case <-ctx.Done():
 					return
 				}
+				tok, err := gcloud.AccessToken(ctx, r)
+				if err != nil {
+					log.Printf("Error getting gcloud token: %v", err)
+					continue
+				}
+
+				// Supply token to the metadata server.
+				if err := mdTokenSetter.SetToken(ctx, tok); err != nil {
+					log.Printf("Error updating token in metadata server: %v", err)
+				}
+
+				// Keep a fresh token in ~/.docker/config.json, which in turn is
+				// available to build steps.  Note that use of `gcloud auth` to switch
+				// accounts mid-build is not supported.
+				if err := b.UpdateDockerAccessToken(ctx, tok.AccessToken); err != nil {
+					log.Printf("Error updating docker credentials: %v", err)
+				}
+				b.TokenSource = oauth2.StaticTokenSource(&oauth2.Token{AccessToken: tok.AccessToken})
+				refresh = common.RefreshDuration(tok.Expiry)
 			}
-		}(tok, stopchan)
+		}(cancelableCtx, tok)
 	}
 
 	b.Start(ctx)
 	<-b.Done
-
-	close(stopchan)
+	cancel() // Cease background token updates.
 
 	if b.GetStatus().BuildStatus == build.StatusError {
 		return fmt.Errorf("Build finished with ERROR status")
@@ -276,28 +272,6 @@ func run(ctx context.Context, source string) error {
 		log.Printf("Warning: this was a dry run; add --dryrun=false if you want to run the build locally.")
 	}
 	return nil
-}
-
-// supplyTokenToMetadata gets gcloud token and supply it to the metadata server.
-func supplyTokenToMetadata(ctx context.Context, metadataUpdater metadata.RealUpdater, r runner.Runner, stopchan <-chan struct{}) {
-	for {
-		tok, err := gcloud.AccessToken(ctx, r)
-		if err != nil {
-			log.Printf("Error getting gcloud token: %v", err)
-			continue
-		}
-		if err := metadataUpdater.SetToken(tok); err != nil {
-			log.Printf("Error updating token in metadata server: %v", err)
-			continue
-		}
-		refresh := common.RefreshDuration(tok.Expiry)
-		select {
-		case <-time.After(refresh):
-			continue
-		case <-stopchan:
-			return
-		}
-	}
 }
 
 // dockerVersion gets local server and client docker versions.
@@ -361,3 +335,11 @@ func (pw prefixWriter) Write(b []byte) (int, error) {
 	}
 	return len(b), nil
 }
+
+type metadataTokenSetter interface {
+	SetToken(context.Context, *metadata.Token) error
+}
+
+type nopTokenSetter struct{}
+
+func (nopTokenSetter) SetToken(context.Context, *metadata.Token) error { return nil }

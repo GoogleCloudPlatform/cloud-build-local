@@ -73,6 +73,13 @@ const (
 	// maxOutputBytes is the max length of outputs persisted from builder
 	// outputs. Data beyond this length is ignored.
 	maxOutputBytes = 4 * 1024 // 4 KB
+
+	// osImage identifies an image (1) containing a base OS image that we can use
+	// to manipulate files on a Docker volume that (2) we know is either already
+	// locally available or is going to be (or very likely to be) pulled anyway
+	// for use during the build. We use our docker container image for this
+	// purpose.
+	osImage = "gcr.io/cloud-builders/docker"
 )
 
 var (
@@ -85,8 +92,6 @@ var (
 	// 'docker pull' output. For example,
 	// "Digest: sha256:070e421b4d5f88e0dd16b1214a47696ab18a7fa2d1f14fbf9ff52799c91df05c"
 	digestPullRE = regexp.MustCompile(`^Digest:\s*(sha256:[^\s]+)$`)
-	// RunRm : if true, all `docker run` commands will be passed a `--rm` flag.
-	RunRm = false
 	// timeNow is a function that returns the current time; stubbable for testing.
 	timeNow = time.Now
 	// baseDelay is passed to common.Backoff(); it is only modified in build_test.
@@ -418,6 +423,8 @@ var gcrHosts = []string{
 	"https://gcr.io",
 	"https://gcr-staging.sandbox.google.com",
 	"https://us.gcr.io",
+	"https://marketplace.gcr.io",
+	"https://k8s.gcr.io",
 }
 
 // SetDockerAccessToken sets the initial Docker config with the credentials we
@@ -443,7 +450,7 @@ func (b *Build) SetDockerAccessToken(ctx context.Context, tok string) error {
 		return err
 	}
 
-	// Simply run an "ubuntu" image with $HOME mounted that writes the ~/.docker/config.json file.
+	// Simply run an osImage container with $HOME mounted that writes the ~/.docker/config.json file.
 	var buf bytes.Buffer
 	args := []string{"docker", "run",
 		"--name", fmt.Sprintf("cloudbuild_set_docker_token_%s", uuid.New()),
@@ -455,7 +462,7 @@ func (b *Build) SetDockerAccessToken(ctx context.Context, tok string) error {
 		// Make sure the container uses the correct docker daemon.
 		"--volume", "/var/run/docker.sock:/var/run/docker.sock",
 		"--entrypoint", "bash",
-		"ubuntu",
+		osImage,
 		"-c", "mkdir -p ~/.docker/ && cat << EOF > ~/.docker/config.json\n" + string(configJSON) + "\nEOF"}
 	if err := b.Runner.Run(ctx, args, nil, &buf, &buf, ""); err != nil {
 		msg := fmt.Sprintf("failed to set initial docker credentials: %v\n%s", err, buf.String())
@@ -490,7 +497,7 @@ func (b *Build) UpdateDockerAccessToken(ctx context.Context, tok string) error {
 	// per-host config with the new token, for each host.
 	script := fmt.Sprintf("sed -i 's/%s/%s/g' ~/.docker/config.json", b.prevGCRAuth, auth)
 
-	// Simply run an "ubuntu" image with $HOME mounted that runs the sed script.
+	// Simply run an osImage container with $HOME mounted that runs the sed script.
 	var buf bytes.Buffer
 	args := []string{"docker", "run",
 		"--name", fmt.Sprintf("cloudbuild_update_docker_token_%s", uuid.New()),
@@ -502,7 +509,7 @@ func (b *Build) UpdateDockerAccessToken(ctx context.Context, tok string) error {
 		// Make sure the container uses the correct docker daemon.
 		"--volume", "/var/run/docker.sock:/var/run/docker.sock",
 		"--entrypoint", "bash",
-		"ubuntu",
+		osImage,
 		"-c", script}
 	if err := b.Runner.Run(ctx, args, nil, &buf, &buf, ""); err != nil {
 		msg := fmt.Sprintf("failed to update docker credentials: %v\n%s", err, buf.String())
@@ -929,13 +936,16 @@ func (b *Build) timeAndRunStep(ctx context.Context, idx int, waitChans []chan st
 	// Fetch the step's builder image and note how long that takes.
 	digest, err := b.fetchBuilder(ctx, idx)
 	end := timeNow()
+	b.mu.Lock()
 	b.Timing.BuildStepPulls[idx].End = end
+	b.mu.Unlock()
 	b.recordStepDigest(idx, digest)
 
 	// If pulling succeeded, try running the step.
 	if err == nil {
 		err = b.runStep(ctx, timeout, idx, digest)
 		end = timeNow()
+		log.Printf("Step %s finished", b.stepIdentifier(idx))
 
 		b.mu.Lock()
 		b.Timing.BuildSteps[idx].End = end
@@ -962,7 +972,9 @@ func (b *Build) timeAndRunStep(ctx context.Context, idx int, waitChans []chan st
 		b.mu.Unlock()
 	} else {
 		// Otherwise, step end time == pull end time
+		b.mu.Lock()
 		b.Timing.BuildSteps[idx].End = end
+		b.mu.Unlock()
 	}
 
 	// If another step executing in parallel fails and sends an error, this step
@@ -1282,22 +1294,16 @@ func workdir(rsDir, stepDir string) string {
 
 // dockerRunArgs returns common arguments to run docker.
 func (b *Build) dockerRunArgs(stepDir, stepOutputDir string, idx int) []string {
-	args := []string{"docker", "run"}
-	if RunRm {
-		// remove the container when it exits
-		args = append(args, "--rm")
-	}
-
 	// Take into account RepoSource dir field.
 	srcDir := ""
 	if dir := b.Request.GetSource().GetRepoSource().GetDir(); dir != "" {
 		srcDir = dir
 	}
 
-	args = append(args,
+	args := []string{"docker", "run", "--rm",
 		// Gives a unique name to each build step.
 		// Makes the build step easier to kill when it fails.
-		"--name", fmt.Sprintf("step_%d", idx))
+		"--name", fmt.Sprintf("step_%d", idx)}
 
 		args = append(args,
 			// Make sure the container uses the correct docker daemon.
@@ -1338,6 +1344,7 @@ func (b *Build) dockerRunArgs(stepDir, stepOutputDir string, idx int) []string {
 
 // cleanBuildSteps kills running build steps and then removes their containers.
 func (b *Build) cleanBuildSteps(ctx context.Context) {
+
 	dockerKillArgs := []string{"docker", "rm", "-f"}
 	for idx := range b.Request.Steps {
 		dockerKillArgs = append(dockerKillArgs, fmt.Sprintf("step_%d", idx))

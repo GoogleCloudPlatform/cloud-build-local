@@ -62,15 +62,21 @@ const (
 	localMetadata = "http://localhost:8082"
 )
 
-// metadataHostedIP is the IP that the metadata spoofer listens to in the
-// hosted cloudbuild environment. iptables is used to route tcp connections
-// going to 169.254.169.254 port 80 to this IP instead.
-var metadataHostedIP = "192.168.10.5" // var for testing
+var (
+	// metadataHostedIP is the IP that the metadata spoofer listens to in the
+	// hosted cloudbuild environment. iptables is used to route tcp connections
+	// going to 169.254.169.254 port 80 to this IP instead.
+	metadataHostedIP = "192.168.10.5" // var for testing
+
+	// httpTimeout is the timeout for http calls; var for testing
+	httpTimeout = 10 * time.Second
+)
 
 // Updater encapsulates updating the spoofed metadata server.
 type Updater interface {
-	SetToken(*Token) error
-	SetProjectInfo(ProjectInfo) error
+	SetToken(context.Context, *Token) error
+	SetProjectInfo(context.Context, ProjectInfo) error
+	Ready(context.Context) bool // Returns true if metadata is up and running.
 }
 
 // ProjectInfo represents an incoming build request containing the project ID
@@ -115,8 +121,8 @@ func (r RealUpdater) getAddress() string {
 }
 
 // SetToken updates the spoofed metadata server's credentials.
-func (r RealUpdater) SetToken(tok *Token) error {
-	scopes, err := getScopes(tok.AccessToken)
+func (r RealUpdater) SetToken(ctx context.Context, tok *Token) error {
+	scopes, err := getScopes(ctx, tok.AccessToken)
 	if err != nil {
 		return err
 	}
@@ -126,7 +132,15 @@ func (r RealUpdater) SetToken(tok *Token) error {
 		return err
 	}
 
-	resp, err := http.Post(r.getAddress()+"/token", "application/json", &buf)
+	req, err := http.NewRequest(http.MethodPost, r.getAddress()+"/token", &buf)
+	if err != nil {
+		return err
+	}
+	req.Header.Add("Content-Type", "application/json")
+
+	ctx, cancel := context.WithTimeout(ctx, httpTimeout)
+	defer cancel()
+	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
 	if err != nil {
 		return err
 	}
@@ -144,7 +158,7 @@ var googleTokenInfoHost = "https://www.googleapis.com"
 //
 // It determines this by POSTing to the tokeninfo API:
 // https://developers.google.com/identity/protocols/OAuth2UserAgent#validatetoken
-func getScopes(tok string) ([]string, error) {
+func getScopes(ctx context.Context, tok string) ([]string, error) {
 	data := url.Values{}
 	data.Set("access_token", tok)
 
@@ -156,8 +170,20 @@ func getScopes(tok string) ([]string, error) {
 			log.Printf("Waiting %v before retry...", delay)
 			time.Sleep(delay)
 		}
+
+		var req *http.Request
+		req, err = http.NewRequest(http.MethodPost, googleTokenInfoHost+"/oauth2/v3/tokeninfo", strings.NewReader(data.Encode()))
+		if err != nil {
+			log.Printf("Error preparing request on attempt #%d/%d: %v", i+1, maxTries, err)
+			continue
+		}
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+		ctx, cancel := context.WithTimeout(ctx, httpTimeout)
+		defer cancel()
 		var resp *http.Response
-		if resp, err = http.Post(googleTokenInfoHost+"/oauth2/v3/tokeninfo", "application/x-www-form-urlencoded", strings.NewReader(data.Encode())); err != nil {
+		resp, err = http.DefaultClient.Do(req.WithContext(ctx))
+		if err != nil {
 			log.Printf("Error reading scopes on attempt #%d/%d: %v", i+1, maxTries, err)
 			continue
 		}
@@ -181,12 +207,21 @@ func getScopes(tok string) ([]string, error) {
 }
 
 // SetProjectInfo updates the spoofed metadata server's project information.
-func (r RealUpdater) SetProjectInfo(b ProjectInfo) error {
+func (r RealUpdater) SetProjectInfo(ctx context.Context, b ProjectInfo) error {
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(b); err != nil {
 		return err
 	}
-	if resp, err := http.Post(r.getAddress()+"/build", "application/json", &buf); err != nil {
+
+	req, err := http.NewRequest(http.MethodPost, r.getAddress()+"/build", &buf)
+	if err != nil {
+		return fmt.Errorf("Request failed: %v", err)
+	}
+	req.Header.Add("Content-Type", "application/json")
+
+	ctx, cancel := context.WithTimeout(ctx, httpTimeout)
+	defer cancel()
+	if resp, err := http.DefaultClient.Do(req.WithContext(ctx)); err != nil {
 		return err
 	} else if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
@@ -196,8 +231,30 @@ func (r RealUpdater) SetProjectInfo(b ProjectInfo) error {
 	return nil
 }
 
-// StartLocalServer starts the metadata server container for VMs running as
-// part of the Cloud Build service.
+// Ready returns true if the metadata server is up and running.
+func (r RealUpdater) Ready(ctx context.Context) bool {
+	req, err := http.NewRequest(http.MethodGet, r.getAddress()+"/ready", nil)
+	if err != nil {
+		// This is a glorious failure that should never happen...
+		log.Printf("Failed to make request: %v", err)
+		return false
+	}
+	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+	if err != nil {
+		log.Printf("Metadata not ready: %v", err)
+		return false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		all, _ := ioutil.ReadAll(resp.Body)
+		log.Printf("/ready failed (%d): %s", resp.StatusCode, string(all))
+		return false
+	}
+	return true
+}
+
+// StartLocalServer starts the metadata server container for VMs running
+// independent from the Cloud Build service.
 //
 // This version of Start*Server does not update iptables.
 //

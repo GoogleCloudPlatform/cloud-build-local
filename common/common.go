@@ -126,9 +126,18 @@ var now = time.Now
 // RefreshDuration calculates when to refresh the access token. We refresh a
 // bit prior to the token's expiration.
 func RefreshDuration(expiration time.Time) time.Duration {
-	d := expiration.Sub(now())
+	calledAt := now()
+	if expiration.Before(calledAt) {
+		return time.Duration(0)
+	}
+	d := expiration.Sub(calledAt)
 	if d > 4*time.Second {
-		d = time.Duration(float64(d)*.75) + time.Second
+		d = time.Duration(float64(d) * .75)
+	} else {
+		d -= time.Second
+		if d < time.Duration(0) {
+			d = time.Duration(0) // Force immediate refresh.
+		}
 	}
 
 	return d

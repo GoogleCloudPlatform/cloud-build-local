@@ -180,12 +180,11 @@ docker volume rm id1 id2`
 }
 
 func TestRefreshDuration(t *testing.T) {
-	start := time.Now()
-
 	// control time.Now for tests.
-	now = func() time.Time {
-		return start
-	}
+	start := time.Now()
+	was := now
+	now = func() time.Time { return start }
+	defer func() { now = was }()
 
 	for _, tc := range []struct {
 		desc       string
@@ -194,15 +193,35 @@ func TestRefreshDuration(t *testing.T) {
 	}{{
 		desc:       "long case",
 		expiration: start.Add(time.Hour),
-		want:       45*time.Minute + time.Second,
+		want:       45 * time.Minute,
 	}, {
 		desc:       "short case",
 		expiration: start.Add(4 * time.Minute),
-		want:       3*time.Minute + time.Second,
+		want:       3 * time.Minute,
+	}, {
+		desc:       "pretty short",
+		expiration: start.Add(2 * time.Second),
+		want:       time.Second,
 	}, {
 		desc:       "pathologically short",
 		expiration: start.Add(time.Second),
-		want:       time.Second,
+		want:       time.Duration(0),
+	}, {
+		desc:       "danger, will robinson",
+		expiration: start.Add(time.Millisecond),
+		want:       time.Duration(0),
+	}, {
+		desc:       "expired",
+		expiration: start.Add(-1 * time.Minute),
+		want:       time.Duration(0),
+	}, {
+		desc:       "epoch",
+		expiration: time.Time{},
+		want:       time.Duration(0),
+	}, {
+		desc:       "equal",
+		expiration: start,
+		want:       time.Duration(0),
 	}} {
 		got := RefreshDuration(tc.expiration)
 		if got != tc.want {
