@@ -345,7 +345,6 @@ func CheckArtifacts(b *pb.Build) error {
 			pathExists[p] = true
 
 			// Paths with whitespace are invalid.
-			
 			for _, ch := range p {
 				if unicode.IsSpace(ch) {
 					return fmt.Errorf(".artifacts.paths %q contains whitespace", p)

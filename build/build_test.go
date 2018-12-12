@@ -197,20 +197,21 @@ func (r *mockRunner) Run(ctx context.Context, args []string, in io.Reader, out, 
 	r.commands = append(r.commands, strings.Join(args, " "))
 	r.mu.Unlock()
 
-	if contains(args, "sleep") {
+	switch {
+	case contains(args, "sleep"):
 		// Sleep duration is the last argument.
 		sleepArg := args[len(args)-1]
 		// Parse the duration argument as milliseconds.
-		dur, err := time.ParseDuration(fmt.Sprintf("%s%s", sleepArg, "ms"))
+		dur, err := time.ParseDuration(sleepArg)
 		if err != nil {
-			return fmt.Errorf("bad args for 'sleep': got %s, want integer value", args[1])
+			return fmt.Errorf("bad args for 'sleep': got %s, want duration", args[1])
 		}
 		time.Sleep(dur)
-	}
-	if startsWith(args, "gsutil") {
+
+	case startsWith(args, "gsutil"):
 		return r.gsutil(ctx, args[1:], in, out, err)
-	}
-	if startsWith(args, "docker", "images") {
+
+	case startsWith(args, "docker", "images"):
 		if args[2] != "-q" {
 			return errors.New("bad args for 'docker image'")
 		}
@@ -220,8 +221,8 @@ func (r *mockRunner) Run(ctx context.Context, args []string, in io.Reader, out, 
 		}
 		// if it's not there, write nothing but still no error.
 		return nil
-	}
-	if startsWith(args, "docker", "inspect") {
+
+	case startsWith(args, "docker", "inspect"):
 		tag := args[2]
 		r.mu.Lock()
 		localImage := r.localImages[tag]
@@ -244,8 +245,8 @@ func (r *mockRunner) Run(ctx context.Context, args []string, in io.Reader, out, 
 		}
 		// Image not present.
 		return errors.New("exit status 1")
-	}
-	if startsWith(args, "docker", "run") && contains(args, "gcr.io/cloud-builders/docker", "pull") {
+
+	case startsWith(args, "docker", "run") && contains(args, "gcr.io/cloud-builders/docker", "pull"):
 		if r.remotePullsFail {
 			// Failed pull.
 			return errors.New("exit status 1")
@@ -265,8 +266,8 @@ Status: Downloaded newer image for gcr.io/test/busybox:latest
 		}
 		// Failed pull.
 		return fmt.Errorf("exit status 1 for tag %q", tag)
-	}
-	if startsWith(args, "docker", "run") && contains(args, "gcr.io/cloud-builders/docker", "push") {
+
+	case startsWith(args, "docker", "run") && contains(args, "gcr.io/cloud-builders/docker", "push"):
 		if r.remotePushesFail {
 			// Failed push.
 			return errors.New("exit status 1")
@@ -290,42 +291,38 @@ ea358092da77: Image successfully pushed
 
 		// Successful push.
 		return nil
-	}
-	if startsWith(args, "docker", "run") && contains(args, "gcr.io/cloud-builders/gsutil") {
+
+	case startsWith(args, "docker", "run") && contains(args, "gcr.io/cloud-builders/gsutil"):
 		for i, a := range args {
 			if a == "gcr.io/cloud-builders/gsutil" && i < len(args)-2 {
 				return r.gsutil(ctx, args[i+1:], in, out, err)
 			}
 		}
 		return fmt.Errorf("no commands for gcr.io/cloud-builders/gsutil: %+v", args)
-	}
-	if startsWith(args, "docker", "run") && r.dockerRunHandler != nil {
+
+	case startsWith(args, "docker", "run") && r.dockerRunHandler != nil:
 		return r.dockerRunHandler(args, out, err)
-	}
-	if startsWith(args, "docker", "volume") {
-		if startsWith(args, "docker", "volume", "create", "--name") {
-			volName := args[len(args)-1]
-			if r.volumes[volName] {
-				return fmt.Errorf("volume %q has already been created", volName)
-			}
-			r.volumes[volName] = true
-			return nil
+
+	case startsWith(args, "docker", "volume", "create", "--name"):
+		volName := args[len(args)-1]
+		if r.volumes[volName] {
+			return fmt.Errorf("volume %q has already been created", volName)
 		}
-		if startsWith(args, "docker", "volume", "rm") {
-			volName := args[len(args)-1]
-			if r.volumes[volName] {
-				return fmt.Errorf("volume %q has not been created (or was already deleted)", volName)
-			}
-			delete(r.volumes, volName)
-			return nil
+		r.volumes[volName] = true
+		return nil
+
+	case startsWith(args, "docker", "volume", "rm"):
+		volName := args[len(args)-1]
+		if r.volumes[volName] {
+			return fmt.Errorf("volume %q has not been created (or was already deleted)", volName)
 		}
-		r.t.Errorf("Unexpected docker volume call: %v", args)
+		delete(r.volumes, volName)
 		return nil
-	}
-	if startsWith(args, "docker", "rm") {
+
+	case startsWith(args, "docker", "rm"):
 		return nil
-	}
-	if startsWith(args, "unzip") {
+
+	case startsWith(args, "unzip"):
 		filename := args[1]
 		contents := r.localFiles[filename]
 		switch contents {
@@ -339,8 +336,8 @@ ea358092da77: Image successfully pushed
 			r.t.Errorf("%s: Unexpected zipfile contents: %q", r.testCaseName, contents)
 			return nil
 		}
-	}
-	if startsWith(args, "tar") {
+
+	case startsWith(args, "tar"):
 		var contents string
 		if startsWith(args, "tar", "-xzf") {
 			filename := args[2]
@@ -365,12 +362,13 @@ ea358092da77: Image successfully pushed
 			r.t.Errorf("%s: Unexpected tarball contents: %q", r.testCaseName, contents)
 			return nil
 		}
-	}
-	if startsWith(args, "/root/write_docker_creds.bash") {
-		return nil
-	}
 
-	r.t.Errorf("%s: unexpected command passed to mockRunner: %q", r.testCaseName, args)
+	case startsWith(args, "/root/write_docker_creds.bash"):
+		return nil
+
+	default:
+		r.t.Errorf("%s: unexpected command passed to mockRunner: %q", r.testCaseName, args)
+	}
 	return nil
 }
 
@@ -1645,7 +1643,6 @@ func TestBuildTiming(t *testing.T) {
 // TestBuildTimingOutOfOrder ensures the correctness of build step timings when steps execute out of order.
 func TestBuildTimingOutOfOrder(t *testing.T) {
 	ctx := context.Background()
-	// Step args specify how long the step should sleep in milliseconds.
 	testCases := []struct {
 		name         string
 		buildRequest pb.Build
@@ -1656,10 +1653,10 @@ func TestBuildTimingOutOfOrder(t *testing.T) {
 		buildRequest: pb.Build{
 			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/step-zero",
-				Args: []string{"sleep", "25"},
+				Args: []string{"sleep", "1s"},
 			}, {
 				Name:    "gcr.io/step-one",
-				Args:    []string{"sleep", "10"},
+				Args:    []string{"sleep", "1ns"},
 				WaitFor: []string{"-"}, // begin immediately while step 0 is running
 			}},
 		},
@@ -1669,18 +1666,18 @@ func TestBuildTimingOutOfOrder(t *testing.T) {
 		buildRequest: pb.Build{
 			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/step-zero",
-				Args: []string{"sleep", "100"},
+				Args: []string{"sleep", "5s"},
 			}, {
 				Name:    "gcr.io/step-one",
-				Args:    []string{"sleep", "50"},
+				Args:    []string{"sleep", "3s"},
 				WaitFor: []string{"-"},
 			}, {
 				Name:    "gcr.io/step-two",
-				Args:    []string{"sleep", "25"},
+				Args:    []string{"sleep", "1s"},
 				WaitFor: []string{"-"},
 			}, {
 				Name:    "gcr.io/step-three",
-				Args:    []string{"sleep", "10"},
+				Args:    []string{"sleep", "1ns"},
 				WaitFor: []string{"-"},
 			}},
 		},
@@ -1690,18 +1687,18 @@ func TestBuildTimingOutOfOrder(t *testing.T) {
 		buildRequest: pb.Build{
 			Steps: []*pb.BuildStep{{
 				Name: "gcr.io/step-zero",
-				Args: []string{"sleep", "100"},
+				Args: []string{"sleep", "3s"},
 			}, {
 				Name:    "gcr.io/step-one",
-				Args:    []string{"sleep", "10"},
+				Args:    []string{"sleep", "1ns"},
 				WaitFor: []string{"-"},
 			}, {
 				Name:    "gcr.io/step-two",
-				Args:    []string{"sleep", "50"},
+				Args:    []string{"sleep", "1s"},
 				WaitFor: []string{"-"},
 			}, {
 				Name:    "gcr.io/step-three",
-				Args:    []string{"sleep", "25"},
+				Args:    []string{"sleep", "100ms"},
 				WaitFor: []string{"-"},
 			}},
 		},
@@ -2610,7 +2607,7 @@ func TestTimeout(t *testing.T) {
 			Name: "gcr.io/step-zero",
 		}, {
 			Name:    "gcr.io/step-one",
-			Args:    []string{"sleep", "5000"}, // mockRunner will sleep this many ms.
+			Args:    []string{"sleep", "5s"},
 			WaitFor: []string{"-"},
 		}, {
 			Name: "gcr.io/step-two",
@@ -2637,7 +2634,7 @@ func TestCancel(t *testing.T) {
 			Name: "gcr.io/step-zero",
 		}, {
 			Name:    "gcr.io/step-one",
-			Args:    []string{"sleep", "30000"}, // mockRunner will sleep this many ms.
+			Args:    []string{"sleep", "30s"},
 			WaitFor: []string{"-"},
 		}, {
 			Name: "gcr.io/step-two",
@@ -2786,7 +2783,11 @@ func TestUpdateDockerAccessToken(t *testing.T) {
 
 	got := strings.Join(r.commands, "\n")
 	want := strings.Join([]string{
-		`docker run --name cloudbuild_set_docker_token_` + uuidRegex + ` --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock --entrypoint bash ubuntu -c mkdir -p ~/.docker/ && cat << EOF > ~/.docker/config.json
+		fmt.Sprint(
+			`docker run --name cloudbuild_set_docker_token_`, uuidRegex,
+			` --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock --entrypoint bash `,
+			osImage,
+			` -c mkdir -p ~/.docker/ && cat << EOF > ~/.docker/config.json
 {
   "auths": {
     "https://asia.gcr.io": {
@@ -2807,14 +2808,22 @@ func TestUpdateDockerAccessToken(t *testing.T) {
     "https://gcr.io": {
       "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
     },
+    "https://k8s.gcr.io": {
+      "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
+    },
+    "https://marketplace.gcr.io": {
+      "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
+    },
     "https://us.gcr.io": {
       "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
     }
   }
 }
-EOF`,
-		"docker run --name cloudbuild_update_docker_token_" + uuidRegex + " --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock --entrypoint bash ubuntu -c sed -i 's/b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q=/b2F1dGgyYWNjZXNzdG9rZW46U0VDT05E/g' ~/.docker/config.json",
-	}, "\n")
+EOF`), fmt.Sprint(
+			"docker run --name cloudbuild_update_docker_token_", uuidRegex,
+			" --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock --entrypoint bash ",
+			osImage,
+			" -c sed -i 's/b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q=/b2F1dGgyYWNjZXNzdG9rZW46U0VDT05E/g' ~/.docker/config.json")}, "\n")
 	if match, _ := regexp.MatchString(want, got); !match {
 		t.Errorf("Commands didn't match!\n===Want:\n%s\n===Got:\n%s", want, got)
 	}
@@ -2987,7 +2996,7 @@ func (nopBuildLogger) MakeWriter(string, int, bool) io.Writer { return ioutil.Di
 // Test coverage to confirm that we don't have the data race fixed in cl/190142977.
 func TestDataRace(t *testing.T) {
 	build := pb.Build{
-		Steps:  []*pb.BuildStep{{Name: "gcr.io/step-zero", Args: []string{"sleep", "1"}}},
+		Steps:  []*pb.BuildStep{{Name: "gcr.io/step-zero", Args: []string{"sleep", "1ns"}}},
 		Images: []string{"one", "two", "three", "four", "five"},
 	}
 	r := newMockRunner(t, "race")
