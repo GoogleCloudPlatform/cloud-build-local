@@ -80,6 +80,9 @@ func TestReady(t *testing.T) {
 		}()
 		t.Run(tc.name, func(t *testing.T) {
 			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if want, got := headerVal, r.Header.Get(headerKey); want != got {
+					t.Errorf("Missing %q header: want %q, got %q", headerKey, want, got)
+				}
 				if r.Method != http.MethodGet {
 					t.Fatalf("want %q, got %q", http.MethodGet, r.Method)
 				}
@@ -111,6 +114,9 @@ func testServer(t *testing.T,
 	buildStatusCode int, // response to a POST "/build"
 ) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if want, got := headerVal, r.Header.Get(headerKey); want != got {
+			t.Errorf("Missing %q header: want %q, got %q", headerKey, want, got)
+		}
 		if r.Method == http.MethodPost {
 			switch r.URL.Path {
 			case "/token":

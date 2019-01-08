@@ -18,6 +18,7 @@ package validate
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path"
 	"reflect"
 	"regexp"
@@ -167,7 +168,7 @@ func CheckSubstitutions(substitutions map[string]string) error {
 	}
 
 	// Also check that all the substitions have the user-defined format.
-	for k, _ := range substitutions {
+	for k := range substitutions {
 		if !validUserSubstKeyRE.MatchString(k) {
 			return fmt.Errorf("substitution key %q does not respect format %q", k, validUserSubstKeyRE)
 		}
@@ -736,4 +737,14 @@ func checkVolumes(b *pb.Build) error {
 	}
 
 	return nil
+}
+
+// IsDirectory checks if the directory exists.
+func IsDirectory(path string) (bool, error) {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
+	mode := fileInfo.Mode()
+	return mode.IsDir(), nil
 }
