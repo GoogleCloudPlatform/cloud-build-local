@@ -31,6 +31,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -60,6 +61,11 @@ const (
 
 	// localMetadata is the host:port for metadata when running the local builder.
 	localMetadata = "http://localhost:8082"
+
+	// Header constants
+	headerKey   = "Metadata-Flavor"
+	headerVal   = "Google"
+	contentType = "Content-Type"
 )
 
 var (
@@ -70,6 +76,8 @@ var (
 
 	// httpTimeout is the timeout for http calls; var for testing
 	httpTimeout = 10 * time.Second
+
+	jsonHeader = http.Header{contentType: []string{"application/json"}}
 )
 
 // Updater encapsulates updating the spoofed metadata server.
@@ -120,6 +128,26 @@ func (r RealUpdater) getAddress() string {
 	return addr
 }
 
+func doRequest(ctx context.Context, method, url string, body io.Reader, header http.Header) (io.ReadCloser, error) {
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header = header
+	req.Header.Set(headerKey, headerVal)
+
+	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		defer resp.Body.Close()
+		all, _ := ioutil.ReadAll(resp.Body)
+		return nil, fmt.Errorf("%s failed (%d): %s", method, resp.StatusCode, string(all))
+	}
+	return resp.Body, nil
+}
+
 // SetToken updates the spoofed metadata server's credentials.
 func (r RealUpdater) SetToken(ctx context.Context, tok *Token) error {
 	scopes, err := getScopes(ctx, tok.AccessToken)
@@ -132,22 +160,13 @@ func (r RealUpdater) SetToken(ctx context.Context, tok *Token) error {
 		return err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, r.getAddress()+"/token", &buf)
-	if err != nil {
-		return err
-	}
-	req.Header.Add("Content-Type", "application/json")
-
 	ctx, cancel := context.WithTimeout(ctx, httpTimeout)
 	defer cancel()
-	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+	body, err := doRequest(ctx, http.MethodPost, r.getAddress()+"/token", &buf, jsonHeader)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Got HTTP %d from spoofed metadata", resp.StatusCode)
-	}
+	body.Close()
 	return nil
 }
 
@@ -171,33 +190,20 @@ func getScopes(ctx context.Context, tok string) ([]string, error) {
 			time.Sleep(delay)
 		}
 
-		var req *http.Request
-		req, err = http.NewRequest(http.MethodPost, googleTokenInfoHost+"/oauth2/v3/tokeninfo", strings.NewReader(data.Encode()))
-		if err != nil {
-			log.Printf("Error preparing request on attempt #%d/%d: %v", i+1, maxTries, err)
-			continue
-		}
-		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
+		var body io.ReadCloser
 		ctx, cancel := context.WithTimeout(ctx, httpTimeout)
 		defer cancel()
-		var resp *http.Response
-		resp, err = http.DefaultClient.Do(req.WithContext(ctx))
+		body, err = doRequest(ctx, http.MethodPost, googleTokenInfoHost+"/oauth2/v3/tokeninfo",
+			strings.NewReader(data.Encode()), http.Header{contentType: []string{"application/x-www-form-urlencoded"}})
 		if err != nil {
 			log.Printf("Error reading scopes on attempt #%d/%d: %v", i+1, maxTries, err)
 			continue
 		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			all, _ := ioutil.ReadAll(resp.Body)
-			err = fmt.Errorf("POST failed (%d): %s", resp.StatusCode, string(all))
-			log.Printf("Error reading scopes on attempt #%d/%d: %v", i+1, maxTries, err)
-			continue
-		}
+		defer body.Close()
 		r := struct {
 			Scope string `json:"scope"`
 		}{}
-		if err = json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		if err = json.NewDecoder(body).Decode(&r); err != nil {
 			log.Printf("Error decoding scopes response on attempt #%d/%d: %v", i+1, maxTries, err)
 			continue
 		}
@@ -213,43 +219,25 @@ func (r RealUpdater) SetProjectInfo(ctx context.Context, b ProjectInfo) error {
 		return err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, r.getAddress()+"/build", &buf)
-	if err != nil {
-		return fmt.Errorf("Request failed: %v", err)
-	}
-	req.Header.Add("Content-Type", "application/json")
-
 	ctx, cancel := context.WithTimeout(ctx, httpTimeout)
 	defer cancel()
-	if resp, err := http.DefaultClient.Do(req.WithContext(ctx)); err != nil {
+	body, err := doRequest(ctx, http.MethodPost, r.getAddress()+"/build", &buf, jsonHeader)
+	if err != nil {
 		return err
-	} else if resp.StatusCode != http.StatusOK {
-		defer resp.Body.Close()
-		all, _ := ioutil.ReadAll(resp.Body)
-		return fmt.Errorf("POST failed (%d): %s", resp.StatusCode, string(all))
 	}
+
+	defer body.Close()
 	return nil
 }
 
 // Ready returns true if the metadata server is up and running.
 func (r RealUpdater) Ready(ctx context.Context) bool {
-	req, err := http.NewRequest(http.MethodGet, r.getAddress()+"/ready", nil)
-	if err != nil {
-		// This is a glorious failure that should never happen...
-		log.Printf("Failed to make request: %v", err)
-		return false
-	}
-	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+	body, err := doRequest(ctx, http.MethodGet, r.getAddress()+"/ready", nil, http.Header{})
 	if err != nil {
 		log.Printf("Metadata not ready: %v", err)
 		return false
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		all, _ := ioutil.ReadAll(resp.Body)
-		log.Printf("/ready failed (%d): %s", resp.StatusCode, string(all))
-		return false
-	}
+	body.Close()
 	return true
 }
 

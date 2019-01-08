@@ -39,28 +39,31 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-build-local/gcloud"
 	"github.com/GoogleCloudPlatform/cloud-build-local/metadata"
 	"github.com/GoogleCloudPlatform/cloud-build-local/runner"
+	"github.com/GoogleCloudPlatform/cloud-build-local/validate"
 	"github.com/GoogleCloudPlatform/cloud-build-local/volume"
 )
 
 const (
 	volumeNamePrefix  = "cloudbuild_vol_"
-	gcbDockerVersion  = "18.06.1-ce"
+	gcbDockerVersion  = "18.09.0"
 	metadataImageName = "gcr.io/cloud-builders/metadata"
 )
 
 var (
-	configFile     = flag.String("config", "cloudbuild.yaml", "File path of the config file")
-	substitutions  = flag.String("substitutions", "", `key=value pairs where the key is already defined in the build request; separate multiple substitutions with a comma, for example: _FOO=bar,_BAZ=baz`)
-	dryRun         = flag.Bool("dryrun", true, "Lints the config file and prints but does not run the commands; Local Builder runs the commands only when dryrun is set to false")
-	push           = flag.Bool("push", false, "Pushes the images to the registry")
-	noSource       = flag.Bool("no-source", false, "Prevents Local Builder from using source for this build")
+	configFile      = flag.String("config", "cloudbuild.yaml", "File path of the config file")
+	substitutions   = flag.String("substitutions", "", `key=value pairs where the key is already defined in the build request; separate multiple substitutions with a comma, for example: _FOO=bar,_BAZ=baz`)
+	dryRun          = flag.Bool("dryrun", true, "Lints the config file and prints but does not run the commands; Local Builder runs the commands only when dryrun is set to false")
+	push            = flag.Bool("push", false, "Pushes the images to the registry")
+	noSource        = flag.Bool("no-source", false, "Prevents Local Builder from using source for this build")
+	bindMountSource = flag.Bool("bind-mount-source", false, "Bind mounts the source directory under /workspace rather "+
+		" than copying its contents into /workspace. It is an error to use this flag with --noSource")
 	writeWorkspace = flag.String("write-workspace", "", "Copies the workspace directory to this host directory")
 	help           = flag.Bool("help", false, "Prints the help message")
 	versionFlag    = flag.Bool("version", false, "Prints the local builder version")
 )
 
 func exitUsage(msg string) {
-	log.Fatalf("%s\nUsage: %s --config=cloudbuild.yaml [--substitutions=_FOO=bar] [--dryrun=true/false] [--push=true/false] source", msg, os.Args[0])
+	log.Fatalf("%s\nUsage: %s --config=cloudbuild.yaml [--substitutions=_FOO=bar] [--dryrun=true/false] [--push=true/false] [--bind-mount-source=true/false] source", msg, os.Args[0])
 }
 
 func main() {
@@ -79,6 +82,9 @@ func main() {
 
 	nbSource := 1
 	if *noSource {
+		if *bindMountSource {
+			exitUsage("Cannot use --bind-mount-source with --no-source.")
+		}
 		nbSource = 0
 	}
 
@@ -162,27 +168,43 @@ func run(ctx context.Context, source string) error {
 		return fmt.Errorf("Error merging substitutions and validating build: %v", err)
 	}
 
-	// Create a volume, a helper container to copy the source, and defer cleaning.
-	volumeName := fmt.Sprintf("%s%s", volumeNamePrefix, uuid.New())
-	if !*dryRun {
-		vol := volume.New(volumeName, r)
-		if err := vol.Setup(ctx); err != nil {
-			return fmt.Errorf("Error creating docker volume: %v", err)
-		}
-		if source != "" {
-			// If the source is a directory, only copy the inner content.
-			if isDir, err := isDirectory(source); err != nil {
-				return fmt.Errorf("Error getting directory: %v", err)
-			} else if isDir {
-				source = filepath.Clean(source) + "/."
+	var volumeName string
+	if *bindMountSource {
+		if isDir, err := validate.IsDirectory(source); err != nil {
+			return fmt.Errorf("Error getting directory: %v", err)
+		} else if isDir {
+			if volumeName, err = filepath.Abs(source); err != nil {
+				return fmt.Errorf("Error getting absolute path: %v", err)
 			}
-			if err := vol.Copy(ctx, source); err != nil {
-				return fmt.Errorf("Error copying source to docker volume: %v", err)
-			}
+		} else {
+			return fmt.Errorf("--bind-mount-source can only be used with directories")
 		}
-		defer vol.Close(ctx)
-		if *writeWorkspace != "" {
-			defer vol.Export(ctx, *writeWorkspace)
+	}
+
+	// Create a volume, a helper container to copy the source, and defer cleaning if we're not bind mounting the source
+	// directory.
+	if volumeName == "" {
+		volumeName = fmt.Sprintf("%s%s", volumeNamePrefix, uuid.New())
+		if !*dryRun {
+			vol := volume.New(volumeName, r)
+			if err := vol.Setup(ctx); err != nil {
+				return fmt.Errorf("Error creating docker volume: %v", err)
+			}
+			if source != "" {
+				// If the source is a directory, only copy the inner content.
+				if isDir, err := validate.IsDirectory(source); err != nil {
+					return fmt.Errorf("Error getting directory: %v", err)
+				} else if isDir {
+					source = filepath.Clean(source) + "/."
+				}
+				if err := vol.Copy(ctx, source); err != nil {
+					return fmt.Errorf("Error copying source to docker volume: %v", err)
+				}
+			}
+			defer vol.Close(ctx)
+			if *writeWorkspace != "" {
+				defer vol.Export(ctx, *writeWorkspace)
+			}
 		}
 	}
 
@@ -190,9 +212,9 @@ func run(ctx context.Context, source string) error {
 
 	// Note: we explicitly call cancel() below rather than awaiting the defer cancel()
 	// because we want cancel() to happen before other defer functions. We defer to
-  // ensure that cancel() will be called on all code paths.
+	// ensure that cancel() will be called on all code paths.
 	cancelableCtx, cancel := context.WithCancel(ctx)
-  defer cancel()
+	defer cancel()
 	if !*dryRun {
 		// Set initial Docker credentials.
 		tok, err := gcloud.AccessToken(ctx, r)
@@ -289,15 +311,6 @@ func dockerVersions(ctx context.Context, r runner.Runner) (string, string, error
 	}
 
 	return strings.TrimSpace(serverb.String()), strings.TrimSpace(clientb.String()), nil
-}
-
-func isDirectory(path string) (bool, error) {
-	fileInfo, err := os.Stat(path)
-	if err != nil {
-		return false, err
-	}
-	mode := fileInfo.Mode()
-	return mode.IsDir(), nil
 }
 
 type stdoutLogger struct{}

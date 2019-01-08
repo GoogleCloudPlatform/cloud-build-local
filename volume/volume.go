@@ -79,7 +79,7 @@ func (v *Volume) Copy(ctx context.Context, dir string) error {
 	return v.runner.Run(ctx, cmd, nil, nil, nil, "")
 }
 
-// Export copies files from a the docker volume to a directory.
+// Export copies files from a docker volume to a directory.
 func (v *Volume) Export(ctx context.Context, dir string) error {
 	helper, err := v.getHelperContainer(ctx)
 	if err != nil {

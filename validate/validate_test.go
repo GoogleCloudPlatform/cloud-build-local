@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -1377,6 +1378,7 @@ func TestCheckImageTags(t *testing.T) {
 		"sub.quay.io/blah",
 		"sub.sub.quay.io/blah",
 		"quay.io/blah:blah",
+		"gcr.io/google.com/project/quickstart-image",
 	}
 	invalidTags := []string{
 		"",
@@ -1539,5 +1541,18 @@ func TestCheckBuildTags(t *testing.T) {
 		if c.wantTags != nil && !reflect.DeepEqual(got, c.wantTags) {
 			t.Errorf("checkBuildTags(%v) got: %+v, want: %+v", c.tags, got, c.wantTags)
 		}
+	}
+}
+
+func TestIsDirectory(t *testing.T) {
+	dir := "/tmp/srcDir"
+
+	os.MkdirAll(dir, os.ModePerm)
+	isDir, err := IsDirectory(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !isDir {
+		t.Errorf("dir %q should be a dir but is not.", dir)
 	}
 }

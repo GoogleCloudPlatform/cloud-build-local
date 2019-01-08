@@ -62,7 +62,6 @@ func SubstituteBuildFields(b *pb.Build) error {
 	}
 
 	// Built-in substitutions.
-	// LINT.IfChange
 	replacements := map[string]string{
 		"PROJECT_ID":  b.ProjectId,
 		"BUILD_ID":    b.Id,
@@ -73,7 +72,6 @@ func SubstituteBuildFields(b *pb.Build) error {
 		"COMMIT_SHA":  commitSHA,
 		"SHORT_SHA":   shortSHA,
 	}
-	// LINT.ThenChange(//depot/google3/cloud/build/admin/api_webhook.go)
 
 	// Add user-defined substitutions, overriding built-in substitutions.
 	for k, v := range b.Substitutions {

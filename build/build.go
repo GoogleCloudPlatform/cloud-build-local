@@ -198,11 +198,12 @@ type kms interface {
 // New constructs a new Build.
 func New(r runner.Runner, b pb.Build, ts oauth2.TokenSource,
 	bl logger.Logger, hostWorkspaceDir string, fs afero.Fs, local, push, dryrun bool) *Build {
-	return &Build{
+	bld := &Build{
 		Runner:           r,
 		Request:          b,
 		TokenSource:      ts,
 		stepDigests:      make([]string, len(b.Steps)),
+		stepStatus:       make([]pb.Build_Status, len(b.Steps)),
 		Log:              bl,
 		Done:             make(chan struct{}),
 		times:            map[BuildStatus]time.Duration{},
@@ -215,6 +216,10 @@ func New(r runner.Runner, b pb.Build, ts oauth2.TokenSource,
 		gsutilHelper:     gsutil.New(r, fs, bl),
 		fs:               fs,
 	}
+	for i := range bld.stepStatus {
+		bld.stepStatus[i] = pb.Build_QUEUED
+	}
+	return bld
 }
 
 // Start executes a single build.
@@ -1234,7 +1239,6 @@ func (b *Build) runBuildSteps(ctx context.Context) error {
 	b.mu.Lock()
 	b.Timing.BuildSteps = make([]*TimeSpan, len(b.Request.Steps))
 	b.Timing.BuildStepPulls = make([]*TimeSpan, len(b.Request.Steps))
-	b.stepStatus = make([]pb.Build_Status, len(b.Request.Steps))
 	b.mu.Unlock()
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -1246,9 +1250,6 @@ func (b *Build) runBuildSteps(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		b.mu.Lock()
-		b.stepStatus[idx] = pb.Build_QUEUED
-		b.mu.Unlock()
 		go b.timeAndRunStep(ctx, idx, waitChans, finishedStep, errors)
 		finishedChannels = append(finishedChannels, finishedStep)
 	}

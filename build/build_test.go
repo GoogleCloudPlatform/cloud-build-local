@@ -1153,7 +1153,7 @@ func TestPushImages(t *testing.T) {
 				// gcr.io/build-output-tag-no-digest doesn't show up at all b/c it has no digest!
 				BuildStepImages: []string{"", ""},
 				Timing:          TimingInfo{},
-				StepStatus:      []pb.Build_Status{},
+				StepStatus:      []pb.Build_Status{pb.Build_QUEUED, pb.Build_QUEUED},
 				StepOutputs:     [][]byte{},
 			}
 			if !reflect.DeepEqual(summary, wantSummary) {
