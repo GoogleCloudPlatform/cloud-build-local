@@ -36,6 +36,7 @@ type Runner interface {
 // RealRunner runs actual os commands.  Tests can define a mocked alternative.
 type RealRunner struct {
 	DryRun    bool
+	ShowCommands bool
 	mu        sync.Mutex
 	processes map[int]*os.Process
 }
@@ -48,6 +49,9 @@ func (r *RealRunner) Run(ctx context.Context, args []string, in io.Reader, out, 
 	}
 
 	cmd := exec.Command(args[0], args[1:]...)
+	if r.ShowCommands {
+		log.Printf("  Cmd=%+v\n", cmd.Args)
+	}
 	if dir != "" {
 		cmd.Dir = dir
 	}

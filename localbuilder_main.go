@@ -53,6 +53,7 @@ var (
 	configFile      = flag.String("config", "cloudbuild.yaml", "File path of the config file")
 	substitutions   = flag.String("substitutions", "", `key=value pairs where the key is already defined in the build request; separate multiple substitutions with a comma, for example: _FOO=bar,_BAZ=baz`)
 	dryRun          = flag.Bool("dryrun", true, "Lints the config file and prints but does not run the commands; Local Builder runs the commands only when dryrun is set to false")
+	showCommands    = flag.Bool("show-commands", false, "Prints all exec commands when show-commands is set to true")
 	push            = flag.Bool("push", false, "Pushes the images to the registry")
 	noSource        = flag.Bool("no-source", false, "Prevents Local Builder from using source for this build")
 	bindMountSource = flag.Bool("bind-mount-source", false, "Bind mounts the source directory under /workspace rather "+
@@ -63,7 +64,7 @@ var (
 )
 
 func exitUsage(msg string) {
-	log.Fatalf("%s\nUsage: %s --config=cloudbuild.yaml [--substitutions=_FOO=bar] [--dryrun=true/false] [--push=true/false] [--bind-mount-source=true/false] source", msg, os.Args[0])
+	log.Fatalf("%s\nUsage: %s --config=cloudbuild.yaml [--substitutions=_FOO=bar] [--dryrun=true/false] [--show-commands=true/false] [--push=true/false] [--bind-mount-source=true/false] source", msg, os.Args[0])
 }
 
 func main() {
@@ -119,6 +120,7 @@ func run(ctx context.Context, source string) error {
 	// Create a runner.
 	r := &runner.RealRunner{
 		DryRun: *dryRun,
+		ShowCommands: *showCommands,
 	}
 
 	// Clean leftovers from a previous build.
