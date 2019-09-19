@@ -2430,7 +2430,7 @@ func TestSecrets(t *testing.T) {
 			return nil
 		}
 		b := New(r, buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
-		b.kms = fakeKMS{
+		b.Kms = fakeKMS{
 			plaintext: c.plaintext,
 			err:       c.kmsErr,
 		}
