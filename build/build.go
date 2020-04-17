@@ -1309,6 +1309,24 @@ func (b *Build) dockerRunArgs(stepDir, stepOutputDir string, idx int) []string {
 		args = append(args,
 			// Make sure the container uses the correct docker daemon.
 			"--volume", "/var/run/docker.sock:/var/run/docker.sock",
+			// Explicitly grant the IPC_LOCK capability so that subprocesses
+			// can mlock(2) (modify memory limits and prevent swap paging). This
+			// is common for software that protects memory ranges via
+			// sandboxing. For example, https://bazel.build uses this to lock
+			// memory and create more hermetic builds by setting soft resource
+			// limits to prevent combinatorial explosion during a build. Without
+			// it, complex builds that invoke multiple languages and have large 
+			// numbers of actions on the action graph (by experimentation >1000)
+			// will fail with rather inscruable error messages like
+			// "cannot allocate memory" (c99) or "fatal error: mlock failed"
+			// (golang).
+			// Note that the hosted version of Google Cloud Build seems to either
+			// set this capability, or use some other trick to allow `mlock` to
+			// work.
+			// Useful documentation:
+			//  - http://man7.org/linux/man-pages/man7/capabilities.7.html
+			//  - http://man7.org/linux/man-pages/man2/mlock.2.html
+			"--cap-add", "IPC_LOCK",
 			// Run in privileged mode.
 			"--privileged")
 
