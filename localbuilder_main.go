@@ -45,7 +45,7 @@ import (
 
 const (
 	volumeNamePrefix  = "cloudbuild_vol_"
-	gcbDockerVersion  = "18.09.0"
+	gcbDockerVersion  = "19.03.8"
 	metadataImageName = "gcr.io/cloud-builders/metadata"
 )
 
