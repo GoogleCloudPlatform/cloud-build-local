@@ -40,22 +40,10 @@ func newMockRunner(t *testing.T) *mockRunner {
 	}
 }
 
-func (r *mockRunner) Run(ctx context.Context, args []string, in io.Reader, out, err io.Writer, _ string) error {
+func (r *mockRunner) Run(ctx context.Context, args []string, in io.Reader, out, err io.Writer) error {
 	r.mu.Lock()
 	r.commands = append(r.commands, strings.Join(args, " "))
 	r.mu.Unlock()
-	return nil
-}
-
-func (r *mockRunner) MkdirAll(dir string) error {
-	return nil
-}
-
-func (r *mockRunner) WriteFile(path, contents string) error {
-	return nil
-}
-
-func (r *mockRunner) Clean() error {
 	return nil
 }
 

@@ -34,11 +34,12 @@ import (
 	"time"
 
 	durpb "github.com/golang/protobuf/ptypes/duration"
-	"github.com/golang/protobuf/ptypes"
 	"github.com/GoogleCloudPlatform/cloud-build-local/gsutil"
 	"github.com/GoogleCloudPlatform/cloud-build-local/runner"
 	"github.com/spf13/afero"
+	"google3/third_party/golang/cmp/cmp"
 	"golang.org/x/oauth2"
+	"github.com/golang/protobuf/ptypes"
 	"github.com/pborman/uuid"
 
 	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
@@ -120,24 +121,6 @@ func contains(arr []string, parts ...string) bool {
 	return false
 }
 
-func (r *mockRunner) MkdirAll(dir string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.commands = append(r.commands, fmt.Sprintf("MkdirAll(%s)", dir))
-	return nil
-}
-
-func (r *mockRunner) WriteFile(path, contents string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.commands = append(r.commands, fmt.Sprintf("WriteFile(%s,%q)", path, contents))
-	return nil
-}
-
-func (r *mockRunner) Clean() error {
-	return nil
-}
-
 func (r *mockRunner) gsutil(ctx context.Context, args []string, in io.Reader, out, err io.Writer) error {
 	if startsWith(args, "cp") {
 		uri := args[1]
@@ -191,8 +174,7 @@ func (r *mockRunner) gsutil(ctx context.Context, args []string, in io.Reader, ou
 	return fmt.Errorf("%s: unexpected gsutil command passed to mockRunner: %q", r.testCaseName, args)
 }
 
-func (r *mockRunner) Run(ctx context.Context, args []string, in io.Reader, out, err io.Writer, _ string) error {
-	
+func (r *mockRunner) Run(ctx context.Context, args []string, in io.Reader, out, err io.Writer) error {
 	r.mu.Lock()
 	r.commands = append(r.commands, strings.Join(args, " "))
 	r.mu.Unlock()
@@ -484,7 +466,7 @@ func TestFetchBuilder(t *testing.T) {
 	for _, tc := range testCases {
 		r := newMockRunner(t, tc.name)
 		r.remotePullsFail = tc.pullsFail
-		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false, nopReceiver{})
 		var gotErr error
 		var gotDigest string
 		wantDigest := ""
@@ -807,7 +789,7 @@ func TestRunBuildSteps(t *testing.T) {
 				r.localImages["gcr.io/build-output-tag-2"] = true
 				return tc.opError
 			}
-			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false, nopReceiver{})
 			gotErr := b.runBuildSteps(ctx)
 			if !reflect.DeepEqual(gotErr, tc.wantErr) {
 				t.Errorf("Wanted error %q, but got %q", tc.wantErr, gotErr)
@@ -1069,7 +1051,7 @@ func TestBuildStepOrder(t *testing.T) {
 			}
 			return nil
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false, nopReceiver{})
 		errorFromFunction := make(chan error)
 		go func() {
 			errorFromFunction <- b.runBuildSteps(ctx)
@@ -1120,7 +1102,7 @@ func TestPushImages(t *testing.T) {
 	}}
 	for _, tc := range testCases {
 		r := newMockRunner(t, tc.name)
-		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false, nopReceiver{})
 		r.remotePushesFail = tc.remotePushesFail
 		gotErr := b.pushImages(ctx)
 		if !reflect.DeepEqual(gotErr, tc.wantErr) {
@@ -1154,6 +1136,7 @@ func TestPushImages(t *testing.T) {
 				BuildStepImages: []string{"", ""},
 				Timing:          TimingInfo{},
 				StepStatus:      []pb.Build_Status{pb.Build_QUEUED, pb.Build_QUEUED},
+				ExitCodes:       make([]int32, 2),
 				StepOutputs:     [][]byte{},
 			}
 			if !reflect.DeepEqual(summary, wantSummary) {
@@ -1232,7 +1215,6 @@ func TestExtractGCSBucket(t *testing.T) {
 }
 
 // TestPushArtifacts checks that after artifacts are uploaded, an ArtifactsInfo object is assigned to the build's artifacts field.
-
 func TestPushArtifacts(t *testing.T) {
 	ctx := context.Background()
 	newUUID = func() string { return "someuuid" }
@@ -1305,7 +1287,7 @@ func TestPushArtifacts(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
 
-			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), false, true, false)
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), false, true, false, nopReceiver{})
 			b.gsutilHelper = tc.gsutilHelper
 
 			err := b.pushArtifacts(ctx)
@@ -1362,7 +1344,7 @@ func TestPushArtifactsTiming(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
-			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false)
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false, nopReceiver{})
 			b.gsutilHelper = newMockGsutilHelper("gs://some-bucket", 0)
 			if err := b.pushArtifacts(ctx); err != nil {
 				t.Fatalf("b.pushArtifacts() = %v", err)
@@ -1417,7 +1399,7 @@ func TestPushAllTiming(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
-			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false)
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false, nopReceiver{})
 			b.gsutilHelper = newMockGsutilHelper("gs://some-bucket", 1)
 			if err := b.pushAll(ctx); err != nil {
 				t.Fatal(err)
@@ -1550,7 +1532,7 @@ func TestBuildTiming(t *testing.T) {
 				r.mu.Unlock()
 				return nil
 			}
-			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false, nopReceiver{})
 			b.runBuildSteps(ctx)
 
 			buildStepTimes := b.Timing.BuildSteps
@@ -1594,7 +1576,6 @@ func TestBuildTiming(t *testing.T) {
 
 			if tc.hasError {
 				// If there is an error, just verify the order of the step timings that exist.
-				
 				// We do not need to check the WaitFor field below because the error test case has consecutive steps.
 				prevStep := buildStepTimes[0]
 				for i := 1; i < len(buildStepTimes); i++ {
@@ -1708,7 +1689,7 @@ func TestBuildTimingOutOfOrder(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
 			r.dockerRunHandler = func([]string, io.Writer, io.Writer) error { return nil }
-			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false, nopReceiver{})
 			b.runBuildSteps(ctx)
 
 			buildStepTimes := b.Timing.BuildSteps
@@ -1746,7 +1727,6 @@ func TestBuildTimingOutOfOrder(t *testing.T) {
 }
 
 func TestPushImagesTiming(t *testing.T) {
-	
 	timeNow = fakeTimeNow
 	defer func() { timeNow = time.Now }()
 	ctx := context.Background()
@@ -1823,7 +1803,7 @@ func TestPushImagesTiming(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newMockRunner(t, tc.name)
-			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false)
+			b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false, nopReceiver{})
 
 			// We record pushStart for the test case where tc.wantFirstPushTimeOnly
 			// is true. Since fakeTimeNow increments the second counter after each
@@ -1897,7 +1877,7 @@ func TestBuildStepConcurrency(t *testing.T) {
 	}
 
 	// Run the build.
-	b := New(r, req, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
+	b := New(r, req, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false, nopReceiver{})
 	ret := make(chan error)
 	go func() {
 		ret <- b.runBuildSteps(ctx)
@@ -1933,10 +1913,10 @@ type fakeRunner struct {
 // channels map.  Specifically, we wait for the first channel given to close,
 // then close the next channel then repeat until we've gone through all the
 // "args".
-func (f *fakeRunner) Run(ctx context.Context, args []string, _ io.Reader, _, _ io.Writer, _ string) error {
+func (f *fakeRunner) Run(ctx context.Context, args []string, _ io.Reader, _, _ io.Writer) error {
 	// The "+1" is for the name of the container which is appended to the
 	// dockerRunArgs base command.
-	b := New(nil, pb.Build{}, nil, nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
+	b := New(nil, pb.Build{}, nil, nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false, nopReceiver{})
 	argCount := len(b.dockerRunArgs("", "", 0)) + 1
 	switch {
 	case !startsWith(args, "docker", "run"):
@@ -1977,27 +1957,15 @@ func (f *fakeRunner) Run(ctx context.Context, args []string, _ io.Reader, _, _ i
 	return nil
 }
 
-func (f *fakeRunner) Clean() error {
-	return nil
-}
-
 // This function helps generate test "docker run" arguments.
 func dockerRunString(idx int) string {
 	return dockerRunInStepDir(idx, "")
 }
 
 func dockerRunInStepDir(idx int, stepDir string) string {
-	b := New(nil, pb.Build{}, nil, nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
+	b := New(nil, pb.Build{}, nil, nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false, nopReceiver{})
 	dockerRunArg := b.dockerRunArgs(stepDir, fmt.Sprintf("/tmp/step-%d/", idx), idx)
 	return strings.Join(dockerRunArg, " ")
-}
-
-func (f *fakeRunner) MkdirAll(_ string) error {
-	return nil
-}
-
-func (f *fakeRunner) WriteFile(_, _ string) error {
-	return nil
 }
 
 func fakeTimeSpan() *TimeSpan {
@@ -2005,7 +1973,7 @@ func fakeTimeSpan() *TimeSpan {
 }
 
 func TestSummary(t *testing.T) {
-	b := New(nil, pb.Build{}, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false)
+	b := New(nil, pb.Build{}, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false, nopReceiver{})
 
 	wantBuildStatus := StatusDone
 	wantStepStatus := []pb.Build_Status{pb.Build_SUCCESS, pb.Build_SUCCESS}
@@ -2083,7 +2051,7 @@ func TestErrorCollection(t *testing.T) {
 		"got an http status: 300: it's a mystery to me",
 		"got another http status: 300: it's a double mystery",
 	}
-	b := New(nil, pb.Build{}, nil, nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
+	b := New(nil, pb.Build{}, nil, nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false, nopReceiver{})
 	for _, o := range outputs {
 		b.detectPushFailure(o)
 	}
@@ -2152,7 +2120,7 @@ func TestEntrypoint(t *testing.T) {
 			stepArgs <- strings.Join(args, " ")
 			return nil
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false, nopReceiver{})
 		errorFromFunction := make(chan error)
 		go func() {
 			errorFromFunction <- b.runBuildSteps(ctx)
@@ -2179,20 +2147,33 @@ func TestEntrypoint(t *testing.T) {
 func TestStripTagDigest(t *testing.T) {
 	tcs := []struct {
 		in, out string
+		wantErr bool
 	}{{
-		in:  "gcr.io/foo/bar@sha256:123abc",
+		in:  "gcr.io/foo/bar@sha256:bfa1c600931132f55789459e2f5a5eb85659ac91bc5a54ce09e3ed14809f8a7f",
 		out: "gcr.io/foo/bar",
 	}, {
-		in:  "gcr.io/foo/bar:123abc",
+		in:  "gcr.io/foo/bar:tag",
 		out: "gcr.io/foo/bar",
 	}, {
-		in:  "gcr.io/foo/bar",
+		in:  "gcr.io/foo/bar", // No tag or digest.
 		out: "gcr.io/foo/bar",
+	}, {
+		in:  "customdomain.com/foo/bar",
+		out: "customdomain.com/foo/bar",
+	}, {
+		in:  "customdomain.com:1234/foo/bar:tag", // Domain with port.
+		out: "customdomain.com:1234/foo/bar",
+	}, {
+		in:      "///39*)(? un:parse.able   ",
+		wantErr: true,
 	}}
 	for _, c := range tcs {
-		got := stripTagDigest(c.in)
+		got, err := stripTagDigest(c.in)
 		if got != c.out {
-			t.Errorf("For %q: got %q, want %q", c.in, got, c.out)
+			t.Errorf("stripTagDigest(%q): got %q, want %q", c.in, got, c.out)
+		}
+		if (err != nil) != c.wantErr {
+			t.Errorf("stripTagDigest(%q): got err %q, want err? %t", c.in, err, c.wantErr)
 		}
 	}
 }
@@ -2281,7 +2262,7 @@ func TestVolumes(t *testing.T) {
 				return nil
 			}
 
-			b := New(r, buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
+			b := New(r, buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false, nopReceiver{})
 			if err := b.runBuildSteps(ctx); err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -2351,7 +2332,7 @@ func TestEnvVars(t *testing.T) {
 				gotCommand = strings.Join(args, " ")
 				return nil
 			}
-			b := New(r, buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
+			b := New(r, buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false, nopReceiver{})
 
 			if err := b.runBuildSteps(ctx); err != nil {
 				t.Errorf("%s: Unexpected error\n got: %v", tc.name, err)
@@ -2429,8 +2410,8 @@ func TestSecrets(t *testing.T) {
 			gotCommand = strings.Join(args, " ")
 			return nil
 		}
-		b := New(r, buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
-		b.kms = fakeKMS{
+		b := New(r, buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false, nopReceiver{})
+		b.Kms = fakeKMS{
 			plaintext: c.plaintext,
 			err:       c.kmsErr,
 		}
@@ -2616,14 +2597,18 @@ func TestTimeout(t *testing.T) {
 	}
 	r := newMockRunner(t, "timeout")
 	r.dockerRunHandler = func([]string, io.Writer, io.Writer) error { return nil }
-	b := New(r, request, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false)
+	b := New(r, request, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false, nopReceiver{})
 	b.Start(ctx)
 	<-b.Done
 
-	want := FullStatus{BuildStatus: StatusTimeout, StepStatus: []pb.Build_Status{pb.Build_SUCCESS, pb.Build_WORKING, pb.Build_QUEUED}}
-	got := b.GetStatus()
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("want %#v, got %#v", want, got)
+	wantStatus := StatusTimeout
+	wantStepStatus := []pb.Build_Status{pb.Build_SUCCESS, pb.Build_WORKING, pb.Build_QUEUED}
+	got := b.Summary()
+	if !reflect.DeepEqual(wantStatus, got.Status) {
+		t.Errorf("Status: want %#v, got %#v", wantStatus, got.Status)
+	}
+	if !reflect.DeepEqual(wantStepStatus, got.StepStatus) {
+		t.Errorf("StepStatus: want %#v, got %#v", wantStepStatus, got.StepStatus)
 	}
 }
 
@@ -2642,7 +2627,7 @@ func TestCancel(t *testing.T) {
 	}
 	r := newMockRunner(t, "cancel")
 	r.dockerRunHandler = func([]string, io.Writer, io.Writer) error { return nil }
-	b := New(r, request, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false)
+	b := New(r, request, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, true, false, nopReceiver{})
 	fullStatus := b.GetStatus()
 	if fullStatus.BuildStatus != "" {
 		t.Errorf("Build has status before Start(): %v", fullStatus)
@@ -2676,10 +2661,15 @@ func TestCancel(t *testing.T) {
 		t.Errorf("b.Start() didn't finish, b.Done never unblocked.")
 	}
 
-	want := FullStatus{BuildStatus: StatusCancelled, StepStatus: []pb.Build_Status{pb.Build_SUCCESS, pb.Build_WORKING, pb.Build_QUEUED}}
-	got := b.GetStatus()
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("want %#v, got %#v", want, got)
+	wantStatus := StatusCancelled
+	wantStepStatus := []pb.Build_Status{pb.Build_SUCCESS, pb.Build_WORKING, pb.Build_QUEUED}
+	got := b.Summary()
+	
+	if !reflect.DeepEqual(wantStatus, got.Status) {
+		t.Errorf("Status: want %#v, got %#v", wantStatus, got.Status)
+	}
+	if !reflect.DeepEqual(wantStepStatus, got.StepStatus) {
+		t.Errorf("StepStatus: want %#v, got %#v", wantStepStatus, got.StepStatus)
 	}
 }
 
@@ -2736,7 +2726,7 @@ func TestStart(t *testing.T) {
 			r.localImages["gcr.io/build"] = true
 			return nil
 		}
-		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, tc.push, false)
+		b := New(r, tc.buildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, tc.push, false, nopReceiver{})
 		b.Start(ctx)
 		<-b.Done
 
@@ -2749,83 +2739,6 @@ func TestStart(t *testing.T) {
 		if match, _ := regexp.MatchString(want, got); !match {
 			t.Errorf("%s: Commands didn't match!\n===Want:\n%s\n===Got:\n%s", tc.name, want, got)
 		}
-	}
-}
-
-// TestUpdateDockerAccessToken tests the commands executed when setting and
-// updating Docker access tokens.
-func TestUpdateDockerAccessToken(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	r := newMockRunner(t, "TestUpdateDockerAccessToken")
-	r.dockerRunHandler = func(args []string, _, _ io.Writer) error { return nil }
-	b := New(r, pb.Build{}, nil, nil, "", afero.NewMemMapFs(), false, false, false)
-
-	// If UpdateDockerAccessToken is called before SetDockerAccessToken, we
-	// should get an error.
-	if err := b.UpdateDockerAccessToken(ctx, "INVALID"); err == nil {
-		t.Errorf("Expected error when calling UpdateDockerAccessToken first, got none: %v", err)
-	}
-
-	if err := b.SetDockerAccessToken(ctx, "FIRST"); err != nil {
-		t.Errorf("SetDockerAccessToken: %v", err)
-	}
-	if got, want := b.prevGCRAuth, base64.StdEncoding.EncodeToString([]byte("oauth2accesstoken:FIRST")); got != want {
-		t.Errorf("After SetDockerAccessToken, GCR auth is %q, want %q", got, want)
-	}
-
-	if err := b.UpdateDockerAccessToken(ctx, "SECOND"); err != nil {
-		t.Errorf("UpdateDockerAccessToken: %v", err)
-	}
-	if got, want := b.prevGCRAuth, base64.StdEncoding.EncodeToString([]byte("oauth2accesstoken:SECOND")); got != want {
-		t.Errorf("After SetDockerAccessToken, GCR auth is %q, want %q", got, want)
-	}
-
-	got := strings.Join(r.commands, "\n")
-	want := strings.Join([]string{
-		fmt.Sprint(
-			`docker run --name cloudbuild_set_docker_token_`, uuidRegex,
-			` --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock --entrypoint bash `,
-			osImage,
-			` -c mkdir -p ~/.docker/ && cat << EOF > ~/.docker/config.json
-{
-  "auths": {
-    "https://asia.gcr.io": {
-      "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
-    },
-    "https://b.gcr.io": {
-      "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
-    },
-    "https://bucket.gcr.io": {
-      "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
-    },
-    "https://eu.gcr.io": {
-      "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
-    },
-    "https://gcr-staging.sandbox.google.com": {
-      "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
-    },
-    "https://gcr.io": {
-      "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
-    },
-    "https://k8s.gcr.io": {
-      "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
-    },
-    "https://marketplace.gcr.io": {
-      "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
-    },
-    "https://us.gcr.io": {
-      "auth": "b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q="
-    }
-  }
-}
-EOF`), fmt.Sprint(
-			"docker run --name cloudbuild_update_docker_token_", uuidRegex,
-			" --rm --volume homevol:/builder/home --env HOME=/builder/home --volume /var/run/docker.sock:/var/run/docker.sock --entrypoint bash ",
-			osImage,
-			" -c sed -i 's/b2F1dGgyYWNjZXNzdG9rZW46RklSU1Q=/b2F1dGgyYWNjZXNzdG9rZW46U0VDT05E/g' ~/.docker/config.json")}, "\n")
-	if match, _ := regexp.MatchString(want, got); !match {
-		t.Errorf("Commands didn't match!\n===Want:\n%s\n===Got:\n%s", want, got)
 	}
 }
 
@@ -2880,11 +2793,11 @@ func TestBuildOutput(t *testing.T) {
 		for i := 0; i < len(c.contents); i++ {
 			req.Steps = append(req.Steps, &pb.BuildStep{Name: "gcr.io/my-project/my-compiler"})
 		}
-		b := New(r, req, mockTokenSource(), nopBuildLogger{}, "", fs, true, false, false)
+		b := New(r, req, mockTokenSource(), nopBuildLogger{}, "", fs, true, false, false, nopReceiver{})
 
 		for i, contents := range c.contents {
 			stepOutputDir := afero.GetTempDir(fs, fmt.Sprintf("step-%d", i))
-			if err := b.fs.MkdirAll(stepOutputDir, os.FileMode(os.O_CREATE)); err != nil {
+			if err := b.FileSystem.MkdirAll(stepOutputDir, os.FileMode(os.O_CREATE)); err != nil {
 				t.Errorf("MkDirAll(%q): %v", stepOutputDir, err)
 			}
 
@@ -2917,10 +2830,10 @@ func TestStepOutputByStatus(t *testing.T) {
 			r.dockerRunHandler = func([]string, io.Writer, io.Writer) error { return stepErr }
 
 			req := pb.Build{Steps: []*pb.BuildStep{{Name: "gcr.io/step-zero"}}}
-			b := New(r, req, mockTokenSource(), nopBuildLogger{}, "", fs, true, false, false)
+			b := New(r, req, mockTokenSource(), nopBuildLogger{}, "", fs, true, false, false, nopReceiver{})
 
 			stepOutputDir := afero.GetTempDir(fs, fmt.Sprintf("step-0"))
-			if err := b.fs.MkdirAll(stepOutputDir, os.FileMode(os.O_CREATE)); err != nil {
+			if err := b.FileSystem.MkdirAll(stepOutputDir, os.FileMode(os.O_CREATE)); err != nil {
 				t.Errorf("MkDirAll(%q): %v", stepOutputDir, err)
 			}
 
@@ -2984,8 +2897,112 @@ func TestGetTempDir(t *testing.T) {
 			t.Errorf("%s: got getTempDir() = %q, want %q", tc.name, gotTempDir, tc.wantTempDir)
 		}
 	}
-
 }
+
+func TestUpdateSourceTotal(t *testing.T) {
+	ts := &TimeSpan{
+		Start: time.Unix(1, 2),
+		End:   time.Unix(3, 4),
+	}
+	b := Build{}
+	b.UpdateSourceTotal(ts)
+	if got, want := b.Timing.SourceTotal, ts; got != want {
+		t.Errorf("update SourceTotal: got %q, want %q", got, want)
+	}
+}
+
+type storeStatusReceiver struct {
+	status BuildStatus
+}
+
+func (sr *storeStatusReceiver) Receive(bs BuildSummary) {
+	sr.status = bs.Status
+}
+
+func TestUpdateStatus(t *testing.T) {
+	cases := []struct {
+		name   string
+		status BuildStatus
+		want   BuildStatus
+	}{{
+		name:   "status build",
+		status: StatusBuild,
+		want:   StatusBuild,
+	}, {
+		name:   "status done",
+		status: StatusDone,
+		want:   StatusDone,
+	},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			rec := &storeStatusReceiver{}
+			run := newMockRunner(t, "TestUpdateStatus")
+			b := New(run, commonBuildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false, rec)
+
+			b.UpdateStatus(tc.status)
+			if got := rec.status; got != tc.want {
+				t.Errorf("update status: got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+type storeStepsReceiver struct {
+	steps []pb.Build_Status
+}
+
+func (sr *storeStepsReceiver) Receive(bs BuildSummary) {
+	sr.steps = bs.StepStatus
+}
+
+func TestUpdateStepStatus(t *testing.T) {
+	cases := []struct {
+		name     string
+		indices  []int
+		statuses []pb.Build_Status
+		want     []pb.Build_Status
+	}{
+		{
+			name:     "single step update",
+			indices:  []int{0},
+			statuses: []pb.Build_Status{pb.Build_QUEUED},
+			want:     []pb.Build_Status{pb.Build_QUEUED, pb.Build_STATUS_UNKNOWN},
+		}, {
+			name:     "update step twice",
+			indices:  []int{0, 0},
+			statuses: []pb.Build_Status{pb.Build_WORKING, pb.Build_SUCCESS},
+			want:     []pb.Build_Status{pb.Build_WORKING, pb.Build_STATUS_UNKNOWN},
+		}, {
+			name:     "update two steps",
+			indices:  []int{0, 1},
+			statuses: []pb.Build_Status{pb.Build_SUCCESS, pb.Build_WORKING},
+			want:     []pb.Build_Status{pb.Build_SUCCESS, pb.Build_WORKING},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			rec := &storeStepsReceiver{}
+			run := newMockRunner(t, "TestUpdateStepStatus")
+			// commonBuildRequest has two steps initialized to Build_STATUS_UNKNOWN.
+			b := New(run, commonBuildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false, rec)
+
+			for i, idx := range tc.indices {
+				b.updateStepStatus(idx, tc.statuses[i])
+			}
+			if got := rec.steps; !cmp.Equal(got, tc.want) {
+				t.Errorf("update step status: got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+type nopReceiver struct{}
+
+func (nopReceiver) Receive(BuildSummary) {}
 
 type nopBuildLogger struct{}
 
@@ -3001,7 +3018,7 @@ func TestDataRace(t *testing.T) {
 	}
 	r := newMockRunner(t, "race")
 	r.dockerRunHandler = func([]string, io.Writer, io.Writer) error { return nil }
-	b := New(r, build, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false)
+	b := New(r, build, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false, nopReceiver{})
 	ctx := context.Background()
 
 	go b.Start(ctx) // updates b.Timing.BuildTotal
@@ -3021,5 +3038,112 @@ func TestDataRace(t *testing.T) {
 
 	close(starter)
 	<-b.Done // Wait for build to complete.
+}
+
+func TestNewFileReceiver(t *testing.T) {
+	cases := []struct {
+		name string
+		path string
+		fs   afero.Fs
+		err  string
+	}{{
+		name: "success",
+		path: "file.txt",
+		fs:   afero.NewMemMapFs(),
+	}, {
+		name: "success with nonexistant path",
+		path: "some/nonexistant/path/file.txt",
+		fs:   afero.NewMemMapFs(),
+	}, {
+		name: "permission denied",
+		path: "file.txt",
+		err:  "MkDirAll(\".\"): operation not permitted",
+		fs:   afero.NewReadOnlyFs(afero.NewMemMapFs()),
+	}}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fr, err := NewFileReceiver(tc.fs, tc.path)
+			if tc.err != "" {
+				if tc.err != err.Error() {
+					t.Errorf("got error %v, want error %v", err, tc.err)
+				}
+				if fr != nil {
+					t.Error("expected nil FileReceiver")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("expcted nil error: got %v", err)
+				}
+				if fr == nil {
+					t.Error("expected non nil FileReceiver")
+				}
+			}
+		})
+	}
+}
+
+func TestFileReceiver(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	dir := "some/path/"
+	if err := fs.MkdirAll(dir, os.FileMode(os.O_CREATE)); err != nil {
+		t.Fatalf("MkDirAll(%q): %v", dir, err)
+	}
+	p := path.Join(dir, "file.txt")
+	f, err := fs.Create(p)
+	if err != nil {
+		t.Fatalf("CreateFile failed: %v", err)
+	}
+
+	fr := FileReceiver{file: f}
+	bs := BuildSummary{Status: StatusBuild}
+	fr.Receive(bs)
+	f, err = fs.Open(p)
+	if err != nil {
+		t.Fatalf("CreateFile failed: %v", err)
+	}
+	var b []byte
+	if b, err = afero.ReadAll(f); err != nil {
+		t.Fatalf("Read failed: %v", err)
+	}
+	if got, want := string(b), fmt.Sprintf("%v\n", bs); got != want {
+		t.Errorf("different content in FileReceiver: got %s, want %s", got, want)
+	}
+}
+
+type storeExitCodeReceiver struct {
+	ExitCodes []int32
+}
+
+func (r *storeExitCodeReceiver) Receive(bs BuildSummary) {
+	// Deep copy slice so updates are only reflected on receive call
+	r.ExitCodes = append([]int32{}, bs.ExitCodes...)
+}
+
+func TestSetExitCode(t *testing.T) {
+	rec := &storeExitCodeReceiver{}
+	run := newMockRunner(t, "TestSetExitCode")
+	details := []int32{5, 6}
+	// commonBuildRequest has two steps initialized to Build_STATUS_UNKNOWN.
+	b := New(run, commonBuildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false, rec)
+	b.setExitCode(0, details[0])
+	b.setExitCode(1, details[1])
+	if len(rec.ExitCodes) != 2 {
+		t.Fatalf("unexpected number of failure details in receiver: got %q, want %q", len(rec.ExitCodes), 2)
+	}
+	for i := range details {
+		if rec.ExitCodes[i] != details[i] {
+			t.Errorf("unexpected failure detail: got %q, want %q", rec.ExitCodes[i], details[i])
+		}
+	}
+}
+
+func TestSetExitCodeNilReceiver(t *testing.T) {
+	run := newMockRunner(t, "TestSetExitCodeNilReceiver")
+	b := New(run, commonBuildRequest, mockTokenSource(), nopBuildLogger{}, "", afero.NewMemMapFs(), true, false, false, nil)
+	exitCode := int32(2)
+	b.setExitCode(0, exitCode)
+	if b.exitCodes[0] != exitCode {
+		t.Errorf("Error: failure details field incorrect: got %q, want %q", b.exitCodes[0], exitCode)
+	}
 }
 

@@ -55,7 +55,7 @@ func AccessToken(ctx context.Context, r runner.Runner) (*metadata.Token, error) 
 
 	cmd := []string{"gcloud", "config", "config-helper", "--format=json"}
 	var b bytes.Buffer
-	if err := r.Run(ctx, cmd, nil, &b, os.Stderr, ""); err != nil {
+	if err := r.Run(ctx, cmd, nil, &b, os.Stderr); err != nil {
 		return nil, err
 	}
 	if err := json.Unmarshal(b.Bytes(), &config); err != nil {
@@ -85,7 +85,7 @@ func AccessToken(ctx context.Context, r runner.Runner) (*metadata.Token, error) 
 func ProjectInfo(ctx context.Context, r runner.Runner) (metadata.ProjectInfo, error) {
 	cmd := []string{"gcloud", "config", "list", "--format", "value(core.project)"}
 	var idb, numb bytes.Buffer
-	if err := r.Run(ctx, cmd, nil, &idb, os.Stderr, ""); err != nil {
+	if err := r.Run(ctx, cmd, nil, &idb, os.Stderr); err != nil {
 		return metadata.ProjectInfo{}, err
 	}
 	projectID := strings.TrimSpace(idb.String())
@@ -95,7 +95,7 @@ func ProjectInfo(ctx context.Context, r runner.Runner) (metadata.ProjectInfo, er
 	}
 
 	cmd = []string{"gcloud", "projects", "describe", projectID, "--format", "value(projectNumber)"}
-	if err := r.Run(ctx, cmd, nil, &numb, os.Stderr, ""); err != nil {
+	if err := r.Run(ctx, cmd, nil, &numb, os.Stderr); err != nil {
 		return metadata.ProjectInfo{}, err
 	}
 	projectNum, err := strconv.ParseInt(strings.TrimSpace(numb.String()), 10, 64)

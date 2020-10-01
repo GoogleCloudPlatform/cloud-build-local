@@ -27,8 +27,8 @@ import (
 
 	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/spf13/afero"
+	"github.com/golang/protobuf/proto"
 	"github.com/pborman/uuid"
 )
 
@@ -42,7 +42,6 @@ func (noopLogger) Close() error                           { return nil }
 func (noopLogger) MakeWriter(string, int, bool) io.Writer { return ioutil.Discard }
 
 type mockRunner struct {
-	
 	t                 *testing.T
 	testCaseName      string
 	commands          []string
@@ -87,7 +86,6 @@ func newMockRunner(t *testing.T, testCaseName string) *mockRunner {
 }
 
 // startsWith returns true iff arr startsWith parts.
-
 func startsWith(arr []string, parts ...string) bool {
 	if len(arr) < len(parts) {
 		return false
@@ -102,7 +100,6 @@ func startsWith(arr []string, parts ...string) bool {
 
 // contains returns true iff arr contains parts in order, considering only the
 // first occurrence of the first part.
-
 func contains(arr []string, parts ...string) bool {
 	if len(arr) < len(parts) {
 		return false
@@ -113,20 +110,6 @@ func contains(arr []string, parts ...string) bool {
 		}
 	}
 	return false
-}
-
-func (r *mockRunner) MkdirAll(dir string) error {
-	r.commands = append(r.commands, fmt.Sprintf("MkdirAll(%s)", dir))
-	return nil
-}
-
-func (r *mockRunner) WriteFile(path, contents string) error {
-	r.commands = append(r.commands, fmt.Sprintf("WriteFile(%s,%q)", path, contents))
-	return nil
-}
-
-func (r *mockRunner) Clean() error {
-	return nil
 }
 
 // gsutil simulates gsutil commands in the mockrunner.
@@ -230,7 +213,7 @@ func (r *mockRunner) gsutil(args []string, in io.Reader, out, err io.Writer) err
 
 }
 
-func (r *mockRunner) Run(ctx context.Context, args []string, in io.Reader, out, errW io.Writer, _ string) error {
+func (r *mockRunner) Run(ctx context.Context, args []string, in io.Reader, out, errW io.Writer) error {
 	r.commands = append(r.commands, strings.Join(args, " "))
 
 	// If a stderr or stdout is specified, print it out and skip checking for specific arguments.
@@ -364,7 +347,6 @@ func TestVerifyBucket(t *testing.T) {
 }
 
 func TestUploadArtifacts(t *testing.T) {
-	
 	ctx := context.Background()
 	md5 := "md5"
 	fakeFileHashes := []*pb.FileHashes{{FileHash: []*pb.Hash{{Type: pb.Hash_MD5, Value: []byte(md5)}}}}

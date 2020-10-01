@@ -69,10 +69,12 @@ const (
 )
 
 var (
-	// metadataHostedIP is the IP that the metadata spoofer listens to in the
+	// MetadataHostedIP is the IP that the metadata spoofer listens to in the
 	// hosted cloudbuild environment. iptables is used to route tcp connections
 	// going to 169.254.169.254 port 80 to this IP instead.
-	metadataHostedIP = "192.168.10.5" // var for testing
+	MetadataHostedIP = "192.168.10.5" // var for testing
+	// DockerNetwork is the network created that the metadata server runs in.
+	DockerNetwork = "cloudbuild"
 
 	// httpTimeout is the timeout for http calls; var for testing
 	httpTimeout = 10 * time.Second
@@ -120,7 +122,7 @@ type RealUpdater struct {
 func (r RealUpdater) getAddress() string {
 	addr := localMetadata
 	if !r.Local {
-		addr = metadataHostedIP
+		addr = MetadataHostedIP
 	}
 	if !strings.HasPrefix(addr, "http") {
 		addr = "http://" + addr
@@ -150,11 +152,18 @@ func doRequest(ctx context.Context, method, url string, body io.Reader, header h
 
 // SetToken updates the spoofed metadata server's credentials.
 func (r RealUpdater) SetToken(ctx context.Context, tok *Token) error {
-	scopes, err := getScopes(ctx, tok.AccessToken)
-	if err != nil {
-		return err
+	// Local builder will send a scopeless token.
+	if len(tok.Scopes) == 0 {
+		log.Printf("Scopeless token, querying for token scopes")
+		scopes, err := getScopes(ctx, tok.AccessToken)
+		if err != nil {
+			return err
+		}
+		tok.Scopes = scopes
+	} else {
+		log.Printf("Found scopes in token, skipping token scope query")
 	}
-	tok.Scopes = scopes
+
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(tok); err != nil {
 		return err
@@ -251,7 +260,7 @@ func (r RealUpdater) Ready(ctx context.Context) bool {
 func StartLocalServer(ctx context.Context, r runner.Runner, metadataImage string) error {
 	// Unlike the hosted Cloud Build service, the user's local machine is
 	// not guaranteed to have the latest version, so we explicitly pull it.
-	if err := r.Run(ctx, []string{"docker", "pull", metadataImage}, nil, os.Stdout, os.Stderr, ""); err != nil {
+	if err := r.Run(ctx, []string{"docker", "pull", metadataImage}, nil, os.Stdout, os.Stderr); err != nil {
 		return err
 	}
 	return startServer(ctx, r, metadataImage, false, fixedMetadataIP, metadataLocalSubnet)
@@ -266,14 +275,14 @@ func StartLocalServer(ctx context.Context, r runner.Runner, metadataImage string
 // The container listens on local port 8082, which is where RealUpdater POSTs
 // to.
 func StartCloudServer(ctx context.Context, r runner.Runner, metadataImage string) error {
-	if err := startServer(ctx, r, metadataImage, true, metadataHostedIP, metadataHostedSubnet); err != nil {
+	if err := startServer(ctx, r, metadataImage, true, MetadataHostedIP, metadataHostedSubnet); err != nil {
 		return err
 	}
 
 	// In a separate goroutine, attach to the metadata server container so its
 	// logs are properly captured and available for debugging.
 	go func() {
-		if err := r.Run(ctx, []string{"docker", "attach", "metadata"}, nil, os.Stdout, os.Stderr, ""); err != nil {
+		if err := r.Run(ctx, []string{"docker", "attach", "metadata"}, nil, os.Stdout, os.Stderr); err != nil {
 			log.Printf("docker attach failed: %v", err)
 		}
 	}()
@@ -284,8 +293,8 @@ func StartCloudServer(ctx context.Context, r runner.Runner, metadataImage string
 // CreateCloudbuildNetwork creates a cloud build network to link the build
 // builds.
 func CreateCloudbuildNetwork(ctx context.Context, r runner.Runner, subnet string) error {
-	cmd := []string{"docker", "network", "create", "cloudbuild", "--subnet=" + subnet}
-	return r.Run(ctx, cmd, nil, nil, os.Stderr, "")
+	cmd := []string{"docker", "network", "create", DockerNetwork, "--subnet=" + subnet}
+	return r.Run(ctx, cmd, nil, nil, os.Stderr)
 }
 
 func startServer(ctx context.Context, r runner.Runner, metadataImage string, iptables bool, ip, subnet string) error {
@@ -301,13 +310,13 @@ func startServer(ctx context.Context, r runner.Runner, metadataImage string, ipt
 	} else {
 		cmd = []string{"docker", "run", "-d", "--name=metadata", metadataImage}
 	}
-	if err := r.Run(ctx, cmd, nil, nil, os.Stderr, ""); err != nil {
+	if err := r.Run(ctx, cmd, nil, nil, os.Stderr); err != nil {
 		return err
 	}
 
 	// Redirect requests to metadata.google.internal and the fixed metadata IP to the metadata container.
 	cmd = []string{"docker", "network", "connect", "--alias=metadata", "--alias=metadata.google.internal", "--ip=" + ip, "cloudbuild", "metadata"}
-	if err := r.Run(ctx, cmd, nil, nil, os.Stderr, ""); err != nil {
+	if err := r.Run(ctx, cmd, nil, nil, os.Stderr); err != nil {
 		return fmt.Errorf("Error connecting metadata to network: %v", err)
 	}
 
@@ -320,9 +329,9 @@ func startServer(ctx context.Context, r runner.Runner, metadataImage string, ipt
 			"--destination", fixedMetadataIP, // intended for the metadata service,
 			"--dport", "80", // intended for port 80.
 			"-j", "DNAT", // This rule does destination NATting,
-			"--to-destination", metadataHostedIP, // to our spoofed metadata container.
+			"--to-destination", MetadataHostedIP, // to our spoofed metadata container.
 		}
-		if err := r.Run(ctx, cmd, nil, os.Stdout, os.Stderr, ""); err != nil {
+		if err := r.Run(ctx, cmd, nil, os.Stdout, os.Stderr); err != nil {
 			return fmt.Errorf("Error updating iptables: %v", err)
 		}
 	}
@@ -332,14 +341,14 @@ func startServer(ctx context.Context, r runner.Runner, metadataImage string, ipt
 
 // CleanCloudbuildNetwork delete the cloudbuild network.
 func CleanCloudbuildNetwork(ctx context.Context, r runner.Runner) error {
-	return r.Run(ctx, []string{"docker", "network", "rm", "cloudbuild"}, nil, nil, os.Stderr, "")
+	return r.Run(ctx, []string{"docker", "network", "rm", "cloudbuild"}, nil, nil, os.Stderr)
 }
 
 // Stop stops the metadata server container and tears down the docker cloudbuild
 // network used to route traffic to it.
 // Try to clean both the container and the network before returning an error.
 func (RealUpdater) Stop(ctx context.Context, r runner.Runner) error {
-	errContainer := r.Run(ctx, []string{"docker", "rm", "-f", "metadata"}, nil, nil, os.Stderr, "")
+	errContainer := r.Run(ctx, []string{"docker", "rm", "-f", "metadata"}, nil, nil, os.Stderr)
 	errNetwork := CleanCloudbuildNetwork(ctx, r)
 	if errContainer != nil {
 		return errContainer

@@ -24,8 +24,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/GoogleCloudPlatform/cloud-build-local/common"
+	"github.com/golang/protobuf/proto"
+
 	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
-	duration "github.com/golang/protobuf/ptypes/duration"
+	durpb "github.com/golang/protobuf/ptypes/duration"
 )
 
 const (
@@ -46,8 +49,8 @@ func randSeq(n int) string {
 
 func TestCheckSubstitutions(t *testing.T) {
 	hugeSubstitutionsMap := make(map[string]string)
-	for len(hugeSubstitutionsMap) < maxNumSubstitutions+1 {
-		hugeSubstitutionsMap[randSeq(maxSubstKeyLength)] = randSeq(1)
+	for len(hugeSubstitutionsMap) < commonconst.MaxNumSubstitutions+1 {
+		hugeSubstitutionsMap[randSeq(commonconst.MaxSubstKeyLength)] = randSeq(1)
 	}
 
 	for _, c := range []struct {
@@ -68,12 +71,12 @@ func TestCheckSubstitutions(t *testing.T) {
 		wantErr: false,
 	}, {
 		substitutions: map[string]string{
-			"_VARIABLE": randSeq(maxSubstValueLength + 1),
+			"_VARIABLE": randSeq(commonconst.MaxSubstValueLength + 1),
 		},
 		wantErr: true,
 	}, {
 		substitutions: map[string]string{
-			randSeq(maxSubstKeyLength + 1): "value",
+			randSeq(commonconst.MaxSubstKeyLength + 1): "value",
 		},
 		wantErr: true,
 	}, {
@@ -136,6 +139,7 @@ func TestCheckSubstitutionsLoose(t *testing.T) {
 	}
 }
 
+
 func TestCheckSubstitutionTemplate(t *testing.T) {
 	for _, c := range []struct {
 		images, tags  []string
@@ -194,6 +198,24 @@ func TestCheckSubstitutionTemplate(t *testing.T) {
 					Location: "gs://some-bucket/$_FOO",
 					Paths:    []string{"$_FOO"},
 				}},
+			Substitutions: map[string]string{
+				"_FOO": "Bar",
+			},
+		},
+	}, {
+		build: &pb.Build{
+			Options: &pb.BuildOptions{
+				Env: []string{"$_FOO"},
+			},
+			Substitutions: map[string]string{
+				"_FOO": "Bar",
+			},
+		},
+	}, {
+		build: &pb.Build{
+			Options: &pb.BuildOptions{
+				WorkerPool: "$_FOO",
+			},
 			Substitutions: map[string]string{
 				"_FOO": "Bar",
 			},
@@ -275,11 +297,19 @@ func TestValidateBuild(t *testing.T) {
 		valid: false,
 	}, {
 		build: &pb.Build{
-			Id: "bad-env",
+			Id: "bad-step-env",
 			Steps: []*pb.BuildStep{{
 				Name: "foo",
 				Env:  []string{"foobar"},
 			}},
+		},
+		valid: false,
+	}, {
+		build: &pb.Build{
+			Id: "bad-global-env",
+			Options: &pb.BuildOptions{
+				Env: []string{"foobar"},
+			},
 		},
 		valid: false,
 	}, {
@@ -302,28 +332,9 @@ func TestValidateBuild(t *testing.T) {
 		valid: false,
 	}, {
 		build: &pb.Build{
-			Id: "check-substitutions-failure",
-			Steps: []*pb.BuildStep{{
-				Name: "$_UNKNOWN_SUBSTITUTION $_ANOTHER_ONE",
-			}},
-		},
-		valid: false,
-	}, {
-		build: &pb.Build{
-			Id: "check-substitutions-failure",
-			Steps: []*pb.BuildStep{{
-				Name: "$_UNKNOWN_SUBSTITUTION $_ANOTHER_ONE",
-			}},
-			Options: &pb.BuildOptions{
-				SubstitutionOption: pb.BuildOptions_ALLOW_LOOSE,
-			},
-		},
-		valid: true,
-	}, {
-		build: &pb.Build{
 			Id:      "name-only",
 			Steps:   []*pb.BuildStep{{Name: "foo"}},
-			Timeout: &duration.Duration{Seconds: int64(MaxTimeout.Seconds())},
+			Timeout: &durpb.Duration{Seconds: int64(MaxTimeout.Seconds())},
 		},
 		valid: true,
 	}, {
@@ -331,7 +342,7 @@ func TestValidateBuild(t *testing.T) {
 		build: &pb.Build{
 			Id:      "name-only",
 			Steps:   []*pb.BuildStep{{Name: "foo"}},
-			Timeout: &duration.Duration{Seconds: int64(MaxTimeout.Seconds()) + 1},
+			Timeout: &durpb.Duration{Seconds: int64(MaxTimeout.Seconds()) + 1},
 		},
 		valid: false,
 	}}
@@ -353,6 +364,22 @@ func TestCheckEnvVars(t *testing.T) {
 		build *pb.Build
 		valid bool
 	}{{
+		build: &pb.Build{
+			Id: "bad-local-env",
+			Options: &pb.BuildOptions{
+				Env: []string{"foobar"},
+			},
+		},
+		valid: false,
+	}, {
+		build: &pb.Build{
+			Id: "bad-global-env",
+			Steps: []*pb.BuildStep{{
+				Env: []string{"foobar"},
+			}},
+		},
+		valid: false,
+	}, {
 		build: &pb.Build{
 			Id: "max-local-env",
 			Steps: []*pb.BuildStep{{
@@ -453,6 +480,17 @@ func TestCheckBuildAfterSubstitutions(t *testing.T) {
 		valid: true,
 	}, {
 		build: &pb.Build{
+			Steps: []*pb.BuildStep{{Name: "foo"}},
+			Artifacts: &pb.Artifacts{
+				Objects: &pb.Artifacts_ArtifactObjects{
+					Location: "gs://some-bucket",
+					Paths:    []string{"doesnotmatter"},
+				},
+			},
+		},
+		valid: true,
+	}, {
+		build: &pb.Build{
 			Steps: []*pb.BuildStep{{Name: "gcr.io/:broken"}},
 		},
 		valid: false,
@@ -460,6 +498,18 @@ func TestCheckBuildAfterSubstitutions(t *testing.T) {
 		build: &pb.Build{
 			Steps:  []*pb.BuildStep{{Name: "foo"}},
 			Images: []string{"gcr.io/:broken"},
+		},
+		valid: false,
+	}, {
+		// .artifacts.location string does not begin with "gs://"
+		build: &pb.Build{
+			Steps: []*pb.BuildStep{{Name: "foo"}},
+			Artifacts: &pb.Artifacts{
+				Objects: &pb.Artifacts_ArtifactObjects{
+					Location: "some-bucket",
+					Paths:    []string{"doesnotmatter"},
+				},
+			},
 		},
 		valid: false,
 	}}
@@ -539,47 +589,6 @@ func TestCheckArtifacts(t *testing.T) {
 		},
 		wantErr: true,
 	}, {
-		// .artifacts.location string does not begin with "gs://"
-		artifacts: &pb.Artifacts{
-			Objects: &pb.Artifacts_ArtifactObjects{
-				Location: "some-bucket",
-				Paths:    []string{"doesnotmatter"},
-			},
-		},
-		wantErr: true,
-	}, {
-		// If .artifacts.location has no trailing slash, suffix a trailing slash.
-		artifacts: &pb.Artifacts{
-			Objects: &pb.Artifacts_ArtifactObjects{
-				Location: "gs://some-bucket",
-				Paths:    []string{"doesnotmatter"},
-			},
-		},
-		wantOut: &pb.Build{
-			Artifacts: &pb.Artifacts{
-				Objects: &pb.Artifacts_ArtifactObjects{
-					Location: "gs://some-bucket/",
-					Paths:    []string{"doesnotmatter"},
-				},
-			},
-		},
-	}, {
-		// If .artifacts.location already has a trailing slash, a slash should not be suffixed.
-		artifacts: &pb.Artifacts{
-			Objects: &pb.Artifacts_ArtifactObjects{
-				Location: "gs://some-bucket/",
-				Paths:    []string{"doesnotmatter"},
-			},
-		},
-		wantOut: &pb.Build{
-			Artifacts: &pb.Artifacts{
-				Objects: &pb.Artifacts_ArtifactObjects{
-					Location: "gs://some-bucket/",
-					Paths:    []string{"doesnotmatter"},
-				},
-			},
-		},
-	}, {
 		// No .artifacts.paths specified.
 		artifacts: &pb.Artifacts{
 			Objects: &pb.Artifacts_ArtifactObjects{
@@ -623,9 +632,72 @@ func TestCheckArtifacts(t *testing.T) {
 			t.Errorf("CheckArtifacts(%v) did not return error", b)
 		} else if err != nil && !c.wantErr {
 			t.Errorf("CheckArtifacts(%v) got unexpected error: %v", b, err)
-		} else if err == nil && !reflect.DeepEqual(b, c.wantOut) {
+		} else if err == nil && !proto.Equal(b, c.wantOut) {
 			t.Errorf("CheckArtifacts modified build to %+v, want %+v", b, c.wantOut)
 		}
+	}
+}
+
+func TestCheckArtifactFieldValues(t *testing.T) {
+	testCases := []struct {
+		name          string
+		artifacts     *pb.Artifacts
+		wantArtifacts *pb.Artifacts
+	}{{
+		// If the artifacts fields are nil, it's a no-op.
+		name: "NilArtifacts",
+	}, {
+		// If .artifacts.location already has a trailing slash, a slash should not be suffixed.
+		name: "TrailingSlash",
+		artifacts: &pb.Artifacts{
+			Objects: &pb.Artifacts_ArtifactObjects{
+				Location: "gs://some-bucket/",
+				Paths:    []string{"doesnotmatter"},
+			},
+		},
+		wantArtifacts: &pb.Artifacts{
+			Objects: &pb.Artifacts_ArtifactObjects{
+				Location: "gs://some-bucket/",
+				Paths:    []string{"doesnotmatter"},
+			},
+		},
+	}, {
+		// If .artifacts.location has no trailing slash, suffix a trailing slash.
+		name: "NoTrailingSlash",
+		artifacts: &pb.Artifacts{
+			Objects: &pb.Artifacts_ArtifactObjects{
+				Location: "gs://some-bucket",
+				Paths:    []string{"doesnotmatter"},
+			},
+		},
+		wantArtifacts: &pb.Artifacts{
+			Objects: &pb.Artifacts_ArtifactObjects{
+				Location: "gs://some-bucket/",
+				Paths:    []string{"doesnotmatter"},
+			},
+		},
+	}}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := checkArtifactFieldValues(tc.artifacts); err != nil {
+				t.Errorf("got unexpected error %v", err)
+			}
+			if !proto.Equal(tc.artifacts, tc.wantArtifacts) {
+				t.Errorf("got artifacts = %+v, want artifacts = %+v", tc.artifacts, tc.wantArtifacts)
+			}
+		})
+	}
+}
+
+func TestCheckArtifactFieldValuesErrors(t *testing.T) {
+	// Location field must be prefixed with `gs://`.
+	if err := checkArtifactFieldValues(&pb.Artifacts{
+		Objects: &pb.Artifacts_ArtifactObjects{
+			Location: "some-bucket/",
+			Paths:    []string{"doesnotmatter"},
+		},
+	}); err == nil {
+		t.Errorf("got nil error, want error")
 	}
 }
 
@@ -1030,20 +1102,21 @@ func TestCheckBuildSteps(t *testing.T) {
 		wantErr: true,
 	}, {
 		// happy case with per-step timeouts and no build timeout
-		steps: []*pb.BuildStep{{Name: "happy-step-timeout", Timeout: &duration.Duration{Seconds: int64(MaxTimeout.Seconds())}}},
+		steps: []*pb.BuildStep{{Name: "happy-step-timeout", Timeout: &durpb.Duration{Seconds: int64(MaxTimeout.Seconds())}}},
 	}, {
 		// happy case with per-step timeouts and build timeout
-		steps:   []*pb.BuildStep{{Name: "happy-step-and-build-timeout", Timeout: &duration.Duration{Seconds: 1}}},
+		steps:   []*pb.BuildStep{{Name: "happy-step-and-build-timeout", Timeout: &durpb.Duration{Seconds: 1}}},
 		timeout: 10 * time.Second,
 	}, {
 		// fails because step timeout > build timeout
-		steps:   []*pb.BuildStep{{Name: "unhappy-step-and-build-timeout", Timeout: &duration.Duration{Seconds: 10}}},
+		steps:   []*pb.BuildStep{{Name: "unhappy-step-and-build-timeout", Timeout: &durpb.Duration{Seconds: 10}}},
 		timeout: time.Second,
 		wantErr: true,
 	}, {
 		// fails because step timeout > MaxTimeout
-		steps:   []*pb.BuildStep{{Name: "step-timeout-too-big", Timeout: &duration.Duration{Seconds: int64(MaxTimeout.Seconds()) + 1}}},
+		steps:   []*pb.BuildStep{{Name: "step-timeout-too-big", Timeout: &durpb.Duration{Seconds: int64(MaxTimeout.Seconds()) + 1}}},
 		wantErr: true,
+	}, {
 	}} {
 		if err := CheckBuildSteps(c.steps, c.timeout); err == nil && c.wantErr {
 			t.Errorf("CheckBuildSteps(%v) did not return error", c.steps)
@@ -1368,83 +1441,42 @@ func TestCheckSecrets(t *testing.T) {
 	}
 }
 
-func TestCheckImageTags(t *testing.T) {
-	validTags := []string{
-		"subdomain.gcr.io/works/folder/folder",
-		"gcr.io/works/folder:tag",
-		"gcr.io/works/folder",
-		"quay.io/blah/blah:blah",
-		"quay.io/blah",
-		"sub.quay.io/blah",
-		"sub.sub.quay.io/blah",
-		"quay.io/blah:blah",
-		"gcr.io/google.com/project/quickstart-image",
-	}
-	invalidTags := []string{
-		"",
-		" ",
-		"contains space",
-		"_ubuntu",
-		"gcr.io/z",
-		"gcr.io/broken/noth:",
-		"gcr.io/broken:image",
-		"subdom.gcr.io/project/image.name.here@digest.here",
-		"gcr.io/broken:tag",
-		"gcr.io/:broken",
-		"gcr.io/projoect/Broken",
-		"gcr.o/broken/folder:tag",
-		"gcr.io/project/image:foo:bar",
-		"gcr.io/project/image@sha257:abcdefg",
-		"gcr.io/project/image@sha256:abcdefg:foo",
-		"baddomaingcr.io/doesntwork",
-		"sub.sub.gcr.io/baddomain/blah",
-	}
-	for _, tag := range validTags {
-		tags := []string{tag}
-		if err := checkImageTags(tags); err != nil {
-			t.Errorf("checkImageTags(%v) got unexpected error: %v", tags, err)
-
-		}
-	}
-	for _, tag := range invalidTags {
-		tags := []string{tag}
-		if err := checkImageTags(tags); err == nil {
-			t.Errorf("checkImageTags(%v) did not return error", tags)
-		}
-	}
-}
+const validDigest = "sha256:deadb33fdeadb33fdeadb33fdeadb33fdeadb33fdeadb33fdeadb33fdeadb33f"
 
 var validNames = []string{
 	"gcr.o/works/folder:tag",
-	"gcr.io/z",
 	"subdomain.gcr.io/works/folder/folder",
 	"gcr.io/works:tag",
 	"gcr.io/works/folder:tag",
 	"gcr.io/works/folder:Tag",
 	"ubuntu",
 	"ubuntu:latest",
-	"gcr.io/cloud-builders/docker@sha256:blah",
+	"gcr.io/cloud-builders/docker@" + validDigest,
+	"gcr.io/cloud-builders/docker:tag@" + validDigest,
 }
 var invalidNames = []string{
-	"",
-	"gcr.io/cloud-builders/docker@sha256:",
-	"gcr.io/cloud-builders/docker@sha56:blah",
-	"ubnutu::latest",
-	"gcr.io/:broken",
-	"gcr.io/project/Broken",
+	"",                                     // empty
+	"gcr.io/z",                             // repository too short
+	"gcr.io/cloud-builders/docker@sha256:", // missing digest
+	"gcr.io/cloud-builders/docker@sha56:" + strings.Repeat("a", 64), // malformed digest (sha56)
+	"gcr.io/cloud-builders/docker@sha56:blah",                       // digest too short
+	"gcr.io/cloud-builders/docker:tag@sha56:blah",                   // digest too short (with tag)
+	"ubuntu::latest",                           // double colon
+	"gcr.io/:broken",                           // bad colon
+	"gcr.io/project/Broken",                    // contains uppercase
+	"gcr.io/cloud-builders/docker@sha256:blah", // invalid digest
+	"UBUNTU:latest",                            // contains uppercase
 }
 
 func TestCheckBuildStepName(t *testing.T) {
 	for _, name := range validNames {
-		step := &pb.BuildStep{Name: name}
-		steps := []*pb.BuildStep{step}
+		steps := []*pb.BuildStep{{Name: name}}
 		if err := checkBuildStepNames(steps); err != nil {
 			t.Errorf("checkBuildStepNames(%v) got unexpected error: %v", steps, err)
 		}
 	}
 	for _, name := range invalidNames {
-		step := &pb.BuildStep{Name: name}
-		steps := []*pb.BuildStep{step}
+		steps := []*pb.BuildStep{{Name: name}}
 		if err := checkBuildStepNames(steps); err == nil {
 			t.Errorf("checkBuildStepNames(%v) did not return error", steps)
 		}
@@ -1460,28 +1492,6 @@ func TestCheckImageNames(t *testing.T) {
 	for _, name := range invalidNames {
 		if err := checkImageNames([]string{name}); err == nil {
 			t.Errorf("checkImageNames(%v) did not return error", name)
-		}
-	}
-}
-
-// TestCheckImageNames ensures that there are different error messages
-// for invalid images with uppercase letters, and all other invalid images.
-func TestCheckImageNamesErrorMessage(t *testing.T) {
-	invalidImages := []string{
-		"UBUNTU:latest",  // contains uppercase
-		"ubnutu::latest", // invalid, but all lowercase
-	}
-	wantErr := []error{
-		errors.New(`invalid image name "UBUNTU:latest" contains uppercase letters`),
-		errors.New(`invalid image name "ubnutu::latest"`),
-	}
-	for i, img := range invalidImages {
-		err := checkImageNames([]string{img})
-		if err == nil {
-			t.Fatalf("checkImageNames(%v) did not return error", img)
-		}
-		if err.Error() != wantErr[i].Error() {
-			t.Errorf("got error = %q, want %q", err.Error(), wantErr[i].Error())
 		}
 	}
 }

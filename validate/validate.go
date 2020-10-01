@@ -27,9 +27,10 @@ import (
 	"unicode"
 
 	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
-	"github.com/golang/protobuf/ptypes"
+	"github.com/GoogleCloudPlatform/cloud-build-local/common"
 	"github.com/GoogleCloudPlatform/cloud-build-local/subst"
-	"github.com/docker/distribution/reference"
+	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/golang/protobuf/ptypes"
 )
 
 const (
@@ -37,29 +38,27 @@ const (
 	StartStep = "-"
 	// MaxTimeout is the maximum allowable timeout for a build or build step.
 	MaxTimeout = 24 * time.Hour
-
-	maxNumSteps       = 100  // max number of steps.
-	maxStepNameLength = 1000 // max length of step name.
-	maxNumEnvs        = 100  // max number of envs per step.
-	maxEnvLength      = 1000 // max length of env value.
-	maxNumArgs        = 100  // max number of args per step.
-	
-	maxArgLength = 4000 // max length of arg value.
-	maxDirLength = 1000 // max length of dir value.
-	maxNumImages = 100  // max number of images.
 	// MaxImageLength is the max length of image value. Used in other packages.
-	MaxImageLength      = 1000
-	maxNumSubstitutions = 100       // max number of user-defined substitutions.
-	maxSubstKeyLength   = 100       // max length of a substitution key.
-	maxSubstValueLength = 4000      // max length of a substitution value.
-	maxNumSecretEnvs    = 100       // max number of unique secret env values.
-	maxSecretSize       = 64 * 1024 // max size of a secret
-	maxArtifactsPaths   = 100       // max number of artifacts paths that can be specified.
-	maxNumTags          = 64        // max length of the list of tags.
+	MaxImageLength = 1000
+
+	maxNumSteps       = 100       // max number of steps.
+	maxStepNameLength = 1000      // max length of step name.
+	maxNumEnvs        = 100       // max number of envs per step.
+	maxEnvLength      = 64 * 1024 // max length of env value.
+	maxNumArgs        = 100       // max number of args per step.
+	
+	maxArgLength      = 4000      // max length of arg value.
+	maxDirLength      = 1000      // max length of dir value.
+	maxNumImages      = 100       // max number of images.
+	maxNumSecretEnvs  = 100       // max number of unique secret env values.
+	maxSecretSize     = 64 * 1024 // max size of a secret
+	maxArtifactsPaths = 100       // max number of artifacts paths that can be specified.
+	maxNumTags        = 64        // max length of the list of tags.
 )
 
 var (
-	validUserSubstKeyRE = regexp.MustCompile(`^_[A-Z0-9_]+$`)
+	// ValidUserSubstKeyRE defines which strings are allowed as user defined substitutions.
+	ValidUserSubstKeyRE = regexp.MustCompile(`^_[A-Z0-9_]+$`)
 
 	// validBuiltInSubstitutions is the list of valid built-in substitution variables.
 	// The boolean values determine if the variable can be used in the
@@ -80,12 +79,7 @@ var (
 		"/builder/home":        struct{}{},
 		"/var/run/docker.sock": struct{}{},
 	}
-	// validImageTagRE ensures only proper characters are used in name and tag.
-	validImageTagRE = regexp.MustCompile(`^(` + reference.NameRegexp.String() + `(@sha256:` + reference.TagRegexp.String() + `|:` + reference.TagRegexp.String() + `)?)$`)
-	// validGCRImageRE ensures proper domain and folder level image for gcr.io. More lenient on the actual characters other than folder structure and domain.
-	validGCRImageRE  = regexp.MustCompile(`^([^\.]+\.)?gcr\.io/[^/]+(/[^/]+)+$`)
-	validQuayImageRE = regexp.MustCompile(`^(.+\.)?quay\.io/.+$`)
-	validBuildTagRE  = regexp.MustCompile(`^(` + reference.TagRegexp.String() + `)$`)
+	validBuildTagRE = regexp.MustCompile(`^[\w][\w.-]{0,127}$`)
 )
 
 // CheckBuild returns no error if build is valid,
@@ -121,16 +115,6 @@ func CheckBuild(b *pb.Build) error {
 		return fmt.Errorf("invalid .steps field: %v", err)
 	}
 
-	if missingSubs, err := CheckSubstitutionTemplate(b); err != nil {
-		return err
-	} else if len(missingSubs) > 0 {
-		// If the user doesn't specifically allow loose substitutions, the warnings
-		// are returned as an error.
-		if b.GetOptions().GetSubstitutionOption() != pb.BuildOptions_ALLOW_LOOSE {
-			return fmt.Errorf(strings.Join(missingSubs, ";"))
-		}
-	}
-
 	if err := checkVolumes(b); err != nil {
 		return err
 	}
@@ -158,7 +142,11 @@ func CheckBuildAfterSubstitutions(b *pb.Build) error {
 		return err
 	}
 
-	return checkImageNames(b.Images)
+	if err := checkImageNames(b.Images); err != nil {
+		return err
+	}
+
+	return checkArtifactFieldValues(b.Artifacts)
 }
 
 // CheckSubstitutions validates the substitutions map.
@@ -169,8 +157,8 @@ func CheckSubstitutions(substitutions map[string]string) error {
 
 	// Also check that all the substitions have the user-defined format.
 	for k := range substitutions {
-		if !validUserSubstKeyRE.MatchString(k) {
-			return fmt.Errorf("substitution key %q does not respect format %q", k, validUserSubstKeyRE)
+		if !ValidUserSubstKeyRE.MatchString(k) {
+			return fmt.Errorf("substitution key %q does not respect format %q", k, ValidUserSubstKeyRE)
 		}
 	}
 
@@ -185,21 +173,21 @@ func CheckSubstitutionsLoose(substitutions map[string]string) error {
 		return nil
 	}
 
-	if len(substitutions) > maxNumSubstitutions {
-		return fmt.Errorf("number of substitutions %d exceeded (max: %d)", len(substitutions), maxNumSubstitutions)
+	if len(substitutions) > commonconst.MaxNumSubstitutions {
+		return fmt.Errorf("number of substitutions %d exceeded (max: %d)", len(substitutions), commonconst.MaxNumSubstitutions)
 	}
 
 	for k, v := range substitutions {
-		if len(k) > maxSubstKeyLength {
-			return fmt.Errorf("substitution key %q too long (max: %d)", k, maxSubstKeyLength)
+		if len(k) > commonconst.MaxSubstKeyLength {
+			return fmt.Errorf("substitution key %q too long (max: %d)", k, commonconst.MaxSubstKeyLength)
 		}
-		if !validUserSubstKeyRE.MatchString(k) {
+		if !ValidUserSubstKeyRE.MatchString(k) {
 			if overridable, ok := validBuiltInSubstitutions[k]; !ok || !overridable {
-				return fmt.Errorf("substitution key %q does not respect format %q and is not an overridable built-in substitutions", k, validUserSubstKeyRE)
+				return fmt.Errorf("substitution key %q does not respect format %q and is not an overridable built-in substitutions", k, ValidUserSubstKeyRE)
 			}
 		}
-		if len(v) > maxSubstValueLength {
-			return fmt.Errorf("substitution value %q too long (max: %d)", v, maxSubstValueLength)
+		if len(v) > commonconst.MaxSubstValueLength {
+			return fmt.Errorf("substitution value %q too long (max: %d)", v, commonconst.MaxSubstValueLength)
 		}
 	}
 
@@ -226,7 +214,7 @@ func CheckSubstitutionTemplate(b *pb.Build) ([]string, error) {
 				continue
 			}
 			if _, ok := b.Substitutions[p.Key]; !ok {
-				if validUserSubstKeyRE.MatchString(p.Key) {
+				if ValidUserSubstKeyRE.MatchString(p.Key) {
 					warnings = append(warnings, fmt.Sprintf("key in the template %q is not matched in the substitution data; substitutions = %+v", p.Key, b.Substitutions))
 					continue
 				}
@@ -239,6 +227,17 @@ func CheckSubstitutionTemplate(b *pb.Build) ([]string, error) {
 		return nil
 	}
 
+	if b.Options != nil {
+		for _, e := range b.Options.Env {
+			if err := checkParameters(e); err != nil {
+				return warnings, err
+			}
+		}
+
+		if err := checkParameters(b.Options.WorkerPool); err != nil {
+			return warnings, err
+		}
+	}
 	for _, step := range b.Steps {
 		if err := checkParameters(step.Name); err != nil {
 			return warnings, err
@@ -270,15 +269,25 @@ func CheckSubstitutionTemplate(b *pb.Build) ([]string, error) {
 			return warnings, err
 		}
 	}
-
-	if b.Artifacts != nil && b.Artifacts.GetObjects() != nil {
-		objects := b.Artifacts.Objects
-		if err := checkParameters(objects.Location); err != nil {
-			return warnings, err
-		}
-		for _, p := range objects.Paths {
-			if err := checkParameters(p); err != nil {
+	if err := checkParameters(b.LogsBucket); err != nil {
+		return warnings, err
+	}
+	if b.Artifacts != nil {
+		artifacts := b.Artifacts
+		for _, img := range artifacts.Images {
+			if err := checkParameters(img); err != nil {
 				return warnings, err
+			}
+		}
+		if artifacts.GetObjects() != nil {
+			objects := artifacts.Objects
+			if err := checkParameters(objects.Location); err != nil {
+				return warnings, err
+			}
+			for _, p := range objects.Paths {
+				if err := checkParameters(p); err != nil {
+					return warnings, err
+				}
 			}
 		}
 	}
@@ -321,14 +330,6 @@ func CheckArtifacts(b *pb.Build) error {
 		if len(gcsURL) == 0 {
 			return errors.New(".artifacts.location field is empty")
 		}
-		if !strings.HasPrefix(gcsURL, "gs://") {
-			return fmt.Errorf("invalid .artifacts.location value %q; Google Cloud Storage URLs must begin with 'gs://'", gcsURL)
-		}
-		if !strings.HasSuffix(gcsURL, "/") {
-			// Suffixing the destination bucket URL with a "/" guarantees that the URL will be treated as a directory.
-			// For details, see https://cloud.google.com/storage/docs/gsutil/addlhelp/HowSubdirectoriesWork.
-			b.Artifacts.Objects.Location = gcsURL + "/"
-		}
 
 		if len(b.Artifacts.Objects.Paths) == 0 {
 			return errors.New(".artifacts.paths field empty")
@@ -336,6 +337,8 @@ func CheckArtifacts(b *pb.Build) error {
 		if numPaths := len(b.Artifacts.Objects.Paths); numPaths > maxArtifactsPaths {
 			return fmt.Errorf(".artifacts.paths field has length %d, but cannot specify more than %d", numPaths, maxArtifactsPaths)
 		}
+
+		// Remove duplicates so we do not upload to same path more than once; it's a waste of build time.
 		pathExists := map[string]bool{}
 		duplicates := []string{}
 		for _, p := range b.Artifacts.Objects.Paths {
@@ -365,6 +368,26 @@ func CheckArtifacts(b *pb.Build) error {
 	return nil
 }
 
+// checkArtifactFieldValues validates the values of the artifacts.location and artifacts.objects.paths field.
+//
+// NB: This is separate from the CheckArtifacts method because CheckArtifacts is called before substitutions are applied
+// to the field, and makes validations that don't care about the field values.
+// Validation on the values of a substitutable field should occur AFTER the substitutions are applied.
+func checkArtifactFieldValues(artifacts *pb.Artifacts) error {
+	if artifacts != nil && artifacts.Objects != nil {
+		gcsURL := artifacts.Objects.Location
+		if !strings.HasPrefix(gcsURL, "gs://") {
+			return fmt.Errorf("invalid .artifacts.location value %q; Google Cloud Storage URLs must begin with 'gs://'", gcsURL)
+		}
+		if !strings.HasSuffix(gcsURL, "/") {
+			// Suffixing the destination bucket URL with a "/" guarantees that the URL will be treated as a directory.
+			// For details, see https://cloud.google.com/storage/docs/gsutil/addlhelp/HowSubdirectoriesWork.
+			artifacts.Objects.Location = gcsURL + "/"
+		}
+	}
+	return nil
+}
+
 // CheckBuildSteps checks the number of steps, and their content.
 func CheckBuildSteps(steps []*pb.BuildStep, buildTimeout time.Duration) error {
 	if buildTimeout == 0 {
@@ -391,12 +414,13 @@ func CheckBuildSteps(steps []*pb.BuildStep, buildTimeout time.Duration) error {
 			return fmt.Errorf("build step %d name too long (max: %d)", i, maxStepNameLength)
 		}
 
-		if len(s.Args) > maxNumArgs {
-			return fmt.Errorf("build step %d too many args (max: %d)", i, maxNumArgs)
-		}
-		for ai, a := range s.Args {
-			if len(a) > maxArgLength {
-				return fmt.Errorf("build step %d arg %d too long (max: %d)", i, ai, maxArgLength)
+			if len(s.Args) > maxNumArgs {
+				return fmt.Errorf("build step %d too many args (max: %d)", i, maxNumArgs)
+			}
+			for ai, a := range s.Args {
+				if len(a) > maxArgLength {
+					return fmt.Errorf("build step %d arg %d too long (max: %d)", i, ai, maxArgLength)
+				}
 			}
 		}
 
@@ -419,11 +443,6 @@ func CheckBuildSteps(steps []*pb.BuildStep, buildTimeout time.Duration) error {
 				return fmt.Errorf("build step #%d - %q: the ID cannot be %q which is reserved as a dependency for build steps that should run first", i, s.Id, StartStep)
 			}
 			knownSteps[s.Id] = true
-		}
-		for _, e := range s.Env {
-			if !strings.Contains(e, "=") {
-				return fmt.Errorf(`build step #%d - %q: the Env entry %q must be of the form "KEY=VALUE"`, i, s.Id, e)
-			}
 		}
 
 		if s.Timeout != nil {
@@ -528,9 +547,12 @@ func checkSecrets(b *pb.Build) error {
 	for i, step := range b.Steps {
 		envs := map[string]struct{}{}
 		for _, e := range append(globalEnvs, step.Env...) {
-			// Previous validation ensures that envs include "=".
-			k := e[:strings.Index(e, "=")]
-			envs[k] = struct{}{}
+			// Validating that envs includes "=" is outside this function's scope.
+			equalsIndex := strings.Index(e, "=")
+			if equalsIndex >= 0 {
+				k := e[:equalsIndex]
+				envs[k] = struct{}{}
+			}
 		}
 		for _, se := range append(b.GetOptions().GetSecretEnv(), step.SecretEnv...) {
 			if _, found := envs[se]; found {
@@ -542,25 +564,11 @@ func checkSecrets(b *pb.Build) error {
 	return nil
 }
 
-// checkImageTags validates the image tag flag.
-func checkImageTags(imageTags []string) error {
-	for _, imageTag := range imageTags {
-		if !validImageTagRE.MatchString(imageTag) {
-			return fmt.Errorf("invalid image tag %q: must match format %q", imageTag, validImageTagRE)
-		}
-		if !validGCRImageRE.MatchString(imageTag) && !validQuayImageRE.MatchString(imageTag) {
-			return fmt.Errorf("invalid image tag %q: must match format %q", imageTag, validGCRImageRE)
-		}
-	}
-	return nil
-}
-
 // checkBuildStepNames validates the build step names.
 func checkBuildStepNames(steps []*pb.BuildStep) error {
 	for _, step := range steps {
-		name := step.Name
-		if !validImageTagRE.MatchString(name) {
-			return fmt.Errorf("invalid build step name %q", name)
+		if _, err := name.ParseReference(step.Name, name.WeakValidation); err != nil {
+			return fmt.Errorf("invalid build step name %q: %v", step.Name, err)
 		}
 	}
 	return nil
@@ -569,15 +577,8 @@ func checkBuildStepNames(steps []*pb.BuildStep) error {
 // checkImageNames validates the images.
 func checkImageNames(images []string) error {
 	for _, image := range images {
-		if !validImageTagRE.MatchString(image) {
-			// If the lowercased string matches the validImageTag regex, then uppercase letters are invalidating the string.
-			// Return an informative error message to the user.
-			// Ideally, we could just print out the desired regex or refer to Docker documentation,
-			// but validImageTagRE is terribly long, and there is no Docker documentation to point to.
-			if validImageTagRE.MatchString(strings.ToLower(image)) {
-				return fmt.Errorf("invalid image name %q contains uppercase letters", image)
-			}
-			return fmt.Errorf("invalid image name %q", image)
+		if _, err := name.ParseReference(image, name.WeakValidation); err != nil {
+			return fmt.Errorf("invalid image name %q: %v", image, err)
 		}
 	}
 	return nil
@@ -619,8 +620,7 @@ func checkEnvVars(b *pb.Build) error {
 	// build step local env vars
 	for i, s := range b.GetSteps() {
 		if err := runCommonEnvChecks(s.GetEnv()); err != nil {
-			return fmt.Errorf("invalid .steps.env field: build step %d %v", i, maxNumEnvs)
-
+			return fmt.Errorf("invalid .steps.env field: build step %d %v", i, err)
 		}
 	}
 	return nil
@@ -632,9 +632,14 @@ func runCommonEnvChecks(envs []string) error {
 	if len(envs) > maxNumEnvs {
 		return fmt.Errorf("too many envs (max: %d)", maxNumEnvs)
 	}
-	for ei, a := range envs {
-		if len(a) > maxEnvLength {
-			return fmt.Errorf("env %d too long (max: %d)", ei, maxEnvLength)
+	for _, e := range envs {
+		if len(e) > maxEnvLength {
+			return fmt.Errorf("env string too long (max: %d)", maxEnvLength)
+		}
+	}
+	for _, e := range envs {
+		if !strings.Contains(e, "=") {
+			return fmt.Errorf(`env entry %q must be of the form "KEY=VALUE"`, e)
 		}
 	}
 	return nil

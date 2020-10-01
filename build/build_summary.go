@@ -48,10 +48,6 @@ const (
 type FullStatus struct {
 	// BuildStatus is the overall build status.
 	BuildStatus BuildStatus
-
-	// StepStatus is the status of each individual build step; StepStatus is
-	// listed in the same order as the build steps in the build request.
-	StepStatus []pb.Build_Status
 }
 
 // HashType is a pseudo-enum of valid SourceHashes.
@@ -85,6 +81,7 @@ type BuildSummary struct {
 	FileHashes      map[string][]Hash
 	Timing          TimingInfo
 	Artifacts       ArtifactsInfo
+	ExitCodes       []int32
 }
 
 // BuiltImage is information about an image that resulted from this build and
