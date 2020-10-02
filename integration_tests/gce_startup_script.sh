@@ -19,13 +19,12 @@ trap uploadLogs EXIT INT TERM
 
 set -x
 
-# Install the Cloud SDK
+# Ensure Cloud SDK is installed.
 export CLOUDSDK_CORE_DISABLE_PROMPTS=1
 snap refresh google-cloud-sdk || exit
 gcloud info || exit
-gcloud components install docker-credential-gcr --quiet || exit
 
-# Install docker
+# Ensure Docker is installed.
 docker --version || snap install docker || exit
 successful_startup=1
 
