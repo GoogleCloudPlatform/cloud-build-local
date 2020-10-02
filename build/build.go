@@ -124,7 +124,7 @@ type Build struct {
 	idxChan          map[int]chan struct{}
 	idxTranslate     map[string]int
 	kmsMu            sync.Mutex // guards accesses to kms
-	Kms              kms
+	kms              kms
 
 	// PushErrors tracks how many times a push got retried. This
 	// field is not protected by a mutex because the worker will
@@ -853,17 +853,17 @@ func (b *Build) recordStepDigest(idx int, digest string) {
 	b.mu.Unlock()
 }
 
-func (b *Build) GetKMSClient() (kms, error) {
+func (b *Build) getKMSClient() (kms, error) {
 	b.kmsMu.Lock()
 	defer b.kmsMu.Unlock()
 
-	if b.Kms != nil {
-		return b.Kms, nil
+	if b.kms != nil {
+		return b.kms, nil
 	}
 
 	if b.dryrun {
-		b.Kms = dryRunKMS{}
-		return b.Kms, nil
+		b.kms = dryRunKMS{}
+		return b.kms, nil
 	}
 
 	
@@ -876,8 +876,8 @@ func (b *Build) GetKMSClient() (kms, error) {
 	if err != nil {
 		return nil, err
 	}
-	b.Kms = realKMS{svc}
-	return b.Kms, nil
+	b.kms = realKMS{svc}
+	return b.kms, nil
 }
 
 // dryRunKMS always returns a base64-encoded placeholder string instead of real
@@ -1040,7 +1040,7 @@ func processEnvVars(b *Build, step *pb.BuildStep) ([]string, error) {
 	// If the step specifies any secrets, decrypt them and pass the plaintext
 	// values as envs.
 	if len(secretEnvVars) > 0 {
-		kms, err := b.GetKMSClient()
+		kms, err := b.getKMSClient()
 		if err != nil {
 			return nil, err
 		}
