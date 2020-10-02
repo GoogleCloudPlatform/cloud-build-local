@@ -18,7 +18,6 @@ package subst
 import (
 	"fmt"
 	"regexp"
-	"strings"
 
 	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
 )
@@ -62,7 +61,8 @@ func SubstituteBuildFields(b *pb.Build) error {
 		}
 	}
 
-	builtInSubstitutions := map[string]string{
+	// Built-in substitutions.
+	replacements := map[string]string{
 		"PROJECT_ID":  b.ProjectId,
 		"BUILD_ID":    b.Id,
 		"REPO_NAME":   repoName,
@@ -73,37 +73,8 @@ func SubstituteBuildFields(b *pb.Build) error {
 		"SHORT_SHA":   shortSHA,
 	}
 
-	replacements := map[string]string{}
-	// Add built-in substitutions.
-	for k, v := range builtInSubstitutions {
-		replacements[k] = v
-	}
-	// Apply Bash style string manipulations to user-defined substitutions making
-	// sure to allow the user-defined substitutions to reference the built_in
-	// substitutions.
-	combinedSubstitutions := map[string]string{}
-	for k, v := range builtInSubstitutions {
-		combinedSubstitutions[k] = v
-	}
-	for k, v := range b.Substitutions {
-		combinedSubstitutions[k] = v
-	}
-	var evaluatedSubstitutions map[string]string
-	if b.GetOptions().GetDynamicSubstitutions() {
-		var err error
-		evaluatedSubstitutions, err = EvalSubstitutions(combinedSubstitutions)
-		if err != nil {
-			return err
-		}
-	} else {
-		evaluatedSubstitutions = combinedSubstitutions
-	}
-	// Replace the substitutions in the build itself with the evaluated versions.
-	for k := range b.Substitutions {
-		b.Substitutions[k] = evaluatedSubstitutions[k]
-	}
 	// Add user-defined substitutions, overriding built-in substitutions.
-	for k, v := range evaluatedSubstitutions {
+	for k, v := range b.Substitutions {
 		replacements[k] = v
 	}
 
@@ -129,13 +100,6 @@ func SubstituteBuildFields(b *pb.Build) error {
 	}
 
 	// Apply variable expansion to fields.
-	if b.Options != nil {
-		for i, e := range b.Options.Env {
-			b.Options.Env[i] = applyReplacements(e)
-		}
-
-		b.Options.WorkerPool = applyReplacements(b.Options.WorkerPool)
-	}
 	for _, step := range b.Steps {
 		step.Name = applyReplacements(step.Name)
 		for i, a := range step.Args {
@@ -158,6 +122,7 @@ func SubstituteBuildFields(b *pb.Build) error {
 		for i, img := range b.Artifacts.Images {
 			b.Artifacts.Images[i] = applyReplacements(img)
 		}
+
 		if b.Artifacts.Objects != nil {
 			b.Artifacts.Objects.Location = applyReplacements(b.Artifacts.Objects.Location)
 			for i, p := range b.Artifacts.Objects.Paths {

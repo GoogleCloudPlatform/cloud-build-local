@@ -50,7 +50,7 @@ func TestGetAddress(t *testing.T) {
 		want  string
 	}{
 		{true, localMetadata},
-		{false, "http://" + MetadataHostedIP},
+		{false, "http://" + metadataHostedIP},
 	} {
 		u := RealUpdater{tc.local}
 		if got := u.getAddress(); got != tc.want {
@@ -73,10 +73,10 @@ func TestReady(t *testing.T) {
 
 	for _, tc := range cases {
 		wasInfoHost := googleTokenInfoHost
-		wasMetadataIP := MetadataHostedIP
+		wasMetadataIP := metadataHostedIP
 		defer func() {
 			googleTokenInfoHost = wasInfoHost
-			MetadataHostedIP = wasMetadataIP
+			metadataHostedIP = wasMetadataIP
 		}()
 		t.Run(tc.name, func(t *testing.T) {
 			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +95,7 @@ func TestReady(t *testing.T) {
 			}))
 			defer s.Close()
 			googleTokenInfoHost = s.URL
-			MetadataHostedIP = s.URL
+			metadataHostedIP = s.URL
 
 			u := RealUpdater{false}
 			ctx, cancel := context.WithTimeout(context.Background(), tc.timeout)
@@ -144,10 +144,10 @@ func testServer(t *testing.T,
 func TestSetToken(t *testing.T) {
 	ctx := context.Background()
 	wasInfoHost := googleTokenInfoHost
-	wasMetadataIP := MetadataHostedIP
+	wasMetadataIP := metadataHostedIP
 	defer func() {
 		googleTokenInfoHost = wasInfoHost
-		MetadataHostedIP = wasMetadataIP
+		metadataHostedIP = wasMetadataIP
 	}()
 
 	cases := []struct {
@@ -155,23 +155,21 @@ func TestSetToken(t *testing.T) {
 		scopesBody                        string
 		wantError                         bool
 		name                              string
-		scopes                            []string
 	}{
-		{http.StatusOK, http.StatusOK, "{}", false, "happy case", []string{}},
-		{http.StatusOK, http.StatusOK, "", true, "no scopes", []string{}},
-		{http.StatusBadRequest, http.StatusOK, "{}", true, "bad token request", []string{}},
-		{http.StatusOK, http.StatusBadRequest, "{}", true, "bad scopes request", []string{}},
-		{http.StatusOK, http.StatusBadRequest, "{}", false, "skip scopes request", []string{"scope1", "scope2"}},
+		{http.StatusOK, http.StatusOK, "{}", false, "happy case"},
+		{http.StatusOK, http.StatusOK, "", true, "no scopes"},
+		{http.StatusBadRequest, http.StatusOK, "{}", true, "bad token request"},
+		{http.StatusOK, http.StatusBadRequest, "{}", true, "bad scopes request"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			s := testServer(t, tc.tokenStatusCode, tc.scopesStatusCode, tc.scopesBody, 0)
 			defer s.Close()
 			googleTokenInfoHost = s.URL
-			MetadataHostedIP = s.URL
+			metadataHostedIP = s.URL
 
 			u := RealUpdater{false}
-			got := u.SetToken(ctx, &Token{Scopes: tc.scopes})
+			got := u.SetToken(ctx, &Token{})
 			if got == nil && tc.wantError || got != nil && !tc.wantError {
 				t.Errorf("got %v, wantError==%t", got, tc.wantError)
 			}
@@ -182,10 +180,10 @@ func TestSetToken(t *testing.T) {
 func TestGetScopes(t *testing.T) {
 	ctx := context.Background()
 	wasInfoHost := googleTokenInfoHost
-	wasMetadataIP := MetadataHostedIP
+	wasMetadataIP := metadataHostedIP
 	defer func() {
 		googleTokenInfoHost = wasInfoHost
-		MetadataHostedIP = wasMetadataIP
+		metadataHostedIP = wasMetadataIP
 	}()
 	cases := []struct {
 		statusCode int
@@ -206,7 +204,7 @@ func TestGetScopes(t *testing.T) {
 			s := testServer(t, 0, tc.statusCode, tc.body, 0)
 			defer s.Close()
 			googleTokenInfoHost = s.URL
-			MetadataHostedIP = s.URL
+			metadataHostedIP = s.URL
 
 			gotScopes, gotErr := getScopes(ctx, "token string")
 			if gotErr == nil && tc.wantError || gotErr != nil && !tc.wantError {
@@ -222,10 +220,10 @@ func TestGetScopes(t *testing.T) {
 func TestProjectInfo(t *testing.T) {
 	ctx := context.Background()
 	wasInfoHost := googleTokenInfoHost
-	wasMetadataIP := MetadataHostedIP
+	wasMetadataIP := metadataHostedIP
 	defer func() {
 		googleTokenInfoHost = wasInfoHost
-		MetadataHostedIP = wasMetadataIP
+		metadataHostedIP = wasMetadataIP
 	}()
 	cases := []struct {
 		statusCode int
@@ -241,7 +239,7 @@ func TestProjectInfo(t *testing.T) {
 			s := testServer(t, 0, 0, "", tc.statusCode)
 			defer s.Close()
 			googleTokenInfoHost = s.URL
-			MetadataHostedIP = s.URL
+			metadataHostedIP = s.URL
 
 			u := RealUpdater{false}
 			got := u.SetProjectInfo(ctx, ProjectInfo{})

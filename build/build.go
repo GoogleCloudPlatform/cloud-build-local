@@ -27,7 +27,6 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
@@ -44,7 +43,6 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-build-local/runner"
 	"github.com/GoogleCloudPlatform/cloud-build-local/volume"
 	"github.com/spf13/afero"
-	"github.com/google/go-containerregistry/pkg/name"
 	"google.golang.org/api/cloudkms/v1"
 	"golang.org/x/oauth2"
 	"github.com/pborman/uuid"
@@ -53,12 +51,10 @@ import (
 const (
 	containerWorkspaceDir = "/workspace"
 
-	// HomeVolume is the name of the Docker volume that contains the build's
+	// homeVolume is the name of the Docker volume that contains the build's
 	// $HOME directory, mounted in as /builder/home.
-	HomeVolume = "homevol"
-
-	// HomeDir is the path of the home directory.
-	HomeDir = "/builder/home"
+	homeVolume = "homevol"
+	homeDir    = "/builder/home"
 
 	// maxPushRetries is the maximum number of times we retry pushing an image
 	// in the face of gcr.io DNS lookup errors.
@@ -108,11 +104,6 @@ type imageDigest struct {
 	tag, digest string
 }
 
-// Receiver receives build updates.
-type Receiver interface {
-	Receive(BuildSummary)
-}
-
 // Build manages a single build.
 type Build struct {
 	// Lock to update public build fields.
@@ -125,7 +116,6 @@ type Build struct {
 	imageDigests     []imageDigest // docker image tag to digest (for built images)
 	stepDigests      []string      // build step index to digest (for build steps)
 	stepStatus       []pb.Build_Status
-	exitCodes        []int32
 	err              error
 	Runner           runner.Runner
 	Done             chan struct{}
@@ -134,7 +124,7 @@ type Build struct {
 	idxChan          map[int]chan struct{}
 	idxTranslate     map[string]int
 	kmsMu            sync.Mutex // guards accesses to kms
-	Kms              Kms
+	Kms              kms
 
 	// PushErrors tracks how many times a push got retried. This
 	// field is not protected by a mutex because the worker will
@@ -151,6 +141,9 @@ type Build struct {
 	push             bool
 	dryrun           bool
 
+	// For UpdateDockerAccessToken, previous GCR auth value to replace.
+	prevGCRAuth string
+
 	// timing holds timing information for build execution phases.
 	Timing TimingInfo
 
@@ -162,15 +155,12 @@ type Build struct {
 
 	// fs is the filesystem to use. In real builds, this is the OS
 	// filesystem, in tests it's an in-memory filesystem.
-	FileSystem afero.Fs
+	fs afero.Fs
 
 	// stepOutputs contains builder outputs produced by each step, if any.
 	// It is initialized once using initStepOutputsOnce.
 	stepOutputs         [][]byte
 	initStepOutputsOnce sync.Once
-
-	// receiver accepts build updates passed to it.
-	receiver Receiver
 }
 
 // TimingInfo holds timing information for build execution phases.
@@ -196,22 +186,24 @@ type TimeSpan struct {
 	End   time.Time
 }
 
-// Kms interface knows the Decrypt function.
-type Kms interface {
+type buildStepTime struct {
+	stepIdx  int
+	timeSpan *TimeSpan
+}
+
+type kms interface {
 	Decrypt(key, enc string) (string, error)
 }
 
 // New constructs a new Build.
 func New(r runner.Runner, b pb.Build, ts oauth2.TokenSource,
-	bl logger.Logger, hostWorkspaceDir string, fs afero.Fs, local, push, dryrun bool, receiver Receiver) *Build {
+	bl logger.Logger, hostWorkspaceDir string, fs afero.Fs, local, push, dryrun bool) *Build {
 	bld := &Build{
 		Runner:           r,
-		FileSystem:       fs,
 		Request:          b,
 		TokenSource:      ts,
 		stepDigests:      make([]string, len(b.Steps)),
 		stepStatus:       make([]pb.Build_Status, len(b.Steps)),
-		exitCodes:        make([]int32, len(b.Steps)),
 		Log:              bl,
 		Done:             make(chan struct{}),
 		times:            map[BuildStatus]time.Duration{},
@@ -222,10 +214,10 @@ func New(r runner.Runner, b pb.Build, ts oauth2.TokenSource,
 		push:             push,
 		dryrun:           dryrun,
 		gsutilHelper:     gsutil.New(r, fs, bl),
-		receiver:         receiver,
+		fs:               fs,
 	}
 	for i := range bld.stepStatus {
-		bld.updateStepStatus(i, pb.Build_QUEUED)
+		bld.stepStatus[i] = pb.Build_QUEUED
 	}
 	return bld
 }
@@ -238,18 +230,14 @@ func (b *Build) Start(ctx context.Context) {
 	}
 
 	// Create the home volume.
-	homeVol := volume.New(HomeVolume, b.Runner)
+	homeVol := volume.New(homeVolume, b.Runner)
 	if err := homeVol.Setup(ctx); err != nil {
 		b.FailBuild(err)
 		return
 	}
 	defer func() {
-		// Use a background context; original ctx may have been timed out or
-		// cancelled. Give a 10s time cap on deleting volumes, then give up and
-		// move on.
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := homeVol.Close(ctx); err != nil {
+		// Use a background context; ctx may have been timed out or cancelled.
+		if err := homeVol.Close(context.Background()); err != nil {
 			log.Printf("Failed to delete homevol: %v", err)
 		}
 	}()
@@ -294,6 +282,7 @@ func (b *Build) GetStatus() FullStatus {
 	defer b.mu.RUnlock()
 	return FullStatus{
 		BuildStatus: b.status,
+		StepStatus:  append([]pb.Build_Status{}, b.stepStatus...),
 	}
 }
 
@@ -301,10 +290,6 @@ func (b *Build) GetStatus() FullStatus {
 func (b *Build) Summary() BuildSummary {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	return b.summary()
-}
-
-func (b *Build) summary() BuildSummary {
 	// Deep-copy pointer values to prevent race conditions if they are later changed.
 	var buildTotal, pushTotal, sourceTotal, artifactsPushes *TimeSpan
 	if b.Timing.BuildTotal != nil {
@@ -360,13 +345,6 @@ func (b *Build) summary() BuildSummary {
 		}
 	}
 
-	var exitCodes []int32
-	for _, c := range b.exitCodes {
-		// Deep copy exitCodes to prevent a data race where an
-		// exit code is written while someone else reads buildSummary.
-		exitCodes = append(exitCodes, c)
-	}
-
 	s := BuildSummary{
 		Status:          b.status,
 		StepStatus:      append([]pb.Build_Status{}, b.stepStatus...),
@@ -382,7 +360,6 @@ func (b *Build) summary() BuildSummary {
 			ArtifactsPushes: artifactsPushes,
 		},
 		Artifacts: b.artifacts,
-		ExitCodes: exitCodes,
 	}
 
 	for _, id := range b.imageDigests {
@@ -406,17 +383,6 @@ func (b *Build) Times() map[BuildStatus]time.Duration {
 	return times
 }
 
-// LastStepEnd returns the end time of the last build step, or nil if not found.
-func (b *Build) LastStepEnd() *time.Time {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	buildTotal := b.Timing.BuildTotal
-	if buildTotal == nil {
-		return nil
-	}
-	return &buildTotal.End
-}
-
 // LastStateStart returns start time of most recent state transition.
 func (b *Build) LastStateStart() time.Time {
 	b.mu.RLock()
@@ -430,34 +396,10 @@ func (b *Build) UpdateStatus(status BuildStatus) {
 	b.times[b.status] = time.Since(b.lastStateStart)
 	b.lastStateStart = timeNow()
 	b.status = status
-
-	if b.receiver != nil {
-		b.receiver.Receive(b.summary())
-	}
 	b.mu.Unlock()
+
 	log.Printf("status changed to %q", string(status))
 	b.Log.WriteMainEntry(string(status))
-}
-
-// updateStepStatus updates the status of a single build step.
-func (b *Build) updateStepStatus(idx int, status pb.Build_Status) {
-	b.mu.Lock()
-	b.stepStatus[idx] = status
-	bs := b.summary()
-	if b.receiver != nil {
-		b.receiver.Receive(bs)
-	}
-	b.mu.Unlock()
-}
-
-// setExitCode sets the exit code for a given build step.
-func (b *Build) setExitCode(idx int, exitCode int32) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.exitCodes[idx] = exitCode
-	if b.receiver != nil {
-		b.receiver.Receive(b.summary())
-	}
 }
 
 // FailBuild updates the build's status to failure.
@@ -476,11 +418,114 @@ func (b *Build) FailBuild(err error) {
 	b.mu.Unlock()
 }
 
-// UpdateSourceTotal updates the SourceTotal in a thread-safe way.
-func (b *Build) UpdateSourceTotal(ts *TimeSpan) {
-	b.mu.Lock()
-	b.Timing.SourceTotal = ts
-	b.mu.Unlock()
+// gcrHosts is the list of GCR hosts that should be logged into when we refresh
+// credentials.
+var gcrHosts = []string{
+	"https://asia.gcr.io",
+	"https://b.gcr.io",
+	"https://bucket.gcr.io",
+	"https://eu.gcr.io",
+	"https://gcr.io",
+	"https://gcr-staging.sandbox.google.com",
+	"https://us.gcr.io",
+	"https://marketplace.gcr.io",
+	"https://k8s.gcr.io",
+}
+
+// SetDockerAccessToken sets the initial Docker config with the credentials we
+// use to authorize requests to GCR.
+// https://cloud.google.com/container-registry/docs/advanced-authentication#using_an_access_token
+func (b *Build) SetDockerAccessToken(ctx context.Context, tok string) error {
+	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("oauth2accesstoken:%s", tok)))
+
+	// Construct the minimal ~/.docker/config.json with auth configs for all GCR
+	// hosts.
+	type authEntry struct {
+		Auth string `json:"auth"`
+	}
+	type config struct {
+		Auths map[string]authEntry `json:"auths"`
+	}
+	cfg := config{map[string]authEntry{}}
+	for _, host := range gcrHosts {
+		cfg.Auths[host] = authEntry{auth}
+	}
+	configJSON, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	// Simply run an osImage container with $HOME mounted that writes the ~/.docker/config.json file.
+	var buf bytes.Buffer
+	args := []string{"docker", "run",
+		"--name", fmt.Sprintf("cloudbuild_set_docker_token_%s", uuid.New()),
+		"--rm",
+		// Mount in the home volume.
+		"--volume", homeVolume + ":" + homeDir,
+		// Make /builder/home $HOME.
+		"--env", "HOME=" + homeDir,
+		// Make sure the container uses the correct docker daemon.
+		"--volume", "/var/run/docker.sock:/var/run/docker.sock",
+		"--entrypoint", "bash",
+		osImage,
+		"-c", "mkdir -p ~/.docker/ && cat << EOF > ~/.docker/config.json\n" + string(configJSON) + "\nEOF"}
+	if err := b.Runner.Run(ctx, args, nil, &buf, &buf, ""); err != nil {
+		msg := fmt.Sprintf("failed to set initial docker credentials: %v\n%s", err, buf.String())
+		if ctx.Err() != nil {
+			log.Printf("ERROR: %v", msg)
+			return ctx.Err()
+		}
+		return errors.New(msg)
+	}
+	b.prevGCRAuth = auth
+	return nil
+}
+
+// UpdateDockerAccessToken updates the credentials we use to authorize requests
+// to GCR.
+// https://cloud.google.com/container-registry/docs/advanced-authentication#using_an_access_token
+func (b *Build) UpdateDockerAccessToken(ctx context.Context, tok string) error {
+	if b.prevGCRAuth == "" {
+		return errors.New("UpdateDockerAccessToken called before SetDockerAccessToken")
+	}
+
+	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("oauth2accesstoken:%s", tok)))
+
+	// Update contents of ~/.docker/config.json in the homevol Docker volume.
+	// Using "docker login" would work, but incurs an overhead on each host that
+	// we update, because it reaches out to GCR to validate the token. Instead,
+	// we can just assume the token is valid (since we just generated it) and
+	// write the file directly. We need to take care not to disturb anything else
+	// the user might have written to ~/.docker/config.json.
+
+	// This sed script replaces the entire per-host config in "auths" with a new
+	// per-host config with the new token, for each host.
+	script := fmt.Sprintf("sed -i 's/%s/%s/g' ~/.docker/config.json", b.prevGCRAuth, auth)
+
+	// Simply run an osImage container with $HOME mounted that runs the sed script.
+	var buf bytes.Buffer
+	args := []string{"docker", "run",
+		"--name", fmt.Sprintf("cloudbuild_update_docker_token_%s", uuid.New()),
+		"--rm",
+		// Mount in the home volume.
+		"--volume", homeVolume + ":" + homeDir,
+		// Make /builder/home $HOME.
+		"--env", "HOME=" + homeDir,
+		// Make sure the container uses the correct docker daemon.
+		"--volume", "/var/run/docker.sock:/var/run/docker.sock",
+		"--entrypoint", "bash",
+		osImage,
+		"-c", script}
+	if err := b.Runner.Run(ctx, args, nil, &buf, &buf, ""); err != nil {
+		msg := fmt.Sprintf("failed to update docker credentials: %v\n%s", err, buf.String())
+		if ctx.Err() != nil {
+			log.Printf("ERROR: %v", msg)
+			return ctx.Err()
+		}
+		return errors.New(msg)
+	}
+	b.prevGCRAuth = auth
+	return nil
 }
 
 func (b *Build) dockerCmdOutput(ctx context.Context, cmd string, args ...string) (string, error) {
@@ -509,16 +554,16 @@ func (b *Build) dockerPull(ctx context.Context, tag string, outWriter, errWriter
 		"--name", fmt.Sprintf("cloudbuild_docker_pull_%s", uuid.New()),
 		"--rm",
 		// Mount in the home volume.
-		"--volume", HomeVolume + ":" + HomeDir,
+		"--volume", homeVolume + ":" + homeDir,
 		// Make /builder/home $HOME.
-		"--env", "HOME=" + HomeDir,
+		"--env", "HOME=" + homeDir,
 		// Make sure the container uses the correct docker daemon.
 		"--volume", "/var/run/docker.sock:/var/run/docker.sock",
 		"gcr.io/cloud-builders/docker",
 		"pull", tag}
 
 	var buf bytes.Buffer
-	if err := b.Runner.Run(ctx, args, nil, io.MultiWriter(outWriter, &buf), errWriter); err != nil {
+	if err := b.Runner.Run(ctx, args, nil, io.MultiWriter(outWriter, &buf), errWriter, ""); err != nil {
 		return "", err
 	}
 	return scrapePullDigest(buf.String())
@@ -614,9 +659,9 @@ func (b *Build) dockerPushWithRetries(ctx context.Context, tag string, attempt i
 		"--name", fmt.Sprintf("cloudbuild_docker_push_%s", uuid.New()),
 		"--rm",
 		// Mount in the home volume.
-		"--volume", HomeVolume + ":" + HomeDir,
+		"--volume", homeVolume + ":" + homeDir,
 		// Make /builder/home $HOME.
-		"--env", "HOME=" + HomeDir,
+		"--env", "HOME=" + homeDir,
 		// Make sure the container uses the correct docker daemon.
 		"--volume", "/var/run/docker.sock:/var/run/docker.sock",
 		"gcr.io/cloud-builders/docker",
@@ -641,12 +686,15 @@ func (b *Build) dockerPushWithRetries(ctx context.Context, tag string, attempt i
 	return output, nil
 }
 
-func stripTagDigest(nameWithTagDigest string) (string, error) {
-	ref, err := name.ParseReference(nameWithTagDigest)
-	if err != nil {
-		return "", err
+func stripTagDigest(nameWithTagDigest string) string {
+	// Check for digest first, since only digests have "@", and both tags and digests have ":".
+	if index := strings.Index(nameWithTagDigest, "@"); index != -1 {
+		return nameWithTagDigest[:index]
 	}
-	return ref.Context().String(), nil
+	if index := strings.Index(nameWithTagDigest, ":"); index != -1 {
+		return nameWithTagDigest[:index]
+	}
+	return nameWithTagDigest
 }
 
 func digestForStepImage(nameWithTagDigest, output string) (string, error) {
@@ -658,10 +706,7 @@ func digestForStepImage(nameWithTagDigest, output string) (string, error) {
 	if err != nil || len(repo) < 1 || len(repo[0].RepoDigests) < 1 {
 		return "", errorScrapingDigest
 	}
-	name, err := stripTagDigest(nameWithTagDigest)
-	if err != nil {
-		return "", err
-	}
+	name := stripTagDigest(nameWithTagDigest)
 	digests := repo[0].RepoDigests
 	for i := 0; i < len(digests); i++ { // should only be one json output because we inspected only one image
 		if strings.HasPrefix(digests[i], name) {
@@ -713,19 +758,21 @@ func (b *Build) dockerPush(ctx context.Context, tag string) ([]imageDigest, erro
 
 // runWithScrapedLogging executes the command and returns the output (stdin, stderr), with logging.
 func (b *Build) runWithScrapedLogging(ctx context.Context, logPrefix string, cmd []string) (string, error) {
+	
 	var buf bytes.Buffer
 	outWriter := io.MultiWriter(b.Log.MakeWriter(logPrefix+":STDOUT", -1, true), &buf)
 	errWriter := io.MultiWriter(b.Log.MakeWriter(logPrefix+":STDERR", -1, false), &buf)
-	err := b.Runner.Run(ctx, cmd, nil, outWriter, errWriter)
+	err := b.Runner.Run(ctx, cmd, nil, outWriter, errWriter, "")
 	return buf.String(), err
 }
 
 // runAndScrape executes the command and returns the output (stdin, stderr), without logging.
 func (b *Build) runAndScrape(ctx context.Context, cmd []string) (string, error) {
+	
 	var buf bytes.Buffer
 	outWriter := io.Writer(&buf)
 	errWriter := io.Writer(&buf)
-	err := b.Runner.Run(ctx, cmd, nil, outWriter, errWriter)
+	err := b.Runner.Run(ctx, cmd, nil, outWriter, errWriter, "")
 	return buf.String(), err
 }
 
@@ -806,9 +853,7 @@ func (b *Build) recordStepDigest(idx int, digest string) {
 	b.mu.Unlock()
 }
 
-// GetKMSClient returns a kms client if one already exists,
-// or creates a new one otherwise.
-func (b *Build) GetKMSClient() (Kms, error) {
+func (b *Build) GetKMSClient() (kms, error) {
 	b.kmsMu.Lock()
 	defer b.kmsMu.Unlock()
 
@@ -826,10 +871,7 @@ func (b *Build) GetKMSClient() (Kms, error) {
 	// when spoofing metadata works by IP. Until then, we'll just fetch the token
 	// and pass it to all HTTP requests.
 	svc, err := cloudkms.New(&http.Client{
-		Transport: &oauth2.Transport{
-			Source: b.TokenSource,
-			Base:   http.DefaultTransport,
-		},
+		Transport: &common.TokenTransport{b.TokenSource},
 	})
 	if err != nil {
 		return nil, err
@@ -863,6 +905,7 @@ func (r realKMS) Decrypt(key, enc string) (string, error) {
 func (b *Build) timeAndRunStep(ctx context.Context, idx int, waitChans []chan struct{}, done chan<- struct{}, errors chan<- error) {
 	// Wait for preceding steps to finish before executing.
 	// If a preceding step fails, the context will cancel and waiting goroutines will die.
+	
 	for _, ch := range waitChans {
 		select {
 		case <-ch:
@@ -872,7 +915,8 @@ func (b *Build) timeAndRunStep(ctx context.Context, idx int, waitChans []chan st
 		}
 	}
 
-	b.updateStepStatus(idx, pb.Build_WORKING)
+	b.mu.Lock()
+	b.stepStatus[idx] = pb.Build_WORKING
 	var timeout time.Duration
 	if stepTimeout := b.Request.Steps[idx].GetTimeout(); stepTimeout != nil {
 		var err error
@@ -886,7 +930,6 @@ func (b *Build) timeAndRunStep(ctx context.Context, idx int, waitChans []chan st
 		}
 	}
 	start := timeNow()
-	b.mu.Lock()
 	b.Timing.BuildSteps[idx] = &TimeSpan{Start: start}
 	b.Timing.BuildStepPulls[idx] = &TimeSpan{Start: start}
 	b.mu.Unlock()
@@ -911,10 +954,9 @@ func (b *Build) timeAndRunStep(ctx context.Context, idx int, waitChans []chan st
 
 		b.mu.Lock()
 		b.Timing.BuildSteps[idx].End = end
-		b.mu.Unlock()
 		switch err {
 		case nil:
-			b.updateStepStatus(idx, pb.Build_SUCCESS)
+			b.stepStatus[idx] = pb.Build_SUCCESS
 		case context.DeadlineExceeded:
 			// If the build step has no timeout, we got a DeadlineExceeded because the
 			// overall build timed out. The step's final status is its current WORKING
@@ -924,14 +966,15 @@ func (b *Build) timeAndRunStep(ctx context.Context, idx int, waitChans []chan st
 				// build timed out (or both). If it was a build timeout, don't update the
 				// per-step status.
 				if stepTime := end.Sub(start); stepTime >= timeout {
-					b.updateStepStatus(idx, pb.Build_TIMEOUT)
+					b.stepStatus[idx] = pb.Build_TIMEOUT
 				}
 			}
 		case context.Canceled:
-			b.updateStepStatus(idx, pb.Build_CANCELLED)
+			b.stepStatus[idx] = pb.Build_CANCELLED
 		default:
-			b.updateStepStatus(idx, pb.Build_FAILURE)
+			b.stepStatus[idx] = pb.Build_FAILURE
 		}
+		b.mu.Unlock()
 	} else {
 		// Otherwise, step end time == pull end time
 		b.mu.Lock()
@@ -939,21 +982,19 @@ func (b *Build) timeAndRunStep(ctx context.Context, idx int, waitChans []chan st
 		b.mu.Unlock()
 	}
 
-
 	// If another step executing in parallel fails and sends an error, this step
 	// will be blocked from sending an error on the channel.
 	// Listen for context cancellation so that the goroutine exits.
 	if err != nil {
-			select {
-			case errors <- fmt.Errorf("build step %d %q failed: %v", idx, b.Request.Steps[idx].Name, err):
-			case <-ctx.Done():
-			}
-			return
+		select {
+		case errors <- fmt.Errorf("build step %d %q failed: %v", idx, b.Request.Steps[idx].Name, err):
+		case <-ctx.Done():
+		}
+		return
 	}
-	// A step is only done if it executes successfully, or we allow it to fail.
+	// A step is only done if it executes successfully.
 	close(done)
 }
-
 
 // runtimeGOOS is the operating system detected at runtime and is stubbable in testing.
 var runtimeGOOS = runtime.GOOS
@@ -985,7 +1026,6 @@ func getTempDir(subpath string) string {
 
 func processEnvVars(b *Build, step *pb.BuildStep) ([]string, error) {
 	envVars := map[string]string{}
-
 
 	// Iterate through global env vars before local in order to overwrite
 	// conflicting variables
@@ -1062,17 +1102,12 @@ func (b *Build) runStep(ctx context.Context, timeout time.Duration, idx int, bui
 
 	runTarget := step.Name
 	if builderImageDigest != "" { // only remove tag / original digest if the digest exists from the builder
-		var err error
-		runTarget, err = stripTagDigest(step.Name)
-		if err != nil {
-			return err
-		}
-		runTarget += ("@" + builderImageDigest)
+		runTarget = stripTagDigest(step.Name) + "@" + builderImageDigest
 	}
 
 	var stepOutputDir string
 	stepOutputDir = getTempDir(fmt.Sprintf("step-%d", idx))
-	if err := b.FileSystem.MkdirAll(stepOutputDir, os.FileMode(os.O_CREATE)); err != nil {
+	if err := b.fs.MkdirAll(stepOutputDir, os.FileMode(os.O_CREATE)); err != nil {
 		return fmt.Errorf("failed to create temp dir for step outputs: %v", err)
 	}
 
@@ -1088,8 +1123,6 @@ func (b *Build) runStep(ctx context.Context, timeout time.Duration, idx int, bui
 	for _, vol := range append(b.Request.GetOptions().GetVolumes(), step.Volumes...) {
 		args = append(args, "--volume", fmt.Sprintf("%s:%s", vol.Name, vol.Path))
 	}
-
-
 	if step.Entrypoint != "" {
 		args = append(args, "--entrypoint", step.Entrypoint)
 	}
@@ -1105,7 +1138,7 @@ func (b *Build) runStep(ctx context.Context, timeout time.Duration, idx int, bui
 
 	outWriter := b.Log.MakeWriter(b.stepIdentifier(idx), idx, true)
 	errWriter := b.Log.MakeWriter(b.stepIdentifier(idx), idx, false)
-	buildErr := b.Runner.Run(ctx, args, nil, outWriter, errWriter)
+	buildErr := b.Runner.Run(ctx, args, nil, outWriter, errWriter, "")
 	if outputErr := b.captureStepOutput(idx, stepOutputDir); outputErr != nil {
 		// Output capture failed:
 		// - On a failed build step, log the outputErr and return the buildErr.
@@ -1121,7 +1154,7 @@ func (b *Build) runStep(ctx context.Context, timeout time.Duration, idx int, bui
 
 func (b *Build) captureStepOutput(idx int, stepOutputDir string) error {
 	fn := path.Join(stepOutputDir, builderOutputFile)
-	if exists, _ := afero.Exists(b.FileSystem, fn); !exists {
+	if exists, _ := afero.Exists(b.fs, fn); !exists {
 		// Step didn't write an output file.
 		return nil
 	}
@@ -1131,7 +1164,7 @@ func (b *Build) captureStepOutput(idx int, stepOutputDir string) error {
 	})
 
 	// Grab any outputs reported by the builder.
-	f, err := b.FileSystem.Open(path.Join(stepOutputDir, builderOutputFile))
+	f, err := b.fs.Open(path.Join(stepOutputDir, builderOutputFile))
 	if err != nil {
 		log.Printf("failed to open step %d output file: %v", idx, err)
 		return err
@@ -1178,11 +1211,8 @@ func (b *Build) runBuildSteps(ctx context.Context) error {
 				return err
 			}
 			defer func(v *volume.Volume, volName string) {
-				// Clean up on a background context; main context may have been timed
-				// out or cancelled.  Use a 10s timeout as volume deletion should be
-				// fast.
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
+				// Clean up on a background context; main context may have been timed out or cancelled.
+				ctx := context.Background()
 				if err := v.Close(ctx); err != nil {
 					log.Printf("Failed to delete volume %q: %v", volName, err)
 				}
@@ -1192,13 +1222,8 @@ func (b *Build) runBuildSteps(ctx context.Context) error {
 
 	// Clean the build steps before trying to delete the volume used by the
 	// running containers. Use a background context because the main context may
-	// have been timed out or cancelled. Use a 10s timeout because cleanup should
-	// be fast and we don't want it to hang.
-	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		b.cleanBuildSteps(ctx)
-	}()
+	// have been timed out or cancelled.
+	defer b.cleanBuildSteps(context.Background())
 
 	b.HasMultipleSteps = len(b.Request.Steps) > 1
 	errors := make(chan error)
@@ -1297,9 +1322,9 @@ func (b *Build) dockerRunArgs(stepDir, stepOutputDir string, idx int) []string {
 		"--workdir", workdir(srcDir, stepDir),
 
 		// Mount in the home volume.
-		"--volume", HomeVolume+":"+HomeDir,
+		"--volume", homeVolume+":"+homeDir,
 		// Make /builder/home $HOME.
-		"--env", "HOME="+HomeDir,
+		"--env", "HOME="+homeDir,
 
 		// Connect to the network for metadata.
 		"--network", "cloudbuild",
@@ -1325,8 +1350,9 @@ func (b *Build) cleanBuildSteps(ctx context.Context) {
 	for idx := range b.Request.Steps {
 		dockerKillArgs = append(dockerKillArgs, fmt.Sprintf("step_%d", idx))
 	}
-	if err := b.Runner.Run(ctx, dockerKillArgs, nil, nil, nil); err != nil {
-		log.Printf("Failed to clean step processes: %v", err)
+	b.Runner.Run(ctx, dockerKillArgs, nil, nil, nil, "")
+	if err := b.Runner.Clean(); err != nil {
+		log.Printf("Failed to clean running processes: %v", err)
 	}
 }
 
@@ -1497,27 +1523,4 @@ func (b *Build) pushArtifacts(ctx context.Context) error {
 	b.artifacts = ArtifactsInfo{ArtifactManifest: artifactManifest, NumArtifacts: numArtifacts}
 
 	return nil
-}
-
-// NewFileReceiver returns a new FileReceiver or an error.
-func NewFileReceiver(fs afero.Fs, path string) (*FileReceiver, error) {
-	dir := filepath.Dir(path)
-	if err := fs.MkdirAll(dir, os.FileMode(os.O_CREATE)); err != nil {
-		return nil, fmt.Errorf("MkDirAll(%q): %v", dir, err)
-	}
-	f, err := fs.Create(path)
-	if err != nil {
-		return nil, err
-	}
-	return &FileReceiver{file: f}, nil
-}
-
-// FileReceiver writes BuildSummaries to a file.
-type FileReceiver struct {
-	file afero.File
-}
-
-// Receive receives build updates and writes them to a file.
-func (fr *FileReceiver) Receive(bs BuildSummary) {
-	fr.file.WriteString(fmt.Sprintf("%v\n", bs))
 }

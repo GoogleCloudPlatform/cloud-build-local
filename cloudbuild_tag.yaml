@@ -17,8 +17,7 @@ steps:
 # Create an archive with the latest binaries; that enables a single download url.
 - name: 'gcr.io/cloud-builders/go:debian'
   entrypoint: 'bash'
-  options:
-    env: ['CGO_ENABLED=0']
+  env: ['CGO_ENABLED=0']
   args:
   - '-c'
   - |

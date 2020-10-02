@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -29,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-build-local/runner"
 	"github.com/GoogleCloudPlatform/cloud-build-local/subst"
 	"github.com/GoogleCloudPlatform/cloud-build-local/validate"
+	"golang.org/x/oauth2"
 )
 
 const (
@@ -83,7 +85,7 @@ func Clean(ctx context.Context, r runner.Runner) error {
 		getCmd, deleteCmd []string
 		warning           string
 	}{{
-		getCmd:    []string{"docker", "ps", "-a", "-q", "--filter", "name=step_[0-9]+|cloudbuild_|metadata|docker_token_container"},
+		getCmd:    []string{"docker", "ps", "-a", "-q", "--filter", "name=step_[0-9]+|cloudbuild_|metadata"},
 		deleteCmd: []string{"docker", "rm", "-f"},
 		warning:   "Warning: there are left over step containers from a previous build, cleaning them.",
 	}, {
@@ -98,7 +100,7 @@ func Clean(ctx context.Context, r runner.Runner) error {
 
 	for _, item := range items {
 		var output bytes.Buffer
-		if err := r.Run(ctx, item.getCmd, nil, &output, os.Stderr); err != nil {
+		if err := r.Run(ctx, item.getCmd, nil, &output, os.Stderr, ""); err != nil {
 			return err
 		}
 
@@ -110,7 +112,7 @@ func Clean(ctx context.Context, r runner.Runner) error {
 
 		args := strings.Split(str, "\n")
 		deleteCmd := append(item.deleteCmd, args...)
-		if err := r.Run(ctx, deleteCmd, nil, nil, os.Stderr); err != nil {
+		if err := r.Run(ctx, deleteCmd, nil, nil, os.Stderr, ""); err != nil {
 			return err
 		}
 	}
@@ -120,6 +122,26 @@ func Clean(ctx context.Context, r runner.Runner) error {
 
 // For unit tests.
 var now = time.Now
+
+// RefreshDuration calculates when to refresh the access token. We refresh a
+// bit prior to the token's expiration.
+func RefreshDuration(expiration time.Time) time.Duration {
+	calledAt := now()
+	if expiration.Before(calledAt) {
+		return time.Duration(0)
+	}
+	d := expiration.Sub(calledAt)
+	if d > 4*time.Second {
+		d = time.Duration(float64(d) * .75)
+	} else {
+		d -= time.Second
+		if d < time.Duration(0) {
+			d = time.Duration(0) // Force immediate refresh.
+		}
+	}
+
+	return d
+}
 
 // SubstituteAndValidate merges the substitutions from the build
 // config and the local flag, validates them and the build.
@@ -147,15 +169,6 @@ func SubstituteAndValidate(b *pb.Build, substMap map[string]string) error {
 	if err := validate.CheckBuild(b); err != nil {
 		return fmt.Errorf("Error validating build: %v", err)
 	}
-	if missingSubs, err := validate.CheckSubstitutionTemplate(b); err != nil {
-		return err
-	} else if len(missingSubs) > 0 {
-		// If the user doesn't specifically allow loose substitutions, the warnings
-		// are returned as an error.
-		if b.GetOptions().GetSubstitutionOption() != pb.BuildOptions_ALLOW_LOOSE {
-			return fmt.Errorf(strings.Join(missingSubs, ";"))
-		}
-	}
 
 	// Apply substitutions.
 	if err := subst.SubstituteBuildFields(b); err != nil {
@@ -168,4 +181,20 @@ func SubstituteAndValidate(b *pb.Build, substMap map[string]string) error {
 	}
 
 	return nil
+}
+
+// TokenTransport is a RoundTripper that automatically applies OAuth
+// credentials from the token source.
+type TokenTransport struct {
+	Ts oauth2.TokenSource
+}
+
+// RoundTrip executes a single HTTP transaction, obtaining the Response for a given Request.
+func (t *TokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	tok, err := t.Ts.Token()
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+tok.AccessToken)
+	return http.DefaultTransport.RoundTrip(req)
 }
