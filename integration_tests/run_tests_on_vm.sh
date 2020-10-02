@@ -9,7 +9,7 @@ gsutil -m copy ./integration_tests/* $GCS_PATH/
 gcloud config set compute/zone us-central1-f
 instance_name=ubuntu-integration-tests-$DATE
 gcloud compute instances create $instance_name \
-  --image-family=ubuntu-1404-lts \
+  --image-family=ubuntu-2004-lts \
   --image-project=ubuntu-os-cloud \
   --machine-type=n1-standard-2 \
   --scopes default,userinfo-email,cloud-platform \

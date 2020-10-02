@@ -4,6 +4,7 @@
 execution of builds on your own hardware, and integration into local build and
 test workflows.
 
+
 --------------------------------------------------------------------------------
 
 ## Prerequisites
@@ -73,9 +74,10 @@ See the
 
 ## Support
 
-File issues here on gitHub, email `google-cloud-dev@googlegroups.com`, or join
-our [Slack channel] if you have general questions about Local Builder or
-Container Builder.
+Our documentation has a [page on getting
+support](https://cloud.google.com/cloud-build/docs/getting-support). If you have
+general questions about Local Builder or Cloud Build, you can file issues here
+on GitHub, email `google-cloud-dev@googlegroups.com`, or join our.
 
-[Google Cloud Build]: http://cloud.google.com/cloud-build/
-[Slack channel]: https://googlecloud-community.slack.com/messages/C4KCRJL4D/details/
+* [Google Cloud Build documentation](http://cloud.google.com/cloud-build/)
+* [Slack channel](https://googlecloud-community.slack.com/messages/C4KCRJL4D/details/)
