@@ -36,7 +36,6 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-build-local/build"
 	"github.com/GoogleCloudPlatform/cloud-build-local/common"
 	"github.com/GoogleCloudPlatform/cloud-build-local/config"
-	"github.com/GoogleCloudPlatform/cloud-build-local/dockertoken"
 	"github.com/GoogleCloudPlatform/cloud-build-local/gcloud"
 	"github.com/GoogleCloudPlatform/cloud-build-local/metadata"
 	"github.com/GoogleCloudPlatform/cloud-build-local/runner"
@@ -46,19 +45,17 @@ import (
 
 const (
 	volumeNamePrefix  = "cloudbuild_vol_"
-	gcbServerVersion  = "19.03.8"
-	gcbClientVersion  = "18.09.6"
+	gcbDockerVersion  = "19.03.8"
 	metadataImageName = "gcr.io/cloud-builders/metadata"
 )
 
 var (
-	configFile       = flag.String("config", "cloudbuild.yaml", "File path of the config file")
-	substitutions    = flag.String("substitutions", "", `key=value pairs where the key is already defined in the build request; separate multiple substitutions with a comma, for example: _FOO=bar,_BAZ=baz`)
-	buildUpdatesFile = flag.String("build-updates-file", "", "Path of a file to write build updates to; an empty path will disable writing build updates to a file")
-	dryRun           = flag.Bool("dryrun", true, "Lints the config file and prints but does not run the commands; Local Builder runs the commands only when dryrun is set to false")
-	push             = flag.Bool("push", false, "Pushes the images to the registry")
-	noSource         = flag.Bool("no-source", false, "Prevents Local Builder from using source for this build")
-	bindMountSource  = flag.Bool("bind-mount-source", false, "Bind mounts the source directory under /workspace rather "+
+	configFile      = flag.String("config", "cloudbuild.yaml", "File path of the config file")
+	substitutions   = flag.String("substitutions", "", `key=value pairs where the key is already defined in the build request; separate multiple substitutions with a comma, for example: _FOO=bar,_BAZ=baz`)
+	dryRun          = flag.Bool("dryrun", true, "Lints the config file and prints but does not run the commands; Local Builder runs the commands only when dryrun is set to false")
+	push            = flag.Bool("push", false, "Pushes the images to the registry")
+	noSource        = flag.Bool("no-source", false, "Prevents Local Builder from using source for this build")
+	bindMountSource = flag.Bool("bind-mount-source", false, "Bind mounts the source directory under /workspace rather "+
 		" than copying its contents into /workspace. It is an error to use this flag with --noSource")
 	writeWorkspace = flag.String("write-workspace", "", "Copies the workspace directory to this host directory")
 	help           = flag.Bool("help", false, "Prints the help message")
@@ -135,11 +132,11 @@ func run(ctx context.Context, source string) error {
 		if err != nil {
 			return fmt.Errorf("Error getting local docker versions: %v", err)
 		}
-		if dockerServerVersion != gcbServerVersion {
-			log.Printf("Warning: The server docker version installed (%s) is different from the one used in GCB (%s)", dockerServerVersion, gcbServerVersion)
+		if dockerServerVersion != gcbDockerVersion {
+			log.Printf("Warning: The server docker version installed (%s) is different from the one used in GCB (%s)", dockerServerVersion, gcbDockerVersion)
 		}
-		if dockerClientVersion != gcbClientVersion {
-			log.Printf("Warning: The client docker version installed (%s) is different from the one used in GCB (%s)", dockerClientVersion, gcbClientVersion)
+		if dockerClientVersion != gcbDockerVersion {
+			log.Printf("Warning: The client docker version installed (%s) is different from the one used in GCB (%s)", dockerClientVersion, gcbDockerVersion)
 		}
 	}
 
@@ -211,21 +208,7 @@ func run(ctx context.Context, source string) error {
 		}
 	}
 
-	dt, err := dockertoken.New(ctx, r)
-	if err != nil {
-		return fmt.Errorf("Error setting up docker token container: %v", err)
-	}
-	defer dt.Close(ctx)
-
-	fs := afero.NewOsFs()
-	var receiver build.Receiver
-	if *buildUpdatesFile != "" {
-		if receiver, err = build.NewFileReceiver(fs, *buildUpdatesFile); err != nil {
-			return fmt.Errorf("Error creating fileReceiver: %v", err)
-		}
-	}
-
-	b := build.New(r, *buildConfig, nil /* TokenSource */, stdoutLogger{}, volumeName, fs, true, *push, *dryRun, receiver)
+	b := build.New(r, *buildConfig, nil /* TokenSource */, stdoutLogger{}, volumeName, afero.NewOsFs(), true, *push, *dryRun)
 
 	// Note: we explicitly call cancel() below rather than awaiting the defer cancel()
 	// because we want cancel() to happen before other defer functions. We defer to
@@ -238,7 +221,7 @@ func run(ctx context.Context, source string) error {
 		if err != nil {
 			return fmt.Errorf("Error getting access token to set docker credentials: %v", err)
 		}
-		if err := dt.Set(ctx, tok.AccessToken); err != nil {
+		if err := b.SetDockerAccessToken(ctx, tok.AccessToken); err != nil {
 			return fmt.Errorf("Error setting docker credentials: %v", err)
 		}
 		b.TokenSource = oauth2.StaticTokenSource(&oauth2.Token{
@@ -290,11 +273,11 @@ func run(ctx context.Context, source string) error {
 				// Keep a fresh token in ~/.docker/config.json, which in turn is
 				// available to build steps.  Note that use of `gcloud auth` to switch
 				// accounts mid-build is not supported.
-				if err := dt.Set(ctx, tok.AccessToken); err != nil {
+				if err := b.UpdateDockerAccessToken(ctx, tok.AccessToken); err != nil {
 					log.Printf("Error updating docker credentials: %v", err)
 				}
 				b.TokenSource = oauth2.StaticTokenSource(&oauth2.Token{AccessToken: tok.AccessToken})
-				refresh = time.Until(tok.Expiry)
+				refresh = common.RefreshDuration(tok.Expiry)
 			}
 		}(cancelableCtx, tok)
 	}
@@ -317,13 +300,13 @@ func run(ctx context.Context, source string) error {
 func dockerVersions(ctx context.Context, r runner.Runner) (string, string, error) {
 	cmd := []string{"docker", "version", "--format", "{{.Server.Version}}"}
 	var serverb bytes.Buffer
-	if err := r.Run(ctx, cmd, nil, &serverb, os.Stderr); err != nil {
+	if err := r.Run(ctx, cmd, nil, &serverb, os.Stderr, ""); err != nil {
 		return "", "", err
 	}
 
 	cmd = []string{"docker", "version", "--format", "{{.Client.Version}}"}
 	var clientb bytes.Buffer
-	if err := r.Run(ctx, cmd, nil, &clientb, os.Stderr); err != nil {
+	if err := r.Run(ctx, cmd, nil, &clientb, os.Stderr, ""); err != nil {
 		return "", "", err
 	}
 

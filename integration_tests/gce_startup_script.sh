@@ -19,52 +19,13 @@ trap uploadLogs EXIT INT TERM
 
 set -x
 
-# Install the Cloud SDK
+# Ensure Cloud SDK is installed.
+export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+snap refresh google-cloud-sdk || exit
 gcloud info || exit
 
-function install_sdk() {
-  export CLOUDSDK_CORE_DISABLE_PROMPTS=1
-  export CLOUDSDK_INSTALL_DIR=/usr/lib
-
-  # We use the public installer.
-  rm -rf "$CLOUDSDK_INSTALL_DIR/google-cloud-sdk"
-  curl https://sdk.cloud.google.com | bash || exit
-
-  # Install needed components.
-  gcloud components install docker-credential-gcr --quiet || exit
-}
-install_sdk&
-export PATH=/usr/lib/google-cloud-sdk/bin:$PATH
-
-# add the install_sdk PID to the list for waiting.
-pids="$! $pids"
-
-function install_docker() {
-  # https://docs.docker.com/engine/installation/linux/docker-ce/ubuntu/#uninstall-old-versions
-  echo "Installing docker..."
-  sudo apt-get update || exit
-  sudo apt-get install -y \
-    linux-image-extra-$(uname -r) \
-    linux-image-extra-virtual \
-    apt-transport-https \
-    ca-certificates \
-    curl \
-    software-properties-common || exit
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add - || exit
-  sudo add-apt-repository \
-    "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
-    $(lsb_release -cs) \
-    stable" || exit
-  sudo apt-get update || exit
-  sudo apt-get install -y docker-ce || exit
-  # Test.
-  docker --version || exit
-}
-install_docker&
-# add the install_docker PID to the list for waiting.
-pids="$! $pids"
-
-wait $pids || exit
+# Ensure Docker is installed.
+docker --version || snap install docker || exit
 successful_startup=1
 
 # Set gcloud zone

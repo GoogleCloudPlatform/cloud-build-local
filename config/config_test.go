@@ -18,11 +18,10 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
-	durpb "github.com/golang/protobuf/ptypes/duration"
-	"github.com/golang/protobuf/proto"
 )
 
 func TestLoad(t *testing.T) {
@@ -72,24 +71,7 @@ steps:
 foo: "bar"
 `,
 		wantErr: true,
-	}, {
-		desc: "parse timeout",
-		content: `
-steps:
-- name: 'gcr.io/cloud-builders/docker'
-  args: ["build", "-t", "gcr.io/$PROJECT_ID/test:latest", "."]
-  timeout: '1.5s'
-`,
-		want: &pb.Build{
-			Steps: []*pb.BuildStep{{
-				Name: "gcr.io/cloud-builders/docker",
-				Args: []string{"build", "-t", "gcr.io/$PROJECT_ID/test:latest", "."},
-				Timeout: &durpb.Duration{
-					Seconds: 1,
-					Nanos:   500000000,
-				},
-			}},
-		}}}
+	}}
 
 	for _, tc := range testCases {
 		tmpDir, err := ioutil.TempDir("", "")
@@ -108,7 +90,7 @@ steps:
 		} else if err == nil && tc.wantErr {
 			t.Errorf("%s: Load should have failed", tc.desc)
 		}
-		if !tc.wantErr && !proto.Equal(tc.want, got) {
+		if !tc.wantErr && !reflect.DeepEqual(tc.want, got) {
 			t.Errorf("%s: Load failed to translate file in build proto: want %+v, got %+v", tc.desc, tc.want, got)
 		}
 	}

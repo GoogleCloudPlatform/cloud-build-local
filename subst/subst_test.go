@@ -17,11 +17,9 @@ package subst
 import (
 	"fmt"
 	"reflect"
-	"sort"
 	"testing"
 
 	pb "google.golang.org/genproto/googleapis/devtools/cloudbuild/v1"
-	"github.com/golang/protobuf/proto"
 )
 
 const (
@@ -69,14 +67,6 @@ func checkBuild(got, want *pb.Build) error {
 	if !reflect.DeepEqual(want.Images, got.Images) {
 		return fmt.Errorf("images: got %q, want %q", got.Images, want.Images)
 	}
-	if !proto.Equal(want.Options, got.Options) {
-		return fmt.Errorf("options: got %q, want %q", got.Options, want.Options)
-	}
-	if len(want.Substitutions) > 0 {
-		if !reflect.DeepEqual(want.Substitutions, got.Substitutions) {
-			return fmt.Errorf("unexpected substitutions: got: %+v, want: %+v", got.Substitutions, want.Substitutions)
-		}
-	}
 	for i, gs := range got.Steps {
 		ws := want.Steps[i]
 		if ws.Name != gs.Name {
@@ -118,9 +108,6 @@ func TestBranch(t *testing.T) {
 		Images:     []string{"gcr.io/foo/$BRANCH_NAME:${COMMIT_SHA}"},
 		Tags:       []string{"${BRANCH_NAME}", "repo=${REPO_NAME}", "unchanged"},
 		LogsBucket: "gs://${PROJECT_ID}/branch/${BRANCH_NAME}",
-		Options: &pb.BuildOptions{
-			Env: []string{"GLOBAL1=$REPO_NAME", "GLOBAL2=${BUILD_ID}"},
-		},
 	}
 	addProjectSourceAndProvenance(b)
 	addBranchName(b)
@@ -139,9 +126,6 @@ func TestBranch(t *testing.T) {
 		Images:     []string{"gcr.io/foo/my-branch:abcdefg1234567"},
 		Tags:       []string{"my-branch", "repo=my-repo", "unchanged"},
 		LogsBucket: "gs://my-project/branch/my-branch",
-		Options: &pb.BuildOptions{
-			Env: []string{"GLOBAL1=my-repo", "GLOBAL2=build-id"},
-		},
 	}); err != nil {
 		t.Error(err)
 	}
@@ -157,9 +141,6 @@ func TestTag(t *testing.T) {
 		}},
 		Images: []string{"gcr.io/foo/$TAG_NAME:$COMMIT_SHA"},
 		Tags:   []string{"${TAG_NAME}", "repo=${REPO_NAME}", "unchanged"},
-		Options: &pb.BuildOptions{
-			Env: []string{"GLOBAL1=$REPO_NAME", "GLOBAL2=${BUILD_ID}"},
-		},
 	}
 	addProjectSourceAndProvenance(b)
 	addTagName(b)
@@ -176,9 +157,6 @@ func TestTag(t *testing.T) {
 		}},
 		Images: []string{"gcr.io/foo/my-tag:abcdefg1234567"},
 		Tags:   []string{"my-tag", "repo=my-repo", "unchanged"},
-		Options: &pb.BuildOptions{
-			Env: []string{"GLOBAL1=my-repo", "GLOBAL2=build-id"},
-		},
 	}); err != nil {
 		t.Error(err)
 	}
@@ -193,9 +171,6 @@ func TestRevision(t *testing.T) {
 		}},
 		Images: []string{"gcr.io/foo/thing"},
 		Tags:   []string{"${REVISION_ID}", "repo=${REPO_NAME}", "unchanged"},
-		Options: &pb.BuildOptions{
-			Env: []string{"GLOBAL1=$REPO_NAME", "GLOBAL2=${BUILD_ID}"},
-		},
 	}
 	addProjectSourceAndProvenance(b)
 	addRevision(b)
@@ -211,9 +186,6 @@ func TestRevision(t *testing.T) {
 		}},
 		Images: []string{"gcr.io/foo/thing"},
 		Tags:   []string{"abcdefg1234567", "repo=my-repo", "unchanged"},
-		Options: &pb.BuildOptions{
-			Env: []string{"GLOBAL1=my-repo", "GLOBAL2=build-id"},
-		},
 	}); err != nil {
 		t.Error(err)
 	}
@@ -279,9 +251,6 @@ func TestUnknownFields(t *testing.T) {
 			Env:  []string{"REPO_NAME=$REPO_NAME", "BUILD_ID=$BUILD_ID"},
 		}},
 		Images: []string{"gcr.io/foo/$BRANCH_NAME"},
-		Options: &pb.BuildOptions{
-			Env: []string{"GLOBAL1=$REPO_NAME", "GLOBAL2=${BUILD_ID}"},
-		},
 	}
 	addProjectSourceAndProvenance(b)
 	if err := SubstituteBuildFields(b); err != nil {
@@ -294,9 +263,6 @@ func TestUnknownFields(t *testing.T) {
 			Env:  []string{"REPO_NAME=my-repo", "BUILD_ID=build-id"},
 		}},
 		Images: []string{"gcr.io/foo/"},
-		Options: &pb.BuildOptions{
-			Env: []string{"GLOBAL1=my-repo", "GLOBAL2=build-id"},
-		},
 	}); err != nil {
 		t.Error(err)
 	}
@@ -307,8 +273,6 @@ func TestUserSubstitutions(t *testing.T) {
 	testCases := []struct {
 		desc, template, want string
 		substitutions        map[string]string
-		shouldEvalSubst      bool
-		wantSubsts           map[string]string
 		wantErr              bool
 	}{{
 		desc:     "variable should be substituted",
@@ -331,74 +295,6 @@ func TestUserSubstitutions(t *testing.T) {
 			"_VAR": "World",
 		},
 		want: "Hello Worldfoo",
-	}, {
-		desc:            "Bash style manipulation for variable which should be substituted if sticked with a char respecting [^A-Z0-9_]",
-		template:        "Hello $_MANIPULATED_VARfoo",
-		shouldEvalSubst: true,
-		substitutions: map[string]string{
-			"_BAR":             "Bob",
-			"_VAR":             "World",
-			"_MANIPULATED_VAR": "my-app-${_VAR^^}-${_BAR}-prod",
-		},
-		wantSubsts: map[string]string{
-			"_BAR":             "Bob",
-			"_VAR":             "World",
-			"_MANIPULATED_VAR": "my-app-WORLD-Bob-prod",
-		},
-		want: "Hello my-app-WORLD-Bob-prodfoo",
-	}, {
-		desc:            "Bash style manipulation for variable which should be substituted if sticked with a char respecting [^A-Z0-9_]",
-		template:        "Hello $_MANIPULATED_VARfoo",
-		shouldEvalSubst: true,
-		substitutions: map[string]string{
-			"_BAR":             "Bob",
-			"_VAR":             "World",
-			"_MANIPULATED_VAR": "my-app-${_VAR^^}-${_BAR}-prod",
-		},
-		wantSubsts: map[string]string{
-			"_BAR":             "Bob",
-			"_VAR":             "World",
-			"_MANIPULATED_VAR": "my-app-WORLD-Bob-prod",
-		},
-		want: "Hello my-app-WORLD-Bob-prodfoo",
-	}, {
-		desc:     "Not enabled Bash style manipulation",
-		template: "Hello $_MANIPULATED_VARfoo",
-		substitutions: map[string]string{
-			"_BAR":             "Bob",
-			"_VAR":             "World",
-			"_MANIPULATED_VAR": "my-app-${_VAR^^}-${_BAR}-prod",
-		},
-		wantSubsts: map[string]string{
-			"_BAR":             "Bob",
-			"_VAR":             "World",
-			"_MANIPULATED_VAR": "my-app-${_VAR^^}-${_BAR}-prod",
-		},
-		want: "Hello my-app-${_VAR^^}-${_BAR}-prodfoo",
-	}, {
-		desc: "Bash manipulation syntax errors are returned",
-		substitutions: map[string]string{
-			"_VAR": "${${_BAR}}",
-		},
-		shouldEvalSubst: true,
-		wantErr:         true,
-	}, {
-		desc: "Bash manipulation respects built_in substitutions",
-		substitutions: map[string]string{
-			"_FOO": "${BUILD_ID:1:4}",
-		},
-		shouldEvalSubst: true,
-		template:        "${_FOO}",
-		want:            "uild",
-	}, {
-		desc: "Bash manipulation cycle errors are returned",
-		substitutions: map[string]string{
-			"_FOO": "$_BAR",
-			"_BAR": "my-app-${_UNDEFINED}-${_BAZ}-staging",
-			"_BAZ": "$_FOO",
-		},
-		shouldEvalSubst: true,
-		wantErr:         true,
 	}, {
 		desc:     "curly braced variable should be substituted",
 		template: "Hello ${_VAR}_FOO",
@@ -460,10 +356,6 @@ func TestUserSubstitutions(t *testing.T) {
 			Steps: []*pb.BuildStep{{
 				Dir: tc.template,
 			}},
-			Options: &pb.BuildOptions{
-				Env:                  []string{tc.template},
-				DynamicSubstitutions: tc.shouldEvalSubst,
-			},
 			Substitutions: tc.substitutions,
 			Tags:          []string{tc.template},
 		}
@@ -478,20 +370,12 @@ func TestUserSubstitutions(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		wantBuild := &pb.Build{
+		if err := checkBuild(b, &pb.Build{
 			Steps: []*pb.BuildStep{{
 				Dir: tc.want,
 			}},
-			Options: &pb.BuildOptions{
-				Env:                  []string{tc.want},
-				DynamicSubstitutions: tc.shouldEvalSubst,
-			},
 			Tags: []string{tc.want},
-		}
-		if tc.wantSubsts != nil {
-			wantBuild.Substitutions = tc.wantSubsts
-		}
-		if err := checkBuild(b, wantBuild); err != nil {
+		}); err != nil {
 			t.Errorf("%q: %v", tc.desc, err)
 		}
 	}
@@ -502,15 +386,13 @@ func TestSubstitutions(t *testing.T) {
 	testCases := []struct {
 		desc, template, location, want string
 		paths                          []string
-		workerpool                     string
 		substitutions                  map[string]string
 		wantErr                        bool
 	}{{
-		desc:       "variable should be substituted",
-		template:   "Hello $_VAR $COMMIT_SHA",
-		location:   "gs://some-bucket/$_VAR/",
-		paths:      []string{"**/$_TEST_OUTPUT", "foo.txt"},
-		workerpool: "my-project/$_VAR",
+		desc:     "variable should be substituted",
+		template: "Hello $_VAR $COMMIT_SHA",
+		location: "gs://some-bucket/$_VAR/",
+		paths:    []string{"**/$_TEST_OUTPUT", "foo.txt"},
 		substitutions: map[string]string{
 			"_VAR":         "World",
 			"_TEST_OUTPUT": "test.xml",
@@ -531,9 +413,6 @@ func TestSubstitutions(t *testing.T) {
 					Location: tc.location,
 					Paths:    tc.paths,
 				},
-			},
-			Options: &pb.BuildOptions{
-				WorkerPool: tc.workerpool,
 			},
 		}
 		addProjectSourceAndProvenance(b)
@@ -557,9 +436,6 @@ func TestSubstitutions(t *testing.T) {
 					Location: "gs://some-bucket/World/",
 					Paths:    []string{"**/test.xml", "foo.txt"},
 				},
-			},
-			Options: &pb.BuildOptions{
-				WorkerPool: "my-project/World",
 			},
 		}); err != nil {
 			t.Errorf("%q: %v", tc.desc, err)
@@ -659,40 +535,5 @@ func TestFindValidKeyFromIndex(t *testing.T) {
 		if !reflect.DeepEqual(tc.want, got) {
 			t.Errorf("findValidKeyFromIndex(%s, %d): want %+v, got %+v", tc.input, tc.index, tc.want, got)
 		}
-	}
-}
-
-func TestScriptMode(t *testing.T) {
-	b := &pb.Build{
-		Steps: []*pb.BuildStep{{
-			Name:   "ubuntu",
-			Script: []string{"echo hello"},
-			Env:    []string{"FOO=foo", "REPO_NAME=new-repo-name"},
-		}},
-	}
-	addProjectSourceAndProvenance(b)
-	addBranchName(b)
-	if err := SubstituteBuildFields(b); err != nil {
-		t.Fatalf("Error while substituting build fields: %v", err)
-	}
-	sort.Strings(b.Steps[0].GetEnv()) // Make test deterministic.
-	if err := checkBuild(b, &pb.Build{
-		Steps: []*pb.BuildStep{{
-			Name:   "ubuntu",
-			Script: []string{"echo hello"},
-			Env: []string{
-				"BRANCH_NAME=my-branch",
-				"BUILD_ID=build-id",
-				"COMMIT_SHA=abcdefg1234567",
-				"FOO=foo",
-				"PROJECT_ID=my-project",
-				"REPO_NAME=new-repo-name",
-				"REVISION_ID=abcdefg1234567",
-				"SHORT_SHA=abcdefg",
-				"TAG_NAME=",
-			},
-		}},
-	}); err != nil {
-		t.Error(err)
 	}
 }

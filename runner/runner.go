@@ -18,41 +18,99 @@ package runner
 import (
 	"context"
 	"io"
+	"io/ioutil"
 	"log"
+	"os"
 	"os/exec"
+	"sync"
 )
 
 // Runner is a mockable interface for running os commands.
 type Runner interface {
-	Run(ctx context.Context, args []string, in io.Reader, out, err io.Writer) error
+	Run(ctx context.Context, args []string, in io.Reader, out, err io.Writer, dir string) error
+	MkdirAll(dir string) error
+	WriteFile(path, contents string) error
+	Clean() error
 }
 
 // RealRunner runs actual os commands.  Tests can define a mocked alternative.
 type RealRunner struct {
 	DryRun    bool
+	mu        sync.Mutex
+	processes map[int]*os.Process
 }
 
 // Run runs a command.
-func (r *RealRunner) Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) error {
+func (r *RealRunner) Run(ctx context.Context, args []string, in io.Reader, out, err io.Writer, dir string) error {
 	if r.DryRun {
 		log.Printf("RUNNER - %v", args)
 		return nil
 	}
 
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
-	cmd.Stdin = stdin
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
+	cmd := exec.Command(args[0], args[1:]...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	cmd.Stdin = in
+	cmd.Stdout = out
+	cmd.Stderr = err
 
-  err := cmd.Run()
-
-	// If the context is canceled or times out, return error from the context
-	// instead of the command. The command error will be `signal: killed` which
-	// isn't very useful.
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
+	if err := cmd.Start(); err != nil {
 		return err
 	}
+
+	// If the process is started, store it until it completes (defer).
+	r.mu.Lock()
+	if r.processes == nil {
+		r.processes = map[int]*os.Process{}
+	}
+	r.processes[cmd.Process.Pid] = cmd.Process
+	r.mu.Unlock()
+	defer func(pid int) {
+		r.mu.Lock()
+		delete(r.processes, pid)
+		r.mu.Unlock()
+	}(cmd.Process.Pid)
+
+	errCh := make(chan error)
+	go func() {
+		errCh <- cmd.Wait()
+	}()
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+		// Make an effort to kill the running process, but don't block on it.
+		go func() {
+			if err := cmd.Process.Kill(); err != nil {
+				log.Printf("RUNNER failed to kill running process `%v %v`: %v", cmd.Path, cmd.Args, err)
+			}
+		}()
+		return ctx.Err()
+	}
+}
+
+// MkdirAll calls MkdirAll.
+func (r *RealRunner) MkdirAll(dir string) error {
+	return os.MkdirAll(dir, 0755)
+}
+
+// WriteFile writes a text file to disk.
+func (r *RealRunner) WriteFile(path, contents string) error {
+	// Note: os.Create uses mode=0666.
+	return ioutil.WriteFile(path, []byte(contents), 0666)
+}
+
+// Clean kills running processes.
+func (r *RealRunner) Clean() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for pid, p := range r.processes {
+		if err := p.Kill(); err != nil {
+			return err
+		}
+		delete(r.processes, pid)
+	}
+	return nil
 }

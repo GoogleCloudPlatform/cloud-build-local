@@ -61,7 +61,7 @@ func startsWith(arr []string, parts ...string) bool {
 	return true
 }
 
-func (r *mockRunner) Run(ctx context.Context, args []string, in io.Reader, out, err io.Writer) error {
+func (r *mockRunner) Run(ctx context.Context, args []string, in io.Reader, out, err io.Writer, _ string) error {
 	r.mu.Lock()
 	r.commands = append(r.commands, strings.Join(args, " "))
 	r.mu.Unlock()
@@ -72,6 +72,18 @@ func (r *mockRunner) Run(ctx context.Context, args []string, in io.Reader, out, 
 		fmt.Fprintln(out, listIds)
 	}
 
+	return nil
+}
+
+func (r *mockRunner) MkdirAll(dir string) error {
+	return nil
+}
+
+func (r *mockRunner) WriteFile(path, contents string) error {
+	return nil
+}
+
+func (r *mockRunner) Clean() error {
 	return nil
 }
 
@@ -156,7 +168,7 @@ func TestClean(t *testing.T) {
 		t.Errorf("Clean failed: %v", err)
 	}
 	got := strings.Join(r.commands, "\n")
-	want := `docker ps -a -q --filter name=step_[0-9]+|cloudbuild_|metadata|docker_token_container
+	want := `docker ps -a -q --filter name=step_[0-9]+|cloudbuild_|metadata
 docker rm -f id1 id2
 docker network ls -q --filter name=cloudbuild
 docker network rm id1 id2
@@ -164,6 +176,57 @@ docker volume ls -q --filter name=homevol|cloudbuild_
 docker volume rm id1 id2`
 	if got != want {
 		t.Errorf("Commands didn't match!\n===Want:\n%s\n===Got:\n%s", want, got)
+	}
+}
+
+func TestRefreshDuration(t *testing.T) {
+	// control time.Now for tests.
+	start := time.Now()
+	was := now
+	now = func() time.Time { return start }
+	defer func() { now = was }()
+
+	for _, tc := range []struct {
+		desc       string
+		expiration time.Time
+		want       time.Duration
+	}{{
+		desc:       "long case",
+		expiration: start.Add(time.Hour),
+		want:       45 * time.Minute,
+	}, {
+		desc:       "short case",
+		expiration: start.Add(4 * time.Minute),
+		want:       3 * time.Minute,
+	}, {
+		desc:       "pretty short",
+		expiration: start.Add(2 * time.Second),
+		want:       time.Second,
+	}, {
+		desc:       "pathologically short",
+		expiration: start.Add(time.Second),
+		want:       time.Duration(0),
+	}, {
+		desc:       "danger, will robinson",
+		expiration: start.Add(time.Millisecond),
+		want:       time.Duration(0),
+	}, {
+		desc:       "expired",
+		expiration: start.Add(-1 * time.Minute),
+		want:       time.Duration(0),
+	}, {
+		desc:       "epoch",
+		expiration: time.Time{},
+		want:       time.Duration(0),
+	}, {
+		desc:       "equal",
+		expiration: start,
+		want:       time.Duration(0),
+	}} {
+		got := RefreshDuration(tc.expiration)
+		if got != tc.want {
+			t.Errorf("%s: got %q; want %q", tc.desc, got, tc.want)
+		}
 	}
 }
 
@@ -227,96 +290,16 @@ func TestSubstituteAndValidate(t *testing.T) {
 		},
 		substMap: map[string]string{"PROJECT_ID": "foo", "BUILD_ID": "bar"},
 		wantErr:  true,
-	}, {
-		desc: "unused substitution",
-		build: &pb.Build{
-			Steps: []*pb.BuildStep{{Name: "fred"}},
-		},
-		substMap: map[string]string{"_UNUSED": "unused"},
-		wantErr:  true,
-	}, {
-		desc: "unused substitution allow loose",
-		build: &pb.Build{
-			Steps:   []*pb.BuildStep{{Name: "fred"}},
-			Options: &pb.BuildOptions{SubstitutionOption: pb.BuildOptions_ALLOW_LOOSE},
-		},
-		substMap: map[string]string{"_UNUSED": "unused"},
-		want:     map[string]string{"_UNUSED": "unused"},
 	}} {
-		t.Run(tc.desc, func(t *testing.T) {
-			err := SubstituteAndValidate(tc.build, tc.substMap)
-			if err != nil && !tc.wantErr {
-				t.Errorf("Got an unexpected error: %v", err)
-			}
-			if err == nil && tc.wantErr {
-				t.Error("Should have returned an error")
-			}
-			if got := tc.build.Substitutions; err == nil && !reflect.DeepEqual(got, tc.want) {
-				t.Errorf("%s: got %q; want %q", tc.desc, got, tc.want)
-			}
-		})
-	}
-}
-
-// TestSubstituteAndValidateArtifacts that SubstituteAndValidate behavior for artifacts
-// works as intended, and is a regression check on b/134590940.
-func TestSubstituteAndValidateArtifacts(t *testing.T) {
-	for _, tc := range []struct {
-		name     string
-		build    *pb.Build
-		substMap map[string]string
-		wantErr  bool
-	}{{
-		name: "empty substitutions",
-		build: &pb.Build{
-			Steps:         []*pb.BuildStep{{Name: "ubuntu"}},
-			Substitutions: make(map[string]string),
-			Artifacts: &pb.Artifacts{
-				Objects: &pb.Artifacts_ArtifactObjects{
-					Location: "gs://some-bucket",
-					Paths:    []string{"doesnotmatter"},
-				},
-			},
-		},
-	}, {
-		name: "substitutions for artifact fields",
-		build: &pb.Build{
-			Steps: []*pb.BuildStep{{Name: "ubuntu"}},
-			Substitutions: map[string]string{
-				"_LOCATION": "gs://some-bucket",
-				"_PATH":     "doesnotmatter",
-			},
-			Artifacts: &pb.Artifacts{
-				Objects: &pb.Artifacts_ArtifactObjects{
-					Location: "$_LOCATION",
-					Paths:    []string{"$_PATH"},
-				},
-			},
-		},
-	}, {
-		name: "substitution values for artifact.location field is invalid",
-		build: &pb.Build{
-			Steps: []*pb.BuildStep{{Name: "ubuntu"}},
-			Substitutions: map[string]string{
-				"_LOCATION": "some-bucket", // not prefixed with gs://
-			},
-			Artifacts: &pb.Artifacts{
-				Objects: &pb.Artifacts_ArtifactObjects{
-					Location: "$_LOCATION",
-					Paths:    []string{"doesnotmatter"},
-				},
-			},
-		},
-		wantErr: true,
-	}} {
-		t.Run(tc.name, func(t *testing.T) {
-			err := SubstituteAndValidate(tc.build, tc.substMap)
-			if err != nil && !tc.wantErr {
-				t.Errorf("Got an unexpected error: %v", err)
-			}
-			if err == nil && tc.wantErr {
-				t.Error("Should have returned an error")
-			}
-		})
+		err := SubstituteAndValidate(tc.build, tc.substMap)
+		if err != nil && !tc.wantErr {
+			t.Errorf("Got an unexpected error: %v", err)
+		}
+		if err == nil && tc.wantErr {
+			t.Error("Should have returned an error")
+		}
+		if got := tc.build.Substitutions; err == nil && !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("%s: got %q; want %q", tc.desc, got, tc.want)
+		}
 	}
 }

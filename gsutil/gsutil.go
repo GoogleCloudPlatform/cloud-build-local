@@ -90,7 +90,7 @@ func (g RealHelper) VerifyBucket(ctx context.Context, bucket string) error {
 		"--network", "cloudbuild",
 		"gcr.io/cloud-builders/gsutil", "ls", bucket}
 
-	if err := g.runner.Run(ctx, args, nil, ioutil.Discard, ioutil.Discard); err == ctx.Err() {
+	if err := g.runner.Run(ctx, args, nil, ioutil.Discard, ioutil.Discard, ""); err == ctx.Err() {
 		return err
 	}
 	// Running 'ls' on a bucket that doesn't exist or has an invalid GCS URL will return an error.
@@ -165,6 +165,7 @@ func (g RealHelper) UploadArtifactsManifest(ctx context.Context, flags DockerFla
 
 	// Remove any trailing forward slash in GCS bucket URL. GCS accepts URLs with or without a trailing slash.
 	// We don't want the path to have a double slash.
+	
 	b := strings.TrimSuffix(bucket, "/")
 	return strings.Join([]string{b, manifest}, "/"), nil
 }
@@ -212,6 +213,7 @@ func (g RealHelper) runGsutil(ctx context.Context, tag string, flags DockerFlags
 		// Set bash entrypoint.
 		// For reasons currently unknown, a bash entrypoint and a -c parameter is required for wildcarding.
 		// Otherwise, any gsutil arguments with wildcards will not expand. Enclosing the source in single quotes does not help.
+		
 		"--entrypoint", "bash"}
 	if flags.Tmpdir != "" {
 		// Mount the temporary directory.
@@ -231,6 +233,8 @@ func (g RealHelper) runGsutil(ctx context.Context, tag string, flags DockerFlags
 // getGeneration takes a GCS object URL as input and returns the URL with the generation number suffixed.
 func (g RealHelper) getGeneration(ctx context.Context, flags DockerFlags, url string) (string, error) {
 	
+	// If we uploaded a large amount of artifacts, we'd have to call this many times to get the generations of all these files.
+	// Moreover, if we wait after upload to check all the file generations, it's possible that the file can change.
 
 	// List existing object with generation number information.
 	// See https://cloud.google.com/storage/docs/gsutil/commands/ls.
@@ -313,7 +317,7 @@ func (g RealHelper) parseGsutilManifest(manifestPath string) ([]*pb.ArtifactResu
 	return artifacts, nil
 }
 
-// runAndScrape executes the command and returns the output (stdin, stderr), with or without logging.
+
 func (g RealHelper) runWithOptionalLogging(ctx context.Context, hasLogging bool, tag string, cmd []string) (string, error) {
 	var buf bytes.Buffer
 	outWriter := io.Writer(&buf)
@@ -324,6 +328,6 @@ func (g RealHelper) runWithOptionalLogging(ctx context.Context, hasLogging bool,
 		errWriter = io.MultiWriter(g.logger.MakeWriter(tag, -1, false), &buf)
 	}
 
-	err := g.runner.Run(ctx, cmd, nil, outWriter, errWriter)
+	err := g.runner.Run(ctx, cmd, nil, outWriter, errWriter, "")
 	return buf.String(), err
 }

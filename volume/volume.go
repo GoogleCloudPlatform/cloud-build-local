@@ -50,7 +50,7 @@ func New(name string, r runner.Runner) *Volume {
 // copy data to the volume.
 func (v *Volume) Setup(ctx context.Context) error {
 	cmd := []string{"docker", "volume", "create", "--name", v.name}
-	return v.runner.Run(ctx, cmd, nil, nil, nil)
+	return v.runner.Run(ctx, cmd, nil, nil, nil, "")
 }
 
 func (v *Volume) getHelperContainer(ctx context.Context) (string, error) {
@@ -59,7 +59,7 @@ func (v *Volume) getHelperContainer(ctx context.Context) (string, error) {
 	if !v.createdHelper {
 		volume := fmt.Sprintf("%s:%s", v.name, workspaceDir)
 		cmd := []string{"docker", "run", "-v", volume, "--name", v.helper, "busybox"}
-		if err := v.runner.Run(ctx, cmd, nil, nil, nil); err != nil {
+		if err := v.runner.Run(ctx, cmd, nil, nil, nil, ""); err != nil {
 			return "", err
 		}
 		v.createdHelper = true
@@ -76,7 +76,7 @@ func (v *Volume) Copy(ctx context.Context, dir string) error {
 
 	helperVol := fmt.Sprintf("%s:%s", helper, workspaceDir)
 	cmd := []string{"docker", "cp", dir, helperVol}
-	return v.runner.Run(ctx, cmd, nil, nil, nil)
+	return v.runner.Run(ctx, cmd, nil, nil, nil, "")
 }
 
 // Export copies files from a docker volume to a directory.
@@ -88,7 +88,7 @@ func (v *Volume) Export(ctx context.Context, dir string) error {
 
 	helperVol := fmt.Sprintf("%s:%s", helper, workspaceDir)
 	cmd := []string{"docker", "cp", helperVol, dir}
-	return v.runner.Run(ctx, cmd, nil, nil, nil)
+	return v.runner.Run(ctx, cmd, nil, nil, nil, "")
 }
 
 // Close cleans up the helper container and the docker volume.
@@ -106,10 +106,10 @@ func (v *Volume) Close(ctx context.Context) error {
 
 func (v *Volume) deleteHelper(ctx context.Context) error {
 	cmd := []string{"docker", "rm", v.helper}
-	return v.runner.Run(ctx, cmd, nil, nil, nil)
+	return v.runner.Run(ctx, cmd, nil, nil, nil, "")
 }
 
 func (v *Volume) deleteVolume(ctx context.Context) error {
 	cmd := []string{"docker", "volume", "rm", v.name}
-	return v.runner.Run(ctx, cmd, nil, nil, nil)
+	return v.runner.Run(ctx, cmd, nil, nil, nil, "")
 }
