@@ -152,9 +152,10 @@ func run(ctx context.Context, source string) error {
 	// This command uses a runner without dryrun to return the real project.
 	projectInfo, err := gcloud.ProjectInfo(ctx, &runner.RealRunner{})
 	if err != nil {
-		return fmt.Errorf("Error getting project information from gcloud: %v", err)
+		log.Printf("Warning: Could not get project information from gcloud: %v", err)
+	} else {
+		buildConfig.ProjectId = projectInfo.ProjectID
 	}
-	buildConfig.ProjectId = projectInfo.ProjectID
 
 	substMap := make(map[string]string)
 	if *substitutions != "" {
