@@ -5,6 +5,10 @@ allowing easier debugging, execution of builds on your own hardware, and integra
 local build and test workflows. *Please note that the Local Builder is not 100%
 feature-compatible with the hosted GCB service.*
 
+**NOTE: The Cloud Build local builder is maintained at best effort as a local debugging
+tool for Cloud Build. It does not support 100% feature parity with the hosted Cloud Build
+service and should not be used for production workloads.**
+
 --------------------------------------------------------------------------------
 
 ## Prerequisites
