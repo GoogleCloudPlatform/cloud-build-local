@@ -1,9 +1,9 @@
 # Google Cloud Build Local Builder
 
-**Local Builder** runs [Google Cloud Build] locally, allowing easier debugging,
-execution of builds on your own hardware, and integration into local build and
-test workflows.
-
+**Local Builder** runs [Google Cloud Build](https://cloud.google.com/cloud-build/) locally,
+allowing easier debugging, execution of builds on your own hardware, and integration into
+local build and test workflows. *Please note that the Local Builder is not 100%
+feature-compatible with the hosted GCB service.*
 
 --------------------------------------------------------------------------------
 
@@ -77,7 +77,7 @@ See the
 Our documentation has a [page on getting
 support](https://cloud.google.com/cloud-build/docs/getting-support). If you have
 general questions about Local Builder or Cloud Build, you can file issues here
-on GitHub, email `google-cloud-dev@googlegroups.com`, or join our.
+on GitHub, or see:
 
 * [Google Cloud Build documentation](http://cloud.google.com/cloud-build/)
 * [Slack channel](https://googlecloud-community.slack.com/messages/C4KCRJL4D/details/)
